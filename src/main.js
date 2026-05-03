@@ -279,12 +279,11 @@ class App {
    * Required by browser autoplay policies.
    */
   _setupAudioInit() {
-    const initAudio = async () => {
+    const initAudio = () => {
       if (this._initialized) return;
-      await this.engine.init();
-      if (this.engine.ctx?.state === 'suspended') {
-        await this.engine.ctx.resume();
-      }
+
+      // Create AudioContext synchronously to preserve user gesture
+      this.engine.initSync();
       this.metronome.init();
       this.creativeMode.init();
       this.playbackEngine?.init();

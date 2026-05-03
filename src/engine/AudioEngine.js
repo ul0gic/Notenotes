@@ -31,11 +31,37 @@ export class AudioEngine {
    */
   async init() {
     if (this._initialized) return;
+    this.initSync();
+  }
+
+  /**
+   * Synchronous init — AudioContext must be created in the same call stack
+   * as the user gesture event for Chrome's autoplay policy.
+   */
+  initSync() {
+    if (this._initialized) return;
 
     this.ctx = new (window.AudioContext || window.webkitAudioContext)({
       sampleRate: 44100,
       latencyHint: 'interactive'
     });
+
+    // Immediately resume if suspended
+    if (this.ctx.state === 'suspended') {
+      this.ctx.resume();
+    }
+
+    // Force-unlock iOS Safari: create a silent oscillator burst
+    // (iOS requires actual AudioContext usage, not just resume())
+    try {
+      const uo = this.ctx.createOscillator();
+      const ug = this.ctx.createGain();
+      ug.gain.value = 0.001;
+      uo.connect(ug);
+      ug.connect(this.ctx.destination);
+      uo.start(0);
+      uo.stop(0.01);
+    } catch (e) { /* non-critical */ }
 
     // Master output chain: source → masterGain → limiter → destination
     this.masterGain = this.ctx.createGain();
