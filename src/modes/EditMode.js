@@ -14,6 +14,19 @@ const DEFAULT_NOTE_HEIGHT = 16;
 const MIN_NOTE_HEIGHT = 8;
 const MAX_NOTE_HEIGHT = 24;
 
+const DRUM_TYPES = [
+  { id: 'kick',   label: 'KICK' },
+  { id: 'snare',  label: 'SNARE' },
+  { id: 'clap',   label: 'CLAP' },
+  { id: 'hihat',  label: 'HI-HAT' },
+  { id: 'cymbal', label: 'CYMBAL' },
+  { id: 'tomlo',  label: 'TOM LO' },
+  { id: 'tommid', label: 'TOM MID' },
+  { id: 'tomhi',  label: 'TOM HI' },
+  { id: 'rim',    label: 'RIM' },
+  { id: 'shaker', label: 'SHAKER' },
+];
+
 export class EditMode {
   constructor(transport, undoManager, store, project) {
     this.transport = transport;
@@ -100,11 +113,21 @@ export class EditMode {
 
   _renderEditor() {
     this._panes = [];
+    const isDrum = this._snippet.type === 'drum';
+    if (isDrum) {
+      this._pitchMin = 0;
+      this._pitchMax = DRUM_TYPES.length;
+      this._noteHeight = DEFAULT_NOTE_HEIGHT;
+    } else {
+      this._pitchMin = 36;
+      this._pitchMax = 84;
+      this.el.style.setProperty('--note-height', `${this._noteHeight}px`);
+    }
 
     const toolbar = document.createElement('div');
     toolbar.className = 'edit-toolbar';
     const noteCount = (this._snippet.notes?.length || 0) + (this._snippet.hits?.length || 0);
-    toolbar.innerHTML = this._buildToolbarHTML(noteCount);
+    toolbar.innerHTML = this._buildToolbarHTML(noteCount, isDrum);
     this.el.appendChild(toolbar);
 
     if (this._splitMode) {
@@ -127,29 +150,10 @@ export class EditMode {
     this._bindEvents(toolbar);
   }
 
-  _buildToolbarHTML(noteCount) {
+  _buildToolbarHTML(noteCount, isDrum) {
     const pitchMinOct = Math.floor(this._pitchMin / 12) - 1;
     const pitchMaxOct = Math.floor(this._pitchMax / 12) - 1;
-
-    return `
-      <div class="edit-toolbar__group">
-        <input type="text" class="edit-toolbar__name-input" id="edit-snippet-name" value="${this._snippet.name || 'Snippet'}" placeholder="Snippet name" title="Edit snippet name" style="background:var(--surface-2);color:var(--text-primary);border:1px solid var(--surface-3);border-radius:4px;padding:2px 6px;font-size:var(--font-size-sm);font-weight:var(--font-weight-medium);outline:none;max-width:120px;" />
-        <span class="edit-toolbar__value">${noteCount} notes</span>
-      </div>
-      <div class="edit-toolbar__group">
-        <span class="edit-toolbar__label">Grid</span>
-        <select class="edit-toolbar__select" id="edit-grid-select" aria-label="Grid size">
-          <option value="480" ${this._gridSize === 480 ? 'selected' : ''}>1/4</option>
-          <option value="240" ${this._gridSize === 240 ? 'selected' : ''}>1/8</option>
-          <option value="120" ${this._gridSize === 120 ? 'selected' : ''}>1/16</option>
-          <option value="960" ${this._gridSize === 960 ? 'selected' : ''}>1/2</option>
-        </select>
-      </div>
-      <div class="edit-toolbar__group">
-        <span class="edit-toolbar__label">Zoom</span>
-        <button class="btn btn--ghost" id="edit-zoom-out" style="min-height:26px;padding:0 6px;font-size:0.7rem;" title="Vertical zoom out">-</button>
-        <button class="btn btn--ghost" id="edit-zoom-in" style="min-height:26px;padding:0 6px;font-size:0.7rem;" title="Vertical zoom in">+</button>
-      </div>
+    const rangeHTML = isDrum ? '' : `
       <div class="edit-toolbar__group">
         <span class="edit-toolbar__label">Range</span>
         <select class="edit-toolbar__select" id="edit-oct-low" aria-label="Low octave">
@@ -160,16 +164,44 @@ export class EditMode {
           ${[2,3,4,5,6].map(o => `<option value="${o}" ${pitchMaxOct === o ? 'selected' : ''}>C${o}</option>`).join('')}
         </select>
       </div>
+    `;
+    const zoomHTML = isDrum ? '' : `
+      <div class="edit-toolbar__group">
+        <span class="edit-toolbar__label">Zoom</span>
+        <button class="btn btn--ghost" id="edit-zoom-out" style="min-height:26px;padding:0 6px;font-size:0.7rem;" title="Vertical zoom out">-</button>
+        <button class="btn btn--ghost" id="edit-zoom-in" style="min-height:26px;padding:0 6px;font-size:0.7rem;" title="Vertical zoom in">+</button>
+      </div>
+    `;
+
+    return `
+      <div class="edit-toolbar__group">
+        <input type="text" class="edit-toolbar__name-input" id="edit-snippet-name" value="${this._snippet.name || 'Snippet'}" placeholder="Snippet name" title="Edit snippet name" style="background:var(--surface-2);color:var(--text-primary);border:1px solid var(--surface-3);border-radius:4px;padding:2px 6px;font-size:var(--font-size-sm);font-weight:var(--font-weight-medium);outline:none;max-width:100px;" />
+        <button class="btn btn--ghost" id="edit-double-btn" style="font-size:0.65rem;min-height:22px;padding:0 5px;" title="Double snippet length">2x</button>
+        <button class="btn btn--ghost" id="edit-half-btn" style="font-size:0.65rem;min-height:22px;padding:0 5px;" title="Halve snippet length">½</button>
+        <span class="edit-toolbar__value">${noteCount} ${isDrum ? 'hits' : 'notes'}</span>
+      </div>
+      <div class="edit-toolbar__group">
+        <span class="edit-toolbar__label">Grid</span>
+        <select class="edit-toolbar__select" id="edit-grid-select" aria-label="Grid size">
+          <option value="480" ${this._gridSize === 480 ? 'selected' : ''}>1/4</option>
+          <option value="240" ${this._gridSize === 240 ? 'selected' : ''}>1/8</option>
+          <option value="120" ${this._gridSize === 120 ? 'selected' : ''}>1/16</option>
+          <option value="960" ${this._gridSize === 960 ? 'selected' : ''}>1/2</option>
+        </select>
+      </div>
+      ${zoomHTML}
+      ${rangeHTML}
       <button class="btn btn--ghost${this._splitMode ? ' is-active' : ''}" id="edit-split-btn" style="font-size:0.7rem;min-height:26px;padding:2px 8px;" title="Split view">Split</button>
       <div class="edit-toolbar__spacer"></div>
       <div class="edit-toolbar__group">
-        <button class="btn btn--ghost" id="edit-delete-btn" style="font-size:0.7rem;min-height:26px;padding:2px 8px;">Delete Note</button>
+        <button class="btn btn--ghost" id="edit-delete-btn" style="font-size:0.7rem;min-height:26px;padding:2px 8px;">Delete ${isDrum ? 'Hit' : 'Note'}</button>
       </div>
     `;
   }
 
   _renderRollPane(pitchMin, pitchMax, paneId) {
     const pitchRange = pitchMax - pitchMin;
+    const isDrum = this._snippet?.type === 'drum';
 
     const paneEl = document.createElement('div');
     paneEl.className = 'piano-roll-pane';
@@ -177,13 +209,18 @@ export class EditMode {
 
     const keysEl = this._renderKeysForRange(pitchMin, pitchMax);
     keysEl.dataset.pane = paneId;
+    if (isDrum) {
+      keysEl.style.setProperty('--note-height', `calc(100% / ${pitchRange})`);
+    }
     paneEl.appendChild(keysEl);
 
     const gridWrapper = document.createElement('div');
     gridWrapper.style.cssText = 'flex:1;display:flex;flex-direction:column;overflow:hidden;';
 
-    const ruler = this._renderRuler();
-    gridWrapper.appendChild(ruler);
+    if (!isDrum) {
+      const ruler = this._renderRuler();
+      gridWrapper.appendChild(ruler);
+    }
 
     const gridContainer = document.createElement('div');
     gridContainer.className = 'piano-roll__grid-container';
@@ -200,21 +237,16 @@ export class EditMode {
     });
 
     const result = {
-      el: paneEl,
-      paneId,
-      pitchMin,
-      pitchMax,
-      pitchRange,
-      keysEl,
-      gridContainer,
-      gridEl,
+      el: paneEl, paneId, pitchMin, pitchMax, pitchRange, keysEl, gridContainer, gridEl,
     };
 
-    requestAnimationFrame(() => {
-      const midScroll = (pitchRange * this._noteHeight) / 2 - gridContainer.clientHeight / 2;
-      gridContainer.scrollTop = Math.max(0, midScroll);
-      keysEl.scrollTop = gridContainer.scrollTop;
-    });
+    if (!isDrum) {
+      requestAnimationFrame(() => {
+        const midScroll = (pitchRange * this._noteHeight) / 2 - gridContainer.clientHeight / 2;
+        gridContainer.scrollTop = Math.max(0, midScroll);
+        keysEl.scrollTop = gridContainer.scrollTop;
+      });
+    }
 
     return result;
   }
@@ -222,15 +254,21 @@ export class EditMode {
   _renderKeysForRange(pitchMin, pitchMax) {
     const el = document.createElement('div');
     el.className = 'piano-roll__keys';
+    const isDrum = this._snippet?.type === 'drum';
 
-    let html = '';
-    for (let pitch = pitchMax - 1; pitch >= pitchMin; pitch--) {
-      const info = midiToNoteName(pitch);
-      const isBlack = info.name.includes('#');
-      const isC = info.name === 'C';
-      const cls = isBlack ? 'piano-roll__key--black' : 'piano-roll__key--white';
-      const cCls = isC ? ' piano-roll__key--c' : '';
-      html += `<div class="piano-roll__key ${cls}${cCls}" data-pitch="${pitch}">${info.display}</div>`;
+    let html = isDrum ? '' : '<div style="height:20px;flex-shrink:0;"></div>';
+    for (let row = pitchMax - 1; row >= pitchMin; row--) {
+      if (isDrum) {
+        const dt = DRUM_TYPES[row] || { label: '?' };
+        html += `<div class="piano-roll__key piano-roll__key--white piano-roll__key--drum" data-pitch="${row}">${dt.label}</div>`;
+      } else {
+        const info = midiToNoteName(row);
+        const isBlack = info.name.includes('#');
+        const isC = info.name === 'C';
+        const cls = isBlack ? 'piano-roll__key--black' : 'piano-roll__key--white';
+        const cCls = isC ? ' piano-roll__key--c' : '';
+        html += `<div class="piano-roll__key ${cls}${cCls}" data-pitch="${row}">${info.display}</div>`;
+      }
     }
     el.innerHTML = html;
     return el;
@@ -263,25 +301,33 @@ export class EditMode {
     const duration = this._snippet.durationTicks || (480 * 4);
     const width = duration * TICK_WIDTH;
     const pitchRange = pitchMax - pitchMin;
-    const height = pitchRange * this._noteHeight;
+    const isDrum = this._snippet?.type === 'drum';
+    const height = isDrum ? '100%' : `${pitchRange * this._noteHeight}px`;
+    const rowHeight = isDrum ? `calc(100% / ${pitchRange})` : `${this._noteHeight}px`;
 
     const grid = document.createElement('div');
     grid.className = 'piano-roll__grid';
     grid.style.width = `${width}px`;
-    grid.style.height = `${height}px`;
+    grid.style.height = height;
     grid.style.position = 'relative';
     grid.dataset.pane = paneId;
     grid.dataset.pitchMin = pitchMin;
     grid.dataset.pitchMax = pitchMax;
 
     let rowsHtml = '';
-    for (let pitch = pitchMax - 1; pitch >= pitchMin; pitch--) {
-      const info = midiToNoteName(pitch);
-      const isBlack = info.name.includes('#');
-      const isC = info.name === 'C';
-      const cls = isBlack ? ' piano-roll__row--black' : '';
-      const cCls = isC ? ' piano-roll__row--c' : '';
-      rowsHtml += `<div class="piano-roll__row${cls}${cCls}"></div>`;
+    for (let row = pitchMax - 1; row >= pitchMin; row--) {
+      const rowStyle = `height:${rowHeight};`;
+      if (isDrum) {
+        const color = row % 2 === 0 ? 'rgba(175,138,106,0.1)' : 'rgba(175,138,106,0.05)';
+        rowsHtml += `<div class="piano-roll__row" style="${rowStyle}background:${color};"></div>`;
+      } else {
+        const info = midiToNoteName(row);
+        const isBlack = info.name.includes('#');
+        const isC = info.name === 'C';
+        const cls = isBlack ? ' piano-roll__row--black' : '';
+        const cCls = isC ? ' piano-roll__row--c' : '';
+        rowsHtml += `<div class="piano-roll__row${cls}${cCls}" style="${rowStyle}"></div>`;
+      }
     }
     const bgEl = document.createElement('div');
     bgEl.className = 'piano-roll__grid-bg';
@@ -308,6 +354,20 @@ export class EditMode {
   }
 
   _renderNotesForPane(grid, pitchMin, pitchMax) {
+    const isDrum = this._snippet?.type === 'drum';
+
+    if (isDrum) {
+      const hits = this._snippet.hits || [];
+      hits.forEach((hit, idx) => {
+        const typeIdx = DRUM_TYPES.findIndex(d => d.id === hit.type);
+        if (typeIdx >= pitchMin && typeIdx < pitchMax) {
+          const el = this._createHitElementForPane(hit, idx, pitchMax);
+          grid.appendChild(el);
+        }
+      });
+      return;
+    }
+
     const notes = this._snippet.notes || [];
     notes.forEach((note, idx) => {
       if (note.pitch >= pitchMin && note.pitch < pitchMax) {
@@ -374,20 +434,40 @@ export class EditMode {
   }
 
   _createHitElementForPane(hit, idx, pitchMax) {
-    const pitchMap = { kick: 36, snare: 40, clap: 40, hihat: 44, cymbal: 46 };
-    const pitch = pitchMap[hit.type] || 38;
-    const x = hit.startTick * TICK_WIDTH;
-    const y = (pitchMax - 1 - pitch) * this._noteHeight;
+    const isDrum = this._snippet?.type === 'drum';
+    let y, h;
+    if (isDrum) {
+      const typeIdx = DRUM_TYPES.findIndex(d => d.id === hit.type);
+      const pct = 100 / DRUM_TYPES.length;
+      y = `${(DRUM_TYPES.length - 1 - typeIdx) * pct}%`;
+      h = `${pct - 0.5}%`;
+    } else {
+      const pitchMap = { kick: 36, snare: 40, clap: 40, hihat: 44, cymbal: 46 };
+      const pitch = pitchMap[hit.type] || 38;
+      y = `${(pitchMax - 1 - pitch) * this._noteHeight}px`;
+      h = `${this._noteHeight - 2}px`;
+    }
 
+    const x = hit.startTick * TICK_WIDTH;
     const el = document.createElement('div');
     el.className = 'piano-roll__note piano-roll__note--drum';
+    el.dataset.hitIdx = idx;
     el.style.left = `${x}px`;
-    el.style.top = `${y}px`;
-    el.style.width = `${this._noteHeight - 2}px`;
+    el.style.top = y;
+    el.style.height = h;
+    el.style.width = isDrum ? '8px' : `${this._noteHeight - 2}px`;
+    el.style.borderRadius = isDrum ? '4px' : '';
     el.title = hit.type;
 
     el.addEventListener('pointerdown', (e) => {
       e.stopPropagation();
+      if (e.ctrlKey || e.metaKey) {
+        this._selectedNoteIdx = idx;
+        this._deleteSelectedHit();
+        return;
+      }
+      this._selectNote(idx);
+      this._startHitDrag(e, hit, idx, el);
     });
 
     return el;
@@ -396,8 +476,67 @@ export class EditMode {
   _selectNote(idx) {
     this._selectedNoteIdx = idx;
     this.el.querySelectorAll('.piano-roll__note').forEach(n => {
-      n.classList.toggle('is-selected', parseInt(n.dataset.noteIdx) === idx);
+      const isSel = n.dataset.noteIdx == idx || n.dataset.hitIdx == idx;
+      n.classList.toggle('is-selected', isSel);
     });
+  }
+
+  _deleteSelectedHit() {
+    if (this._selectedNoteIdx === null || !this._snippet?.hits) return;
+    const hits = this._snippet.hits;
+    if (this._selectedNoteIdx >= hits.length) return;
+    hits.splice(this._selectedNoteIdx, 1);
+    this._selectedNoteIdx = null;
+    this._onEdit('Delete hit');
+    showToast('Hit deleted');
+  }
+
+  _startHitDrag(e, hit, idx, el) {
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const origTick = hit.startTick;
+    const isDrum = this._snippet?.type === 'drum';
+    const origTypeIdx = isDrum ? DRUM_TYPES.findIndex(d => d.id === hit.type) : 0;
+    const rowH = isDrum ? (el.closest('.piano-roll__grid-container')?.clientHeight || 400) / DRUM_TYPES.length : this._noteHeight;
+
+    const onMove = (me) => {
+      const dx = me.clientX - startX;
+      const dy = me.clientY - startY;
+      const deltaTick = Math.round(dx / TICK_WIDTH / this._gridSize) * this._gridSize;
+      const newTick = Math.max(0, origTick + deltaTick);
+      el.style.left = `${newTick * TICK_WIDTH}px`;
+      if (isDrum) {
+        const deltaRow = Math.round(dy / rowH);
+        const newTypeIdx = Math.max(0, Math.min(DRUM_TYPES.length - 1, origTypeIdx - deltaRow));
+        el.style.top = `${(DRUM_TYPES.length - 1 - newTypeIdx) * (100 / DRUM_TYPES.length)}%`;
+      }
+    };
+
+    const onUp = () => {
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+
+      const finalLeft = parseFloat(el.style.left);
+      const newTick = Math.round(finalLeft / TICK_WIDTH / this._gridSize) * this._gridSize;
+
+      if (isDrum) {
+        if (newTick !== origTick) hit.startTick = Math.max(0, newTick);
+        const finalTop = parseFloat(el.style.top);
+        const finalPct = finalTop / (100 / DRUM_TYPES.length);
+        const newTypeIdx = DRUM_TYPES.length - 1 - Math.round(finalPct);
+        const newType = DRUM_TYPES[Math.max(0, Math.min(DRUM_TYPES.length - 1, newTypeIdx))];
+        if (newType && newType.id !== hit.type) {
+          hit.type = newType.id;
+          el.title = newType.id;
+        }
+        if (newTick !== origTick || newType?.id !== hit.type) {
+          this._onEdit('Move hit');
+        }
+      }
+    };
+
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
   }
 
   _paneForPitch(pitch) {
@@ -506,6 +645,16 @@ export class EditMode {
       this._deleteSelectedNote();
     });
 
+    toolbar.querySelector('#edit-double-btn')?.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      this._setDuration(this._snippet ? this._snippet.durationTicks * 2 : 1920);
+    });
+
+    toolbar.querySelector('#edit-half-btn')?.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      this._setDuration(this._snippet ? Math.max(480, Math.floor(this._snippet.durationTicks / 2)) : 960);
+    });
+
     toolbar.querySelector('#edit-zoom-out')?.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       if (this._noteHeight > MIN_NOTE_HEIGHT) {
@@ -560,10 +709,22 @@ export class EditMode {
         const y = e.clientY - rect.top + pane.gridContainer.scrollTop;
 
         const tick = Math.round(x / TICK_WIDTH / this._gridSize) * this._gridSize;
-        const pitch = pane.pitchMax - 1 - Math.floor(y / this._noteHeight);
+        const isDrum = this._snippet?.type === 'drum';
+        let pitch;
+        if (isDrum) {
+          const rowH = pane.gridContainer.clientHeight / DRUM_TYPES.length;
+          pitch = pane.pitchMax - 1 - Math.floor(y / rowH);
+        } else {
+          pitch = pane.pitchMax - 1 - Math.floor(y / this._noteHeight);
+        }
 
         if (pitch >= pane.pitchMin && pitch < pane.pitchMax && tick >= 0) {
-          this._addNote(tick, pitch);
+          if (this._snippet?.type === 'drum') {
+            const drumType = DRUM_TYPES[pitch];
+            if (drumType) this._addHit(tick, drumType.id);
+          } else {
+            this._addNote(tick, pitch);
+          }
         }
       });
     });
@@ -596,8 +757,29 @@ export class EditMode {
     showToast(`Added ${midiToNoteName(pitch).display}`);
   }
 
+  _addHit(startTick, drumType) {
+    if (!this._snippet) return;
+    if (!this._snippet.hits) this._snippet.hits = [];
+
+    const hit = {
+      type: drumType,
+      startTick,
+      velocity: 0.8,
+    };
+
+    this._snippet.hits.push(hit);
+    this._selectedNoteIdx = this._snippet.hits.length - 1;
+    this._onEdit('Add hit');
+    showToast(`Added ${drumType}`);
+  }
+
   _deleteSelectedNote() {
-    if (this._selectedNoteIdx === null || !this._snippet?.notes) return;
+    if (this._selectedNoteIdx === null || !this._snippet) return;
+    if (this._snippet.type === 'drum') {
+      this._deleteSelectedHit();
+      return;
+    }
+    if (!this._snippet.notes) return;
     if (this._selectedNoteIdx >= this._snippet.notes.length) return;
 
     this._snippet.notes.splice(this._selectedNoteIdx, 1);
@@ -613,7 +795,8 @@ export class EditMode {
     const countEl = this.el.querySelector('.edit-toolbar__value');
     if (countEl) {
       const count = (this._snippet.notes?.length || 0) + (this._snippet.hits?.length || 0);
-      countEl.textContent = `${count} notes`;
+      const isDrum = this._snippet?.type === 'drum';
+      countEl.textContent = `${count} ${isDrum ? 'hits' : 'notes'}`;
     }
 
     this.store?.scheduleAutoSave(this.project);
@@ -631,6 +814,35 @@ export class EditMode {
     }
     const ticksPerBeat = 480;
     this._snippet.durationTicks = Math.ceil((maxEnd + ticksPerBeat) / ticksPerBeat) * ticksPerBeat;
+  }
+
+  _setDuration(newDuration) {
+    if (!this._snippet) return;
+    const beats = this.transport?.ticksPerBeat || 480;
+    const durationTicks = Math.max(480, Math.ceil(newDuration / beats) * beats);
+    this._snippet.durationTicks = durationTicks;
+
+    const removed = [];
+    if (this._snippet.notes) {
+      this._snippet.notes = this._snippet.notes.filter(n => {
+        if (n.startTick >= durationTicks) { removed.push('note'); return false; }
+        return true;
+      });
+    }
+    if (this._snippet.hits) {
+      this._snippet.hits = this._snippet.hits.filter(h => {
+        if (h.startTick >= durationTicks) { removed.push('hit'); return false; }
+        return true;
+      });
+    }
+    if (this._selectedNoteIdx !== null && this._selectedNoteIdx >= (this._snippet.notes?.length || 0) + (this._snippet.hits?.length || 0)) {
+      this._selectedNoteIdx = null;
+    }
+
+    this._rebuildAll();
+    this.store?.scheduleAutoSave(this.project);
+    const msg = removed.length ? `${(this._snippet.durationTicks / 480).toFixed(0)} beats · removed ${removed.length}` : `${(this._snippet.durationTicks / 480).toFixed(0)} beats`;
+    showToast(msg);
   }
 
   _rebuildGrids() {

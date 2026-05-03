@@ -147,6 +147,14 @@
   font-weight: var(--font-weight-bold);
 }
 
+.piano-roll__key--drum {
+  background: rgba(175,138,106,0.15) !important;
+  color: #d4a574;
+  font-weight: var(--font-weight-semibold);
+  font-size: 8px;
+  letter-spacing: 0.04em;
+}
+
 /* --- Grid Area --- */
 .piano-roll__grid-container {
   flex: 1;
