@@ -253,6 +253,7 @@ export class CanvasMode {
     el.innerHTML = `
       <span class="canvas-clip__label">${snippetName}</span>
       <div class="canvas-clip__preview">${this._renderClipPreview(clip, w)}</div>
+      ${this._renderModOverlay(clip, w)}
     `;
 
     // Click to select
@@ -301,6 +302,31 @@ export class CanvasMode {
     }
 
     return `<svg width="${width - 4}" height="${height}" style="display:block;">${svgContent}</svg>`;
+  }
+
+  _renderModOverlay(clip, clipWidth) {
+    const mod = clip.snippet?.modulation;
+    if (!mod || mod.length < 2) return '';
+
+    const h = 10;
+    const duration = clip.snippet.durationTicks || 1;
+    let pitchPath = '';
+    let modPath = '';
+
+    for (let i = 0; i < mod.length; i++) {
+      const x = (mod[i].tick / duration) * clipWidth;
+      const py = h - Math.abs(mod[i].pitchBend) * h;
+      const my = h - (mod[i].modulation / 2) * h;
+      const cmd = i === 0 ? 'M' : 'L';
+      pitchPath += `${cmd}${x.toFixed(1)},${py.toFixed(1)} `;
+      modPath += `${cmd}${x.toFixed(1)},${my.toFixed(1)} `;
+    }
+
+    return `
+      <svg class="canvas-clip__mod" width="${clipWidth}" height="${h}" style="position:absolute;bottom:2px;left:0;opacity:0.85;pointer-events:none;">
+        <path d="${pitchPath}" fill="none" stroke="#f0a060" stroke-width="1.5" stroke-linejoin="round"/>
+        <path d="${modPath}" fill="none" stroke="#f060a0" stroke-width="1.5" stroke-linejoin="round"/>
+      </svg>`;
   }
 
   /** Set up drop zone for drag-and-drop from snippet dock */

@@ -21,6 +21,7 @@ import { CanvasMode } from './modes/CanvasMode.js';
 import { EditMode } from './modes/EditMode.js';
 import { SettingsPanel } from './ui/SettingsPanel.js';
 import { PlaybackEngine } from './engine/PlaybackEngine.js';
+import { ModulationManager } from './engine/ModulationManager.js';
 
 class App {
   constructor() {
@@ -35,11 +36,14 @@ class App {
     // UI components
     this.transportBar = new TransportBar(this.transport, this.metronome);
     this.modeTabs = new ModeTabs();
-    this.creativeMode = new CreativeMode(this.engine, this.transport, this.quantizer, this.store, null);
+    this.modManager = new ModulationManager(null);
+    this.creativeMode = new CreativeMode(this.engine, this.transport, this.quantizer, this.store, null, this.modManager);
     this.canvasMode = null; // Created after project load
     this.editMode = null;   // Created after project load
     this.settingsPanel = null; // Created after project load
     this.playbackEngine = null; // Created after project load
+
+    // UI components
 
     this._initialized = false;
   }
@@ -127,12 +131,25 @@ class App {
     // Wire metronome button to also show settings on long-press
     this.transportBar.onSettingsClick = () => this.settingsPanel.toggle();
 
+    // Wire modulation manager to creative mode synth (after synth init)
+    this.modManager._synth = this.creativeMode.synth;
+
+    // Wire pitch/mod display
+    this.modManager.onChange = () => {
+      this.transportBar.setModDisplay(this.modManager.pitchPercent, this.modManager.modPercent);
+    };
+
     this.transportBar.onArpClick = () => {
       this.creativeMode.arpManager.cycleMode();
       this.transportBar.setArpLabel(this.creativeMode.arpManager.mode);
     };
 
     this.transportBar.onKeysClick = () => this._toggleKeysOverlay();
+
+    this.transportBar.onModResetClick = () => {
+      this.modManager.resetAll();
+      this.transportBar.setModDisplay(this.modManager.pitchPercent, this.modManager.modPercent);
+    };
 
     // First user interaction will init audio
     this._setupAudioInit();
@@ -352,6 +369,27 @@ class App {
         const active = this.metronome.toggle();
         document.querySelector('#metronome-toggle')?.classList.toggle('is-active', active);
         showToast(active ? 'Metronome on' : 'Metronome off');
+      }
+
+      // 1/3/4/6/7/9 → Pitch bend / Modulation (hold to ramp)
+      if (e.code.startsWith('Digit') || e.code.startsWith('Numpad')) {
+        const key = e.code.replace('Digit', '').replace('Numpad', '');
+        if (['1','3','4','6','7','9'].includes(key) && !e.repeat) {
+          e.preventDefault();
+          const code = e.code.startsWith('Numpad') ? `Numpad${key}` : key;
+          this.modManager.startRamp();
+          this.modManager.handleKeyDown(code);
+        }
+      }
+    });
+
+    document.addEventListener('keyup', (e) => {
+      if (e.code.startsWith('Digit') || e.code.startsWith('Numpad')) {
+        const key = e.code.replace('Digit', '').replace('Numpad', '');
+        if (['1','3','4','6','7','9'].includes(key)) {
+          const code = e.code.startsWith('Numpad') ? `Numpad${key}` : key;
+          this.modManager.handleKeyUp(code);
+        }
       }
     });
   }

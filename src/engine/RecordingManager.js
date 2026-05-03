@@ -24,6 +24,13 @@ export class RecordingManager {
     /** Drum hits captured (no duration, instant) */
     this._capturedHits = [];
 
+    /** Modulation automation captured */
+    this._capturedMod = [];
+    this._lastModTick = -480;
+
+    /** Reference to mod manager for capturing values */
+    this._modManager = null;
+
     /** Callback when a snippet is created */
     this._onSnippetCreated = null;
 
@@ -38,6 +45,22 @@ export class RecordingManager {
    */
   onSnippetCreated(fn) {
     this._onSnippetCreated = fn;
+  }
+
+  setModManager(mm) {
+    this._modManager = mm;
+  }
+
+  captureModulation() {
+    if (!this.armed || !this._modManager) return;
+    const tick = this._getRelativeTick();
+    if (tick - this._lastModTick < 120) return;
+    this._lastModTick = tick;
+    this._capturedMod.push({
+      tick,
+      pitchBend: this._modManager.pitchBend,
+      modulation: this._modManager.modulation,
+    });
   }
 
   /**
@@ -173,14 +196,15 @@ export class RecordingManager {
       name: `${noteCount} notes`,
       notes: [...this._capturedNotes],
       hits: [...this._capturedHits],
+      modulation: [...this._capturedMod],
       durationTicks: contentTicks,
       bpm: this.transport.bpm,
       timeSignature: { ...this.transport.timeSignature },
     };
 
-    // Clear buffers
     this._capturedNotes = [];
     this._capturedHits = [];
+    this._capturedMod = [];
 
     console.log('[RecordingManager] Snippet created:', snippet.id,
       `${snippet.notes.length} notes, ${snippet.hits.length} hits`);

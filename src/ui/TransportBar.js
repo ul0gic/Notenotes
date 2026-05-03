@@ -19,6 +19,7 @@ export class TransportBar {
     this.onSettingsClick = null;
     this.onArpClick = null;
     this.onKeysClick = null;
+    this.onModResetClick = null;
   }
 
   /**
@@ -62,6 +63,12 @@ export class TransportBar {
       </button>
 
       <div class="transport-bar__spacer"></div>
+
+      <span class="transport-bar__mod" id="mod-display" style="font-size:0.65rem;color:var(--text-tertiary);display:flex;gap:8px;align-items:center;">
+        <span>Pitch <span id="mod-pitch" style="color:var(--accent-light);">0%</span></span>
+        <span>Mod <span id="mod-mod" style="color:var(--accent-light);">0%</span></span>
+        <button id="mod-reset-btn" style="font-size:0.55rem;background:none;border:1px solid var(--surface-3);border-radius:3px;color:var(--text-tertiary);cursor:pointer;padding:0 3px;line-height:1.2;" title="Reset pitch and modulation">↺</button>
+      </span>
 
       <div class="transport-bar__section">
         <div class="metronome-toggle" id="metronome-toggle">
@@ -159,6 +166,13 @@ export class TransportBar {
       e.preventDefault();
       if (this.onKeysClick) this.onKeysClick();
     });
+
+    // Mod reset
+    this.el.querySelector('#mod-reset-btn')?.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (this.onModResetClick) this.onModResetClick();
+    });
   }
 
   setArpLabel(mode) {
@@ -174,6 +188,13 @@ export class TransportBar {
     } else {
       btn.textContent = 'OFF';
     }
+  }
+
+  setModDisplay(pitch, mod) {
+    const p = this.el?.querySelector('#mod-pitch');
+    const m = this.el?.querySelector('#mod-mod');
+    if (p) p.textContent = `${pitch}%`;
+    if (m) m.textContent = `${mod}%`;
   }
 
   _updatePlayButton(state) {

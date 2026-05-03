@@ -10,6 +10,7 @@ import { ScaleBoard } from '../instruments/ScaleBoard.js';
 import { MicroPiano } from '../instruments/MicroPiano.js';
 import { SketchKit } from '../instruments/SketchKit.js';
 import { MicRecorder } from '../instruments/MicRecorder.js';
+import { ControllerMode } from '../instruments/ControllerMode.js';
 import { RecordingManager } from '../engine/RecordingManager.js';
 import { SnippetTray } from '../ui/SnippetTray.js';
 import { LoopProgress } from '../ui/LoopProgress.js';
@@ -22,15 +23,17 @@ const INSTRUMENTS = {
   PIANO: 'piano',
   KIT: 'kit',
   MIC: 'mic',
+  CONTROLLER: 'controller',
 };
 
 export class CreativeMode {
-  constructor(engine, transport, quantizer, store, project) {
+  constructor(engine, transport, quantizer, store, project, modManager) {
     this.engine = engine;
     this.transport = transport;
     this.quantizer = quantizer;
     this.store = store;
     this.project = project;
+    this._modManager = modManager;
     this.el = null;
     this.activeInstrument = INSTRUMENTS.SCALEBOARD;
 
@@ -42,6 +45,7 @@ export class CreativeMode {
     this.microPiano = new MicroPiano(this.synth, this.project);
     this.sketchKit = new SketchKit(this.project);
     this.micRecorder = new MicRecorder();
+    this.controllerMode = new ControllerMode(this.synth, this.project, modManager);
 
     // Recording
     this.recordingManager = new RecordingManager(transport, quantizer);
@@ -61,6 +65,7 @@ export class CreativeMode {
     if (this.scaleBoard) this.scaleBoard.project = p;
     if (this.microPiano) this.microPiano.project = p;
     if (this.sketchKit) this.sketchKit.project = p;
+    if (this.controllerMode) this.controllerMode.project = p;
     if (this.arpManager) this.arpManager.project = p;
     if (this.loopProgress) this.loopProgress.project = p;
   }
@@ -80,6 +85,16 @@ export class CreativeMode {
     this.sketchKit.init();
     this.recordingManager.init();
 
+    if (this._modManager) {
+      this._modManager._synth = this.synth;
+    }
+
+    // Wire modulation capture
+    this.recordingManager.setModManager(this._modManager);
+    this.transport.onTick(() => {
+      this.recordingManager.captureModulation();
+    });
+
     // Wrap synth with arpeggio manager (routes noteOn/noteOff through arp logic)
     this.arpManager.wrapSynth(this.synth);
 
@@ -88,6 +103,7 @@ export class CreativeMode {
     const noteOff = (midi) => this.recordingManager.noteOff(midi);
     this.scaleBoard.setNoteCallbacks(noteOn, noteOff);
     this.microPiano.setNoteCallbacks(noteOn, noteOff);
+    this.controllerMode.setNoteCallbacks(noteOn, noteOff);
     this.sketchKit.setHitCallback((drumName) => this.recordingManager.drumHit(drumName));
 
     // When snippets are created
@@ -162,6 +178,7 @@ export class CreativeMode {
     switcher.id = 'instrument-switcher';
     const tabs = [
       { id: INSTRUMENTS.SCALEBOARD, icon: '🎹', label: 'Scale' },
+      { id: INSTRUMENTS.CONTROLLER, icon: '🎮', label: 'Ctrl' },
       { id: INSTRUMENTS.PIANO, icon: '🎵', label: 'Piano' },
       { id: INSTRUMENTS.KIT, icon: '🥁', label: 'Kit' },
       { id: INSTRUMENTS.MIC, icon: '🎤', label: 'Mic' },
@@ -206,6 +223,7 @@ export class CreativeMode {
       { id: INSTRUMENTS.PIANO, content: this.microPiano.render() },
       { id: INSTRUMENTS.KIT, content: this.sketchKit.render() },
       { id: INSTRUMENTS.MIC, content: this.micRecorder.render() },
+      { id: INSTRUMENTS.CONTROLLER, content: this.controllerMode.render() },
     ];
 
     views.forEach(v => {
@@ -239,7 +257,7 @@ export class CreativeMode {
     });
 
     const patchSel = this.el.querySelector('#patch-selector');
-    const isSynth = id === INSTRUMENTS.SCALEBOARD || id === INSTRUMENTS.PIANO;
+    const isSynth = id === INSTRUMENTS.SCALEBOARD || id === INSTRUMENTS.PIANO || id === INSTRUMENTS.CONTROLLER;
     patchSel.style.display = isSynth ? 'flex' : 'none';
   }
 }
