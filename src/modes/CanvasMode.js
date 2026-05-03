@@ -510,12 +510,75 @@ export class CanvasMode {
 
     // Make items draggable
     dock.querySelectorAll('.canvas-snippet-dock__item').forEach(item => {
+      // Desktop drag
       item.addEventListener('dragstart', (e) => {
         e.dataTransfer.setData('text/snippet-id', item.dataset.snippetId);
         item.classList.add('is-dragging');
       });
       item.addEventListener('dragend', () => {
         item.classList.remove('is-dragging');
+      });
+
+      // iOS touch drag
+      item.addEventListener('touchstart', (e) => {
+        if (e.touches.length !== 1) return;
+        this._touchDrag = {
+          snippetId: item.dataset.snippetId,
+          startX: e.touches[0].clientX,
+          startY: e.touches[0].clientY,
+          el: item,
+        };
+      }, { passive: true });
+
+      item.addEventListener('touchmove', (e) => {
+        if (!this._touchDrag) return;
+        e.preventDefault();
+        const t = e.touches[0];
+        const dx = t.clientX - this._touchDrag.startX;
+        const dy = t.clientY - this._touchDrag.startY;
+        if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+        if (!this._touchDrag.clone) {
+          this._touchDrag.clone = item.cloneNode(true);
+          this._touchDrag.clone.style.cssText = 'position:fixed;z-index:999;opacity:0.8;pointer-events:none;';
+          document.body.appendChild(this._touchDrag.clone);
+        }
+        this._touchDrag.clone.style.left = `${t.clientX - 40}px`;
+        this._touchDrag.clone.style.top = `${t.clientY - 10}px`;
+      });
+
+      item.addEventListener('touchend', (e) => {
+        if (!this._touchDrag) return;
+        if (this._touchDrag.clone) {
+          this._touchDrag.clone.remove();
+          const t = e.changedTouches[0];
+          const el = document.elementFromPoint(t.clientX, t.clientY);
+          const lane = el?.closest('.canvas-lane__content');
+          if (lane) {
+            const trackId = lane.dataset.trackId;
+            const track = this.project?.tracks?.find(tr => tr.id === trackId);
+            const snippet = this.project?.snippets?.find(s => s.id === this._touchDrag.snippetId);
+            if (track && snippet) {
+              const rect = lane.getBoundingClientRect();
+              const scrollLeft = lane.parentElement?.closest('.canvas-tracks')?.scrollLeft || 0;
+              const offsetX = t.clientX - rect.left + scrollLeft;
+              const startBar = Math.max(0, Math.floor(offsetX / this.barWidth));
+              const durationBars = Math.ceil(snippet.durationTicks / this.transport.ticksPerBar) || 1;
+              const clip = {
+                id: crypto.randomUUID(),
+                snippetId: snippet.id,
+                snippet: snippet,
+                startBar,
+                durationBars,
+              };
+              track.clips.push(clip);
+              this.store?.scheduleAutoSave(this.project);
+              this._renderTracks();
+              this._autoSetLoopFromClips();
+              showToast(`Clip added to ${track.name}`);
+            }
+          }
+        }
+        this._touchDrag = null;
       });
     });
   }

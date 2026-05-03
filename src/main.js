@@ -282,14 +282,18 @@ class App {
     const initAudio = () => {
       if (this._initialized) return;
 
-      // Create AudioContext synchronously to preserve user gesture
-      this.engine.initSync();
-      this.metronome.init();
-      this.creativeMode.init();
-      this.playbackEngine?.init();
-      this._initialized = true;
-      showToast('Audio engine ready');
-      console.log('[App] Audio initialized on user gesture.');
+      try {
+        this.engine.initSync();
+        this.metronome.init();
+        this.creativeMode.init();
+        this.playbackEngine?.init();
+        this._initialized = true;
+        showToast('Audio engine ready');
+        console.log('[App] Audio initialized on user gesture.');
+      } catch (e) {
+        console.warn('[App] Audio init failed, will retry:', e);
+        return;
+      }
 
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible' && this.engine.ctx?.state === 'suspended') {
@@ -298,13 +302,24 @@ class App {
       });
     };
 
-    // Listen for first interaction
-    const events = ['pointerdown', 'keydown', 'touchstart'];
+    // Persistent resume handler: iOS may need multiple touches before it accepts one
+    const maybeResume = () => {
+      if (!this._initialized) {
+        initAudio();
+        return;
+      }
+      if (this.engine.ctx?.state === 'suspended') {
+        this.engine.ctx.resume().catch(() => {});
+      }
+    };
+
+    // Listen for first interaction — use touchend on iOS (preferred for audio), pointerdown on desktop
+    const events = ['pointerdown', 'keydown', 'touchstart', 'touchend'];
     const handler = () => {
-      initAudio();
+      maybeResume();
       events.forEach(e => document.removeEventListener(e, handler));
     };
-    events.forEach(e => document.addEventListener(e, handler, { once: false }));
+    events.forEach(e => document.addEventListener(e, handler, { passive: true }));
   }
 
   /**
