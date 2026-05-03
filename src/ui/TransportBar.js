@@ -64,13 +64,13 @@ export class TransportBar {
 
       <div class="transport-bar__spacer"></div>
 
-      <span class="transport-bar__mod" id="mod-display" style="font-size:0.65rem;color:var(--text-tertiary);display:flex;gap:8px;align-items:center;">
-        <span>Pitch <span id="mod-pitch" style="color:var(--accent-light);">0%</span></span>
-        <span>Mod <span id="mod-mod" style="color:var(--accent-light);">0%</span></span>
-        <button id="mod-reset-btn" style="font-size:0.55rem;background:none;border:1px solid var(--surface-3);border-radius:3px;color:var(--text-tertiary);cursor:pointer;padding:0 3px;line-height:1.2;" title="Reset pitch and modulation">↺</button>
-      </span>
+      <div class="transport-bar__more" id="tb-more">
+        <span class="transport-bar__mod" id="mod-display" style="font-size:0.65rem;color:var(--text-tertiary);display:flex;gap:8px;align-items:center;">
+          <span>Pitch <span id="mod-pitch" style="color:var(--accent-light);">0%</span></span>
+          <span>Mod <span id="mod-mod" style="color:var(--accent-light);">0%</span></span>
+          <button id="mod-reset-btn" style="font-size:0.55rem;background:none;border:1px solid var(--surface-3);border-radius:3px;color:var(--text-tertiary);cursor:pointer;padding:0 3px;line-height:1.2;" title="Reset pitch and modulation">↺</button>
+        </span>
 
-      <div class="transport-bar__section">
         <div class="metronome-toggle" id="metronome-toggle">
           <button class="btn btn--icon btn--ghost" id="btn-metronome" title="Metronome" aria-label="Toggle metronome">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -79,14 +79,16 @@ export class TransportBar {
             </svg>
           </button>
         </div>
-        <button class="btn btn--icon btn--ghost" id="btn-keys" title="Keyboard shortcuts" aria-label="Show keyboard shortcuts" style="margin-left:4px;">⌨</button>
-        <button class="btn btn--icon btn--ghost" id="btn-settings" title="Settings" aria-label="Open settings" style="margin-left:4px;">
+        <button class="btn btn--icon btn--ghost" id="btn-keys" title="Keyboard shortcuts" aria-label="Show keyboard shortcuts">⌨</button>
+        <button class="btn btn--icon btn--ghost" id="btn-settings" title="Settings" aria-label="Open settings">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="3"/>
             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
           </svg>
         </button>
       </div>
+
+      <button class="btn btn--icon btn--ghost transport-bar__more-btn" id="tb-more-btn" title="More" aria-label="More options">⋯</button>
     `;
 
     this._beatDots = this.el.querySelectorAll('.beat-indicator__dot');
@@ -172,6 +174,13 @@ export class TransportBar {
       e.preventDefault();
       e.stopPropagation();
       if (this.onModResetClick) this.onModResetClick();
+    });
+
+    // More dropdown toggle
+    this.el.querySelector('#tb-more-btn')?.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      const more = this.el.querySelector('#tb-more');
+      if (more) more.classList.toggle('is-open');
     });
   }
 
