@@ -18,6 +18,7 @@ export class TransportBar {
     this._beatDots = [];
     this.onSettingsClick = null;
     this.onArpClick = null;
+    this.onKeysClick = null;
   }
 
   /**
@@ -71,6 +72,7 @@ export class TransportBar {
             </svg>
           </button>
         </div>
+        <button class="btn btn--icon btn--ghost" id="btn-keys" title="Keyboard shortcuts" aria-label="Show keyboard shortcuts" style="margin-left:4px;">⌨</button>
         <button class="btn btn--icon btn--ghost" id="btn-settings" title="Settings" aria-label="Open settings" style="margin-left:4px;">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="3"/>
@@ -150,6 +152,12 @@ export class TransportBar {
     this.el.querySelector('#btn-arp')?.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       if (this.onArpClick) this.onArpClick();
+    });
+
+    // Keys shortcut reference
+    this.el.querySelector('#btn-keys')?.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      if (this.onKeysClick) this.onKeysClick();
     });
   }
 

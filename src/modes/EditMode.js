@@ -348,8 +348,20 @@ export class EditMode {
 
     el.addEventListener('pointerdown', (e) => {
       e.stopPropagation();
+
+      if (e.ctrlKey || e.metaKey) {
+        this._selectNote(idx);
+        this._deleteSelectedNote();
+        return;
+      }
+
       this._selectNote(idx);
-      this._startNoteDrag(e, note, idx, el);
+
+      if (e.altKey) {
+        this._startNoteResize(e, note, idx, el);
+      } else {
+        this._startNoteDrag(e, note, idx, el);
+      }
     });
 
     const resizeHandle = el.querySelector('.piano-roll__note-resize');
@@ -595,6 +607,7 @@ export class EditMode {
   }
 
   _onEdit(description) {
+    this._updateSnippetDuration();
     this._rebuildGrids();
 
     const countEl = this.el.querySelector('.edit-toolbar__value');
@@ -604,6 +617,20 @@ export class EditMode {
     }
 
     this.store?.scheduleAutoSave(this.project);
+  }
+
+  _updateSnippetDuration() {
+    if (!this._snippet) return;
+    let maxEnd = 480;
+    for (const n of (this._snippet.notes || [])) {
+      const end = n.startTick + n.durationTick;
+      if (end > maxEnd) maxEnd = end;
+    }
+    for (const h of (this._snippet.hits || [])) {
+      if (h.startTick > maxEnd) maxEnd = h.startTick;
+    }
+    const ticksPerBeat = 480;
+    this._snippet.durationTicks = Math.ceil((maxEnd + ticksPerBeat) / ticksPerBeat) * ticksPerBeat;
   }
 
   _rebuildGrids() {

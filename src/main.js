@@ -132,6 +132,8 @@ class App {
       this.transportBar.setArpLabel(this.creativeMode.arpManager.mode);
     };
 
+    this.transportBar.onKeysClick = () => this._toggleKeysOverlay();
+
     // First user interaction will init audio
     this._setupAudioInit();
 
@@ -352,6 +354,46 @@ class App {
         showToast(active ? 'Metronome on' : 'Metronome off');
       }
     });
+  }
+
+  _toggleKeysOverlay() {
+    let overlay = document.getElementById('keys-overlay');
+    if (overlay) {
+      overlay.remove();
+      return;
+    }
+    overlay = document.createElement('div');
+    overlay.id = 'keys-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;display:flex;align-items:center;justify-content:center;pointer-events:auto;';
+    overlay.addEventListener('pointerdown', (e) => {
+      if (e.target === overlay) overlay.remove();
+    });
+    overlay.innerHTML = `
+      <div style="background:var(--surface-1);border:1px solid var(--surface-3);border-radius:8px;padding:var(--space-lg);max-width:360px;width:90%;font-family:var(--font-family);color:var(--text-primary);max-height:80vh;overflow-y:auto;" onclick="event.stopPropagation()">
+        <h3 style="margin:0 0 var(--space-md) 0;font-size:var(--font-size-md);">Keyboard Shortcuts</h3>
+        <table style="width:100%;font-size:var(--font-size-sm);border-collapse:collapse;">
+          <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Space</td><td style="padding:4px 8px;color:var(--text-secondary);">Play / Pause</td></tr>
+          <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Enter</td><td style="padding:4px 8px;color:var(--text-secondary);">Stop</td></tr>
+          <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">R</td><td style="padding:4px 8px;color:var(--text-secondary);">Toggle Recording</td></tr>
+          <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">M</td><td style="padding:4px 8px;color:var(--text-secondary);">Toggle Metronome</td></tr>
+          <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Ctrl+Z</td><td style="padding:4px 8px;color:var(--text-secondary);">Undo</td></tr>
+          <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Ctrl+Shift+Z</td><td style="padding:4px 8px;color:var(--text-secondary);">Redo</td></tr>
+          <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Ctrl+S</td><td style="padding:4px 8px;color:var(--text-secondary);">Save Project</td></tr>
+          <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Delete</td><td style="padding:4px 8px;color:var(--text-secondary);">Delete selected note/clip</td></tr>
+        </table>
+        <hr style="border:none;border-top:1px solid var(--surface-3);margin:var(--space-sm) 0;" />
+        <h4 style="margin:var(--space-sm) 0;font-size:var(--font-size-sm);">Inspect Mode (Piano Roll)</h4>
+        <table style="width:100%;font-size:var(--font-size-sm);border-collapse:collapse;">
+          <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Click</td><td style="padding:4px 8px;color:var(--text-secondary);">Add note / Select note</td></tr>
+          <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Shift+drag</td><td style="padding:4px 8px;color:var(--text-secondary);">Move note (pitch + time)</td></tr>
+          <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Alt+drag</td><td style="padding:4px 8px;color:var(--text-secondary);">Resize note (extend/shrink)</td></tr>
+          <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Ctrl+click</td><td style="padding:4px 8px;color:var(--text-secondary);">Delete note</td></tr>
+          <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Click empty space</td><td style="padding:4px 8px;color:var(--text-secondary);">Add new note</td></tr>
+          <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Scroll</td><td style="padding:4px 8px;color:var(--text-secondary);">Pan pitch range</td></tr>
+        </table>
+      </div>
+    `;
+    document.body.appendChild(overlay);
   }
 }
 

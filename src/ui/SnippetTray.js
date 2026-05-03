@@ -84,7 +84,7 @@ export class SnippetTray {
       const displayName = s.name || autoMeta;
 
       return `
-        <div class="snippet-tray__item" data-id="${s.id}">
+        <div class="snippet-tray__item" data-id="${s.id}" draggable="true">
           <div class="snippet-tray__item-preview">
             ${this._renderMiniPreview(s)}
           </div>
@@ -108,18 +108,33 @@ export class SnippetTray {
       });
     });
 
-    // Bind item selection
+    // Bind item selection (tap only — drag is native HTML5)
     list.querySelectorAll('.snippet-tray__item').forEach(item => {
+      let startX = 0, startY = 0;
+
       item.addEventListener('pointerdown', (e) => {
         if (e.target.closest('.snippet-tray__action-btn')) return;
-        const id = item.dataset.id;
-        const snippet = this.snippets.find(s => s.id === id);
-        if (snippet && this._onSnippetSelected) {
-          this._onSnippetSelected(snippet);
+        startX = e.clientX;
+        startY = e.clientY;
+      });
+
+      item.addEventListener('pointerup', (e) => {
+        if (e.target.closest('.snippet-tray__action-btn')) return;
+        const dx = Math.abs(e.clientX - startX);
+        const dy = Math.abs(e.clientY - startY);
+        if (dx < 5 && dy < 5) {
+          const id = item.dataset.id;
+          const snippet = this.snippets.find(s => s.id === id);
+          if (snippet && this._onSnippetSelected) {
+            this._onSnippetSelected(snippet);
+          }
+          list.querySelectorAll('.snippet-tray__item').forEach(i => i.classList.remove('is-selected'));
+          item.classList.add('is-selected');
         }
-        // Visual selection
-        list.querySelectorAll('.snippet-tray__item').forEach(i => i.classList.remove('is-selected'));
-        item.classList.add('is-selected');
+      });
+
+      item.addEventListener('dragstart', (e) => {
+        e.dataTransfer.setData('text/snippet-id', item.dataset.id);
       });
     });
   }

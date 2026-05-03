@@ -156,7 +156,6 @@
 
 .piano-roll__grid {
   position: relative;
-  min-width: 100%;
 }
 
 /* Grid lines rendered as background */
