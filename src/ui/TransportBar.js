@@ -58,13 +58,12 @@ export class TransportBar {
         <span>BPM</span>
       </div>
 
-      <button class="btn btn--ghost arp-toggle" id="btn-arp" title="Hold/Arpeggio" aria-label="Cycle hold/arpeggio mode" style="min-height:32px;padding:2px 10px;font-size:0.75rem;border-radius:var(--radius-sm);min-width:54px;">
-        OFF
-      </button>
-
       <div class="transport-bar__spacer"></div>
 
       <div class="transport-bar__more" id="tb-more">
+        <button class="btn btn--ghost arp-toggle" id="btn-arp" title="Hold/Arpeggio" aria-label="Cycle hold/arpeggio mode" style="min-height:32px;padding:2px 10px;font-size:0.75rem;border-radius:var(--radius-sm);min-width:54px;">
+          OFF
+        </button>
         <span class="transport-bar__mod" id="mod-display" style="font-size:0.65rem;color:var(--text-tertiary);display:flex;gap:8px;align-items:center;">
           <span>Pitch <span id="mod-pitch" style="color:var(--accent-light);">0%</span></span>
           <span>Mod <span id="mod-mod" style="color:var(--accent-light);">0%</span></span>
