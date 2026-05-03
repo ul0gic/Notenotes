@@ -1,0 +1,396 @@
+/* ============================================================
+   CANVAS MODE — Arranger Timeline
+   ============================================================ */
+
+.canvas-mode {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--surface-0);
+}
+
+/* --- Canvas Toolbar --- */
+.canvas-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-md);
+  background: var(--surface-1);
+  border-bottom: var(--border-subtle);
+  flex-shrink: 0;
+  min-height: 36px;
+}
+
+.canvas-toolbar__group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.canvas-toolbar__label {
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.canvas-toolbar__spacer { flex: 1; }
+
+/* --- Timeline Container --- */
+.canvas-timeline {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+/* --- Time Ruler (top bar numbers) --- */
+.canvas-ruler {
+  display: flex;
+  height: 24px;
+  background: var(--surface-2);
+  border-bottom: var(--border-subtle);
+  flex-shrink: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.canvas-ruler__bar {
+  flex-shrink: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  padding-left: 6px;
+  font-size: 10px;
+  font-weight: var(--font-weight-medium);
+  color: var(--text-tertiary);
+  border-right: 1px solid var(--surface-4);
+  box-sizing: border-box;
+  font-variant-numeric: tabular-nums;
+}
+
+.canvas-ruler__bar:nth-child(4n+1) {
+  color: var(--text-secondary);
+}
+
+/* --- Track Area (scrollable) --- */
+.canvas-tracks {
+  flex: 1;
+  overflow: auto;
+  position: relative;
+}
+
+.canvas-tracks__inner {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  position: relative;
+}
+
+/* --- Individual Track Lane --- */
+.canvas-lane {
+  display: flex;
+  min-height: 72px;
+  border-bottom: 1px solid var(--surface-3);
+  position: relative;
+}
+
+.canvas-lane__header {
+  flex-shrink: 0;
+  width: 140px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--surface-1);
+  border-right: var(--border-subtle);
+  position: sticky;
+  left: 0;
+  z-index: 2;
+}
+
+.canvas-lane__name-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.canvas-lane__name {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  cursor: text;
+}
+
+.canvas-lane__name:hover {
+  color: var(--accent-light);
+}
+
+.canvas-lane__name-input {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  background: var(--surface-3);
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-family: var(--font-family);
+  width: 90px;
+  outline: none;
+}
+
+.canvas-lane__remove-btn {
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: 10px;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out);
+}
+
+.canvas-lane__header:hover .canvas-lane__remove-btn {
+  opacity: 1;
+}
+
+.canvas-lane__remove-btn:hover {
+  color: var(--color-error);
+}
+
+.canvas-lane__instrument {
+  font-size: 10px;
+  font-family: var(--font-family);
+  background: var(--surface-3);
+  border: 1px solid var(--surface-4);
+  border-radius: 3px;
+  color: var(--text-secondary);
+  padding: 1px 3px;
+  cursor: pointer;
+  max-width: 120px;
+  line-height: 1.3;
+}
+
+.canvas-lane__instrument:hover {
+  border-color: var(--accent-dim);
+}
+
+.canvas-lane__controls {
+  display: flex;
+  gap: 4px;
+}
+
+.canvas-lane__ctrl-btn {
+  padding: 1px 6px;
+  font-size: 9px;
+  font-weight: var(--font-weight-bold);
+  background: var(--surface-3);
+  border: none;
+  border-radius: 3px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  font-family: var(--font-family);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition: all var(--duration-fast) var(--ease-out);
+  line-height: 1.4;
+}
+
+.canvas-lane__ctrl-btn:hover {
+  background: var(--surface-4);
+  color: var(--text-secondary);
+}
+
+.canvas-lane__ctrl-btn.is-muted {
+  background: var(--color-mute);
+  color: var(--surface-1);
+}
+
+.canvas-lane__ctrl-btn.is-solo {
+  background: var(--color-warning);
+  color: var(--surface-1);
+}
+
+/* --- Track Content (grid + clips) --- */
+.canvas-lane__content {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent calc(var(--bar-width) - 1px),
+      var(--surface-3) calc(var(--bar-width) - 1px),
+      var(--surface-3) var(--bar-width)
+    );
+}
+
+/* Beat subdivisions within bars */
+.canvas-lane__content::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent calc(var(--beat-width) - 1px),
+      rgba(255,255,255,0.02) calc(var(--beat-width) - 1px),
+      rgba(255,255,255,0.02) var(--beat-width)
+    );
+  pointer-events: none;
+}
+
+/* --- Clip Block --- */
+.canvas-clip {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  border-radius: var(--radius-sm);
+  cursor: grab;
+  transition: box-shadow var(--duration-fast) var(--ease-out);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.1);
+  min-width: 20px;
+}
+
+.canvas-clip:hover {
+  box-shadow: 0 0 12px rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.2);
+}
+
+.canvas-clip.is-selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 16px var(--accent-glow);
+}
+
+.canvas-clip.is-dragging {
+  opacity: 0.7;
+  cursor: grabbing;
+  z-index: 10;
+}
+
+.canvas-clip__label {
+  font-size: 9px;
+  font-weight: var(--font-weight-semibold);
+  padding: 2px 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: rgba(255,255,255,0.8);
+}
+
+.canvas-clip__preview {
+  flex: 1;
+  padding: 2px;
+  opacity: 0.6;
+}
+
+/* --- Playhead --- */
+.canvas-playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--accent-light);
+  z-index: 5;
+  pointer-events: none;
+  box-shadow: 0 0 6px var(--accent-glow-strong);
+  transition: left 50ms linear;
+}
+
+.canvas-playhead::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -4px;
+  width: 10px;
+  height: 8px;
+  background: var(--accent-light);
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+
+/* --- Drop Zone Indicator --- */
+.canvas-lane__content.is-drop-target {
+  background-color: var(--accent-glow);
+}
+
+/* --- Add Track Button --- */
+.canvas-add-track {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  color: var(--text-tertiary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  border: 1px dashed var(--surface-4);
+  margin: var(--space-sm);
+  border-radius: var(--radius-sm);
+  transition: all var(--duration-fast) var(--ease-out);
+  background: transparent;
+  font-family: var(--font-family);
+}
+
+.canvas-add-track:hover {
+  border-color: var(--accent-dim);
+  color: var(--text-secondary);
+  background: var(--accent-glow);
+}
+
+/* --- Snippet Drop Zone (from Creative Mode) --- */
+.canvas-snippet-dock {
+  display: flex;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--surface-1);
+  border-top: var(--border-subtle);
+  flex-shrink: 0;
+  overflow-x: auto;
+  min-height: 52px;
+  align-items: center;
+}
+
+.canvas-snippet-dock__empty {
+  color: var(--text-tertiary);
+  font-size: var(--font-size-xs);
+  font-style: italic;
+  white-space: nowrap;
+}
+
+.canvas-snippet-dock__item {
+  flex-shrink: 0;
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--surface-3);
+  border: 1px solid var(--surface-4);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+  cursor: grab;
+  transition: all var(--duration-fast) var(--ease-out);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.canvas-snippet-dock__item:hover {
+  border-color: var(--accent-dim);
+  background: var(--surface-4);
+}
+
+.canvas-snippet-dock__item.is-dragging {
+  opacity: 0.5;
+}

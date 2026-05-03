@@ -1,0 +1,301 @@
+/* ============================================================
+   EDIT MODE — Piano Roll Note Editor
+   ============================================================ */
+
+.edit-mode {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--surface-0);
+}
+
+/* --- Edit Toolbar --- */
+.edit-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-md);
+  background: var(--surface-1);
+  border-bottom: var(--border-subtle);
+  flex-shrink: 0;
+  min-height: 36px;
+}
+
+.edit-toolbar__group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.edit-toolbar__label {
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.edit-toolbar__value {
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.edit-toolbar__spacer { flex: 1; }
+
+.edit-toolbar__select {
+  background: var(--surface-3);
+  border: var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-family);
+  font-size: var(--font-size-xs);
+  padding: 2px 6px;
+  min-height: 28px;
+}
+
+/* --- No Clip State --- */
+.edit-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: var(--space-md);
+  color: var(--text-tertiary);
+}
+
+.edit-empty__icon {
+  font-size: 48px;
+  opacity: 0.5;
+}
+
+.edit-empty__title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+}
+
+.edit-empty__desc {
+  font-size: var(--font-size-sm);
+  max-width: 300px;
+  text-align: center;
+  line-height: 1.5;
+}
+
+/* --- Piano Roll Container --- */
+.piano-roll {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  position: relative;
+}
+
+/* --- Piano Keys (left sidebar) --- */
+.piano-roll__keys {
+  flex-shrink: 0;
+  width: 48px;
+  overflow-y: hidden;
+  background: var(--surface-1);
+  border-right: var(--border-subtle);
+  z-index: 2;
+}
+
+.piano-roll__key {
+  height: var(--note-height, 16px);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 4px;
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+  border-bottom: 1px solid var(--surface-3);
+  box-sizing: border-box;
+  user-select: none;
+}
+
+.piano-roll__key--white {
+  background: var(--surface-2);
+  color: var(--text-tertiary);
+}
+
+.piano-roll__key--black {
+  background: var(--surface-0);
+  color: var(--text-tertiary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.piano-roll__key--c {
+  color: var(--accent);
+  font-weight: var(--font-weight-bold);
+}
+
+/* --- Grid Area --- */
+.piano-roll__grid-container {
+  flex: 1;
+  overflow: auto;
+  position: relative;
+}
+
+.piano-roll__grid {
+  position: relative;
+  min-width: 100%;
+}
+
+/* Grid lines rendered as background */
+.piano-roll__grid-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.piano-roll__row {
+  height: var(--note-height, 16px);
+  border-bottom: 1px solid var(--surface-3);
+  box-sizing: border-box;
+}
+
+.piano-roll__row--black {
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.piano-roll__row--c {
+  border-bottom: 1px solid var(--surface-5);
+}
+
+/* Beat lines */
+.piano-roll__beat-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--surface-4);
+  pointer-events: none;
+}
+
+.piano-roll__beat-line--bar {
+  background: var(--surface-5);
+  width: 1px;
+}
+
+.piano-roll__beat-line--sub {
+  background: rgba(255,255,255,0.03);
+}
+
+/* --- Note Blocks --- */
+.piano-roll__note {
+  position: absolute;
+  height: calc(var(--note-height, 16px) - 2px);
+  border-radius: 2px;
+  cursor: pointer;
+  transition: box-shadow var(--duration-fast) var(--ease-out);
+  display: flex;
+  align-items: center;
+  padding-left: 3px;
+  font-size: 8px;
+  color: rgba(255,255,255,0.7);
+  white-space: nowrap;
+  overflow: hidden;
+  min-width: 6px;
+  box-sizing: border-box;
+}
+
+.piano-roll__note--midi {
+  background: linear-gradient(135deg, rgba(106,140,175,0.8), rgba(106,140,175,0.5));
+  border: 1px solid rgba(106,140,175,0.6);
+}
+
+.piano-roll__note--drum {
+  background: linear-gradient(135deg, rgba(175,138,106,0.8), rgba(175,138,106,0.5));
+  border: 1px solid rgba(175,138,106,0.6);
+  border-radius: var(--radius-round);
+}
+
+.piano-roll__note:hover {
+  box-shadow: 0 0 8px rgba(106,140,175,0.4);
+  z-index: 3;
+}
+
+.piano-roll__note.is-selected {
+  border-color: var(--accent-light);
+  box-shadow: 0 0 12px var(--accent-glow-strong);
+  z-index: 4;
+}
+
+/* Note resize handle */
+.piano-roll__note-resize {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: ew-resize;
+  background: transparent;
+}
+
+/* --- Velocity Bar (bottom of each note) --- */
+.piano-roll__note-velocity {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--accent);
+  border-radius: 0 0 2px 2px;
+  opacity: 0.6;
+}
+
+/* --- Ghost Notes Preview (from other clips) --- */
+.piano-roll__ghost-note {
+  position: absolute;
+  height: calc(var(--note-height, 16px) - 2px);
+  border-radius: 2px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.05);
+  pointer-events: none;
+}
+
+/* --- Time Ruler (mini, inside the piano roll) --- */
+.piano-roll__ruler {
+  height: 20px;
+  background: var(--surface-2);
+  border-bottom: var(--border-subtle);
+  display: flex;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.piano-roll__ruler-label {
+  position: absolute;
+  font-size: 9px;
+  color: var(--text-tertiary);
+  top: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Velocity Lane (below the piano roll) --- */
+.velocity-lane {
+  height: 48px;
+  background: var(--surface-1);
+  border-top: var(--border-subtle);
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.velocity-lane__bar {
+  position: absolute;
+  bottom: 0;
+  width: 4px;
+  background: var(--accent-dim);
+  border-radius: 2px 2px 0 0;
+  cursor: ns-resize;
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+.velocity-lane__bar:hover {
+  background: var(--accent);
+}
+
+.velocity-lane__bar.is-selected {
+  background: var(--accent-light);
+}

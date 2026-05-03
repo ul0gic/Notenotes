@@ -1,0 +1,19 @@
+{
+  "name": "notenotes",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^8.0.10"
+  },
+  "dependencies": {
+    "abcjs": "^6.6.3",
+    "idb": "^8.0.3",
+    "vite-plugin-pwa": "^1.2.0"
+  }
+}

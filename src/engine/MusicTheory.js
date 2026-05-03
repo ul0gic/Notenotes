@@ -1,0 +1,80 @@
+/**
+ * MusicTheory — Scale definitions, note names, and MIDI utilities.
+ */
+
+/** MIDI note number for C4 (middle C) */
+export const MIDDLE_C = 60;
+
+/** All 12 note names */
+export const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+/** Scale interval patterns (semitones from root) */
+export const SCALES = {
+  major:       { name: 'Major',       intervals: [0, 2, 4, 5, 7, 9, 11] },
+  minor:       { name: 'Minor',       intervals: [0, 2, 3, 5, 7, 8, 10] },
+  pentatonic:  { name: 'Pentatonic',  intervals: [0, 2, 4, 7, 9] },
+  pentatonicMinor: { name: 'Pent. Minor', intervals: [0, 3, 5, 7, 10] },
+  blues:       { name: 'Blues',        intervals: [0, 3, 5, 6, 7, 10] },
+  dorian:      { name: 'Dorian',       intervals: [0, 2, 3, 5, 7, 9, 10] },
+  mixolydian:  { name: 'Mixolydian',   intervals: [0, 2, 4, 5, 7, 9, 10] },
+  chromatic:   { name: 'Chromatic',    intervals: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] }
+};
+
+/**
+ * Convert a MIDI note number to a frequency in Hz.
+ * @param {number} midi - MIDI note number (0–127)
+ * @returns {number} Frequency in Hz
+ */
+export function midiToFreq(midi) {
+  return 440 * Math.pow(2, (midi - 69) / 12);
+}
+
+/**
+ * Get the note name and octave from a MIDI number.
+ * @param {number} midi
+ * @returns {{ name: string, octave: number, display: string }}
+ */
+export function midiToNoteName(midi) {
+  const name = NOTE_NAMES[midi % 12];
+  const octave = Math.floor(midi / 12) - 1;
+  return { name, octave, display: `${name}${octave}` };
+}
+
+/**
+ * Get the root MIDI note for a given note name and octave.
+ * @param {string} noteName - e.g. 'C', 'F#'
+ * @param {number} octave - e.g. 4
+ * @returns {number} MIDI note number
+ */
+export function noteNameToMidi(noteName, octave = 4) {
+  const idx = NOTE_NAMES.indexOf(noteName);
+  if (idx === -1) return MIDDLE_C;
+  return (octave + 1) * 12 + idx;
+}
+
+/**
+ * Generate MIDI notes for a scale at a given root and octave.
+ * @param {string} scaleName - Key in SCALES object
+ * @param {string} rootNote - Note name, e.g. 'C'
+ * @param {number} octave - Base octave
+ * @returns {number[]} Array of MIDI note numbers
+ */
+export function getScaleNotes(scaleName, rootNote, octave = 4) {
+  const scale = SCALES[scaleName];
+  if (!scale) return [];
+  const rootMidi = noteNameToMidi(rootNote, octave);
+  return scale.intervals.map(interval => rootMidi + interval);
+}
+
+/**
+ * Get scale degree label (1–7) for display.
+ * @param {number} index - 0-indexed scale degree
+ * @param {object} scale - Scale definition from SCALES
+ * @returns {string}
+ */
+export function getScaleDegreeLabel(index, scaleName) {
+  const scale = SCALES[scaleName];
+  if (!scale) return String(index + 1);
+  const labels = ['1', '2', '3', '4', '5', '6', '7'];
+  return labels[index % labels.length] || String(index + 1);
+}

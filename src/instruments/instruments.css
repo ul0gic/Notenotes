@@ -1,0 +1,426 @@
+/* ============================================================
+   INSTRUMENTS — Component Styles
+   Scale Board, Micro Piano, Sketch Kit, Mic Recorder
+   ============================================================ */
+
+/* --- Instrument Switcher --- */
+.instrument-switcher {
+  display: flex;
+  gap: 2px;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--surface-1);
+  border-bottom: var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.instrument-switcher__tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-md);
+  min-height: 40px;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-tertiary);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.instrument-switcher__tab:hover {
+  background: var(--surface-3);
+  color: var(--text-secondary);
+}
+
+.instrument-switcher__tab.is-active {
+  background: var(--surface-3);
+  color: var(--accent-light);
+}
+
+/* --- Synth Patch Selector --- */
+.patch-selector {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-md);
+  background: var(--surface-1);
+  border-bottom: var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.patch-selector__label {
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.patch-selector select {
+  background: var(--surface-3);
+  border: var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-family);
+  font-size: var(--font-size-sm);
+  padding: var(--space-xs) var(--space-sm);
+  min-height: 32px;
+}
+
+/* === SCALE BOARD === */
+.scaleboard {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: var(--space-md);
+  gap: var(--space-md);
+}
+
+.scaleboard__controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+  flex-wrap: wrap;
+}
+
+.scaleboard__control-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.scaleboard__label {
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.scaleboard__select {
+  background: var(--surface-3);
+  border: var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-family);
+  font-size: var(--font-size-sm);
+  padding: var(--space-xs) var(--space-sm);
+  min-height: 32px;
+}
+
+.scaleboard__octave {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-left: auto;
+}
+
+.scaleboard__oct-btn {
+  min-width: 36px !important;
+  min-height: 36px !important;
+  font-size: var(--font-size-sm);
+}
+
+.scaleboard__oct-display {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--accent);
+  min-width: 48px;
+  text-align: center;
+}
+
+.scaleboard__pads {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-md);
+  flex: 1;
+  align-content: center;
+}
+
+.scaleboard__pad {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  aspect-ratio: 1;
+  min-height: var(--tap-large);
+  background: var(--surface-3);
+  border: 2px solid var(--surface-5);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+  user-select: none;
+  -webkit-user-select: none;
+  color: var(--text-primary);
+  font-family: var(--font-family);
+}
+
+.scaleboard__pad:hover {
+  background: var(--surface-4);
+  border-color: var(--accent-dim);
+}
+
+.scaleboard__pad.is-active {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  transform: scale(0.94);
+  box-shadow: 0 0 20px var(--accent-glow-strong);
+}
+
+.scaleboard__pad-degree {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+}
+
+.scaleboard__pad-note {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+}
+
+/* === MICRO PIANO === */
+.micropiano {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: var(--space-md);
+  gap: var(--space-md);
+}
+
+.micropiano__controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+}
+
+.micropiano__oct-display {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--accent);
+  min-width: 48px;
+  text-align: center;
+}
+
+.micropiano__keyboard {
+  flex: 1;
+  display: flex;
+  gap: 2px;
+  align-items: stretch;
+  padding: var(--space-md) 0;
+  position: relative;
+}
+
+.micropiano__key {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: var(--space-md);
+  border: none;
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+  user-select: none;
+  -webkit-user-select: none;
+  font-family: var(--font-family);
+  position: relative;
+}
+
+.micropiano__key--white {
+  flex: 1;
+  background: linear-gradient(180deg, #e8e8e8 0%, #d0d0d0 100%);
+  color: var(--surface-2);
+  min-height: 180px;
+  z-index: 1;
+}
+
+.micropiano__key--white:hover {
+  background: linear-gradient(180deg, #f0f0f0 0%, #ddd 100%);
+}
+
+.micropiano__key--white.is-active {
+  background: linear-gradient(180deg, var(--accent) 0%, var(--accent-dim) 100%);
+  transform: scaleY(0.98);
+  transform-origin: top;
+}
+
+.micropiano__key--black {
+  flex: 0.6;
+  background: linear-gradient(180deg, #333 0%, #1a1a1a 100%);
+  color: var(--text-secondary);
+  min-height: 120px;
+  margin: 0 -4px;
+  z-index: 2;
+  border: 1px solid rgba(255,255,255,0.05);
+}
+
+.micropiano__key--black:hover {
+  background: linear-gradient(180deg, #444 0%, #222 100%);
+}
+
+.micropiano__key--black.is-active {
+  background: linear-gradient(180deg, var(--accent-dim) 0%, #444 100%);
+  transform: scaleY(0.97);
+  transform-origin: top;
+}
+
+.micropiano__key-label {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  pointer-events: none;
+}
+
+/* === SKETCH KIT === */
+.sketchkit {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: var(--space-lg);
+  justify-content: center;
+}
+
+.sketchkit__pads {
+  display: flex;
+  gap: var(--space-lg);
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.sketchkit__pad-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.sketchkit__pad {
+  width: 110px;
+  height: 110px;
+  border-radius: var(--radius-xl);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  background: var(--surface-3);
+  border: 2px solid var(--surface-5);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-spring);
+  user-select: none;
+  -webkit-user-select: none;
+  font-family: var(--font-family);
+  color: var(--text-primary);
+}
+
+.sketchkit__pad:hover {
+  background: var(--surface-4);
+  border-color: var(--accent-dim);
+}
+
+.sketchkit__pad.is-active {
+  transform: scale(0.92);
+  border-color: var(--accent);
+  box-shadow: 0 0 24px var(--accent-glow-strong);
+}
+
+.sketchkit__pad--kick.is-active { background: rgba(106, 140, 175, 0.3); }
+.sketchkit__pad--snare.is-active { background: rgba(138, 106, 175, 0.3); }
+.sketchkit__pad--hihat.is-active { background: rgba(175, 138, 106, 0.3); }
+
+.sketchkit__pad-icon {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.sketchkit__pad-label {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+}
+
+.sketchkit__swap-btn {
+  padding: 2px 12px;
+  font-size: var(--font-size-xs);
+  background: var(--surface-2);
+  border: var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+  min-height: 28px;
+  font-family: var(--font-family);
+}
+
+.sketchkit__swap-btn:hover {
+  background: var(--surface-3);
+  color: var(--text-secondary);
+}
+
+/* === MIC RECORDER === */
+.mic-recorder {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: var(--space-lg);
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xl);
+}
+
+.mic-recorder__visual {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.mic-recorder__meter {
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  border: var(--border-subtle);
+}
+
+.mic-recorder__status {
+  font-size: var(--font-size-sm);
+  color: var(--text-tertiary);
+  text-align: center;
+}
+
+.mic-recorder__controls {
+  display: flex;
+  gap: var(--space-md);
+}
+
+.mic-recorder__btn {
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius-round);
+}
+
+/* --- Instrument Container (active instrument view) --- */
+.instrument-container {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+.instrument-view {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+
+.instrument-view.is-active {
+  opacity: 1;
+  pointer-events: auto;
+}
