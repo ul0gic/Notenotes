@@ -325,10 +325,14 @@ html, body {
 }
 
 @media (max-width: 620px) {
+  .transport-bar {
+    padding-right: var(--space-sm);
+  }
+
   .transport-bar__more {
     display: none;
     position: absolute;
-    top: 56px;
+    top: 100%;
     right: var(--space-sm);
     flex-direction: column;
     gap: var(--space-xs);

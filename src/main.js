@@ -282,12 +282,21 @@ class App {
     const initAudio = async () => {
       if (this._initialized) return;
       await this.engine.init();
+      if (this.engine.ctx?.state === 'suspended') {
+        await this.engine.ctx.resume();
+      }
       this.metronome.init();
       this.creativeMode.init();
       this.playbackEngine?.init();
       this._initialized = true;
       showToast('Audio engine ready');
       console.log('[App] Audio initialized on user gesture.');
+
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' && this.engine.ctx?.state === 'suspended') {
+          this.engine.ctx.resume();
+        }
+      });
     };
 
     // Listen for first interaction
