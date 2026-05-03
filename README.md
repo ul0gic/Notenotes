@@ -4,6 +4,15 @@
 
 Notenotes is designed for musicians, producers, and anyone who wants a zero-friction way to capture musical ideas on any device. It runs entirely in the browser using the Web Audio API, stores everything locally via IndexedDB, and works offline as a Progressive Web App.
 
+### Seeing Sound — Design Philosophy
+
+Notenotes is built for visual thinkers and non-traditional musicians who feel friction in standard grid-based DAWs. It treats composition as a spatial, tactile act rather than a programming exercise.
+
+- **Spatial composition.** The Canvas Mode is a workspace you paint into — drag blocks of sound around to visually digest the structure, density, and flow of your track at a glance.
+- **Frictionless translation.** Scale-locked pads and simplified instruments remove the barrier of formal music theory. You don't need to know scales — you just play. The UI bridges the gap between a mental melody and tangible audio.
+- **The interface stays out of the way.** A deep charcoal aesthetic ensures your music blocks stand out while the chrome recedes. The architecture of your ideas takes center stage.
+- **Sketch, don't program.** The fluid loop between playing, capturing, and dragging snippets onto the Canvas feels like scribbling on a notepad — not programming a machine.
+
 ---
 
 ## ✨ Features
