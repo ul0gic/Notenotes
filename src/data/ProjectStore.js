@@ -37,7 +37,11 @@ export function createProject(name = 'Untitled Sketch') {
       masterVolume: 0.8,
       pianoCount: 1,
       pianoKeys: 12,
-      drumPads: 10
+      drumPads: 10,
+      arpRate: '1/8',
+      arpChordType: 'major',
+      arpPattern: 'up',
+      holdDuration: 3000
     }
   };
 }

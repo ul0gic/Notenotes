@@ -6,6 +6,7 @@
 
 import { QuantizeGrid } from '../engine/Quantizer.js';
 import { SheetMusicView } from '../export/SheetMusicView.js';
+import { CHORD_TYPES, ARP_PATTERNS, ARP_RATES } from '../engine/ArpeggioManager.js';
 import { showToast } from './Toast.js';
 
 export class SettingsPanel {
@@ -130,6 +131,38 @@ export class SettingsPanel {
           <div class="settings-row">
             <label class="settings-label">Number of Pads (<span id="setting-drum-display">${this.project?.settings?.drumPads || 10}</span>)</label>
             <input class="settings-range" id="setting-drum-pads" type="range" min="1" max="10" value="${this.project?.settings?.drumPads || 10}" aria-label="Drum kit pad count"/>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <h3 class="settings-group__title">Arpeggio</h3>
+          <div class="settings-row">
+            <label class="settings-label">Rate</label>
+            <select class="settings-select" id="setting-arp-rate" aria-label="Arpeggio rate">
+              ${ARP_RATES.map(r =>
+                `<option value="${r.id}" ${(this.project?.settings?.arpRate || '1/8') === r.id ? 'selected' : ''}>${r.name}</option>`
+              ).join('')}
+            </select>
+          </div>
+          <div class="settings-row">
+            <label class="settings-label">Chord Type</label>
+            <select class="settings-select" id="setting-arp-chord" aria-label="Arpeggio chord type">
+              ${CHORD_TYPES.map(c =>
+                `<option value="${c.id}" ${(this.project?.settings?.arpChordType || 'major') === c.id ? 'selected' : ''}>${c.name}</option>`
+              ).join('')}
+            </select>
+          </div>
+          <div class="settings-row">
+            <label class="settings-label">Pattern</label>
+            <select class="settings-select" id="setting-arp-pattern" aria-label="Arpeggio pattern">
+              ${ARP_PATTERNS.map(p =>
+                `<option value="${p.id}" ${(this.project?.settings?.arpPattern || 'up') === p.id ? 'selected' : ''}>${p.name}</option>`
+              ).join('')}
+            </select>
+          </div>
+          <div class="settings-row">
+            <label class="settings-label">Hold Duration (s)</label>
+            <input class="settings-range" id="setting-hold-dur" type="range" min="1" max="30" value="${(this.project?.settings?.holdDuration || 3000) / 1000}" aria-label="Hold note duration"/>
           </div>
         </div>
 
@@ -297,6 +330,36 @@ export class SettingsPanel {
           this.project.settings.drumPads = count;
           this.store?.scheduleAutoSave(this.project);
           window.dispatchEvent(new CustomEvent('settings-pads-changed'));
+        }
+      });
+
+      // Arpeggio settings
+      body.querySelector('#setting-arp-rate')?.addEventListener('change', (e) => {
+        if (this.project) {
+          this.project.settings.arpRate = e.target.value;
+          this.store?.scheduleAutoSave(this.project);
+        }
+      });
+
+      body.querySelector('#setting-arp-chord')?.addEventListener('change', (e) => {
+        if (this.project) {
+          this.project.settings.arpChordType = e.target.value;
+          this.store?.scheduleAutoSave(this.project);
+        }
+      });
+
+      body.querySelector('#setting-arp-pattern')?.addEventListener('change', (e) => {
+        if (this.project) {
+          this.project.settings.arpPattern = e.target.value;
+          this.store?.scheduleAutoSave(this.project);
+        }
+      });
+
+      body.querySelector('#setting-hold-dur')?.addEventListener('input', (e) => {
+        const secs = Math.max(1, Math.min(30, parseInt(e.target.value, 10) || 3));
+        if (this.project) {
+          this.project.settings.holdDuration = secs * 1000;
+          this.store?.scheduleAutoSave(this.project);
         }
       });
 

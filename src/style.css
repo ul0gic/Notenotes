@@ -276,7 +276,7 @@ html, body {
 }
 
 .transport-bar__bpm input {
-  width: 48px;
+  width: 56px;
   text-align: center;
   background: var(--surface-3);
   border: var(--border-subtle);
@@ -293,6 +293,23 @@ html, body {
   outline: none;
   border-color: var(--accent-dim);
   box-shadow: var(--shadow-glow);
+}
+
+.arp-toggle {
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.arp-toggle.is-hold {
+  color: var(--accent-light);
+  background: var(--surface-3);
+  border-color: var(--accent-dim);
+}
+
+.arp-toggle.is-arp {
+  color: var(--color-record);
+  background: var(--surface-3);
+  border-color: var(--color-record-glow);
+  box-shadow: 0 0 8px var(--color-record-glow);
 }
 
 /* --- Beat Indicator --- */

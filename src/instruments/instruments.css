@@ -315,8 +315,35 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  padding: var(--space-lg);
-  justify-content: center;
+  padding: var(--space-md);
+  gap: var(--space-sm);
+}
+
+.sk-kit-selector {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 0 var(--space-xs);
+  flex-shrink: 0;
+}
+
+.sk-kit-selector__label {
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.sk-kit-selector__select {
+  background: var(--surface-3);
+  border: var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-family);
+  font-size: var(--font-size-sm);
+  padding: var(--space-xs) var(--space-sm);
+  min-height: 32px;
+  flex: 1;
 }
 
 .sketchkit__pads {

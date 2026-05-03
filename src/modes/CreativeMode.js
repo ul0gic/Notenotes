@@ -14,6 +14,7 @@ import { RecordingManager } from '../engine/RecordingManager.js';
 import { SnippetTray } from '../ui/SnippetTray.js';
 import { LoopProgress } from '../ui/LoopProgress.js';
 import { TransportState } from '../engine/Transport.js';
+import { ArpeggioManager, ARP_MODES } from '../engine/ArpeggioManager.js';
 import { showToast } from '../ui/Toast.js';
 
 const INSTRUMENTS = {
@@ -45,6 +46,9 @@ export class CreativeMode {
     // Recording
     this.recordingManager = new RecordingManager(transport, quantizer);
 
+    // Arpeggio
+    this.arpManager = new ArpeggioManager(transport, project);
+
     // UI
     this.snippetTray = new SnippetTray();
     this.loopProgress = new LoopProgress(transport, project);
@@ -57,6 +61,7 @@ export class CreativeMode {
     if (this.scaleBoard) this.scaleBoard.project = p;
     if (this.microPiano) this.microPiano.project = p;
     if (this.sketchKit) this.sketchKit.project = p;
+    if (this.arpManager) this.arpManager.project = p;
     if (this.loopProgress) this.loopProgress.project = p;
   }
 
@@ -74,6 +79,9 @@ export class CreativeMode {
     this.synth.loadPatch(PRESETS.chip_lead);
     this.sketchKit.init();
     this.recordingManager.init();
+
+    // Wrap synth with arpeggio manager (routes noteOn/noteOff through arp logic)
+    this.arpManager.wrapSynth(this.synth);
 
     // Wire up note callbacks for recording
     const noteOn = (midi, vel) => this.recordingManager.noteOn(midi, vel);
@@ -186,6 +194,7 @@ export class CreativeMode {
   _switchInstrument(id) {
     if (id === this.activeInstrument) return;
     this.synth.allNotesOff();
+    this.arpManager.setMode(ARP_MODES.OFF);
     this.activeInstrument = id;
 
     this.el.querySelectorAll('.instrument-switcher__tab').forEach(tab => {

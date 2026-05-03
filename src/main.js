@@ -127,6 +127,11 @@ class App {
     // Wire metronome button to also show settings on long-press
     this.transportBar.onSettingsClick = () => this.settingsPanel.toggle();
 
+    this.transportBar.onArpClick = () => {
+      this.creativeMode.arpManager.cycleMode();
+      this.transportBar.setArpLabel(this.creativeMode.arpManager.mode);
+    };
+
     // First user interaction will init audio
     this._setupAudioInit();
 

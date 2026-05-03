@@ -4,6 +4,7 @@
  */
 
 import { TransportState } from '../engine/Transport.js';
+import { ARP_MODES } from '../engine/ArpeggioManager.js';
 
 export class TransportBar {
   /**
@@ -16,6 +17,7 @@ export class TransportBar {
     this.el = null;
     this._beatDots = [];
     this.onSettingsClick = null;
+    this.onArpClick = null;
   }
 
   /**
@@ -50,9 +52,13 @@ export class TransportBar {
       </div>
 
       <div class="transport-bar__bpm">
-        <input type="number" id="bpm-input" value="${this.transport.bpm}" min="40" max="240" aria-label="BPM" />
+        <input type="number" id="bpm-input" value="${this.transport.bpm}" min="40" max="240" aria-label="BPM" style="width:56px;" />
         <span>BPM</span>
       </div>
+
+      <button class="btn btn--ghost arp-toggle" id="btn-arp" title="Hold/Arpeggio" aria-label="Cycle hold/arpeggio mode" style="min-height:32px;padding:2px 10px;font-size:0.75rem;border-radius:var(--radius-sm);min-width:54px;">
+        OFF
+      </button>
 
       <div class="transport-bar__spacer"></div>
 
@@ -139,6 +145,27 @@ export class TransportBar {
       e.preventDefault();
       if (this.onSettingsClick) this.onSettingsClick();
     });
+
+    // Hold/Arp toggle
+    this.el.querySelector('#btn-arp')?.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      if (this.onArpClick) this.onArpClick();
+    });
+  }
+
+  setArpLabel(mode) {
+    const btn = this.el?.querySelector('#btn-arp');
+    if (!btn) return;
+    btn.classList.remove('is-arp', 'is-hold');
+    if (mode === ARP_MODES.ARP) {
+      btn.classList.add('is-arp');
+      btn.textContent = 'ARP';
+    } else if (mode === ARP_MODES.HOLD) {
+      btn.classList.add('is-hold');
+      btn.textContent = 'HLD';
+    } else {
+      btn.textContent = 'OFF';
+    }
   }
 
   _updatePlayButton(state) {
