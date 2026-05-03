@@ -42,6 +42,11 @@
 
 .edit-toolbar__spacer { flex: 1; }
 
+.edit-toolbar .btn.is-active {
+  color: var(--accent-light);
+  background: var(--surface-3);
+}
+
 .edit-toolbar__select {
   background: var(--surface-3);
   border: var(--border-subtle);
@@ -88,6 +93,19 @@
   display: flex;
   overflow: hidden;
   position: relative;
+}
+
+/* Individual pane in split mode */
+.piano-roll-pane {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  position: relative;
+  border-bottom: 1px solid var(--surface-3);
+}
+
+.piano-roll-pane:last-child {
+  border-bottom: none;
 }
 
 /* --- Piano Keys (left sidebar) --- */

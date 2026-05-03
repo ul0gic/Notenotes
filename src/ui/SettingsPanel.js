@@ -111,6 +111,29 @@ export class SettingsPanel {
         </div>
 
         <div class="settings-group">
+          <h3 class="settings-group__title">Piano</h3>
+          <div class="settings-row">
+            <label class="settings-label">Pianos</label>
+            <select class="settings-select" id="setting-piano-count" aria-label="Number of pianos">
+              <option value="1" ${(this.project?.settings?.pianoCount || 1) === 1 ? 'selected' : ''}>1</option>
+              <option value="2" ${(this.project?.settings?.pianoCount || 1) === 2 ? 'selected' : ''}>2</option>
+            </select>
+          </div>
+          <div class="settings-row">
+            <label class="settings-label">Keys (<span id="setting-keys-display">${this.project?.settings?.pianoKeys || 12}</span>)</label>
+            <input class="settings-range" id="setting-piano-keys" type="range" min="10" max="32" value="${this.project?.settings?.pianoKeys || 12}" aria-label="Piano keys"/>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <h3 class="settings-group__title">Drum Kit</h3>
+          <div class="settings-row">
+            <label class="settings-label">Number of Pads (<span id="setting-drum-display">${this.project?.settings?.drumPads || 10}</span>)</label>
+            <input class="settings-range" id="setting-drum-pads" type="range" min="1" max="10" value="${this.project?.settings?.drumPads || 10}" aria-label="Drum kit pad count"/>
+          </div>
+        </div>
+
+        <div class="settings-group">
           <h3 class="settings-group__title">Time Signature Visualizer</h3>
           <div class="settings-row" style="justify-content: flex-start; gap: 10px;">
             <input type="checkbox" id="setting-vis-enabled" ${this.project?.settings?.visualizerEnabled ? 'checked' : ''} />
@@ -231,8 +254,49 @@ export class SettingsPanel {
         if (this.project) {
           this.project.settings.scalePadsCount = count;
           this.store?.scheduleAutoSave(this.project);
-          // Trigger event for ScaleBoard to update
           window.dispatchEvent(new CustomEvent('settings-pads-changed', { detail: { count } }));
+        }
+      });
+
+      // Piano count
+      body.querySelector('#setting-piano-count')?.addEventListener('change', (e) => {
+        const count = parseInt(e.target.value, 10);
+        if (this.project) {
+          this.project.settings.pianoCount = count;
+          this.store?.scheduleAutoSave(this.project);
+          window.dispatchEvent(new CustomEvent('settings-piano-changed'));
+        }
+      });
+
+      // Piano keys
+      body.querySelector('#setting-piano-keys')?.addEventListener('input', (e) => {
+        let keys = parseInt(e.target.value, 10);
+        if (isNaN(keys) || keys < 10) keys = 12;
+        if (keys > 32) keys = 32;
+
+        const display = body.querySelector('#setting-keys-display');
+        if (display) display.textContent = keys;
+
+        if (this.project) {
+          this.project.settings.pianoKeys = keys;
+          this.store?.scheduleAutoSave(this.project);
+          window.dispatchEvent(new CustomEvent('settings-piano-changed'));
+        }
+      });
+
+      // Drum pads count
+      body.querySelector('#setting-drum-pads')?.addEventListener('input', (e) => {
+        let count = parseInt(e.target.value, 10);
+        if (isNaN(count) || count < 1) count = 10;
+        if (count > 10) count = 10;
+
+        const display = body.querySelector('#setting-drum-display');
+        if (display) display.textContent = count;
+
+        if (this.project) {
+          this.project.settings.drumPads = count;
+          this.store?.scheduleAutoSave(this.project);
+          window.dispatchEvent(new CustomEvent('settings-pads-changed'));
         }
       });
 

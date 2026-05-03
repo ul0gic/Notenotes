@@ -1,27 +1,20 @@
 /**
  * EditMode — Live Edit / Piano Roll.
  * Per-clip note editor for fine-tuning pitch, timing, duration, and velocity.
- * Supports click-to-add, drag-to-move, resize, delete, and velocity editing.
+ * Supports click-to-add, drag-to-move, resize, delete, velocity editing,
+ * vertical zoom, custom octave range, and split dual-pane view.
  */
 
 import './edit.css';
 import { NOTE_NAMES, midiToNoteName } from '../engine/MusicTheory.js';
 import { showToast } from '../ui/Toast.js';
 
-/** Configuration */
-const NOTE_HEIGHT = 16;      // px per semitone row
-const TICK_WIDTH = 0.15;     // px per tick (adjustable zoom)
-const PITCH_MIN = 36;        // C2
-const PITCH_MAX = 84;        // C6 (4 octaves)
-const PITCH_RANGE = PITCH_MAX - PITCH_MIN;
+const TICK_WIDTH = 0.15;
+const DEFAULT_NOTE_HEIGHT = 16;
+const MIN_NOTE_HEIGHT = 8;
+const MAX_NOTE_HEIGHT = 24;
 
 export class EditMode {
-  /**
-   * @param {Transport} transport
-   * @param {UndoManager} undoManager
-   * @param {ProjectStore} store
-   * @param {object} project
-   */
   constructor(transport, undoManager, store, project) {
     this.transport = transport;
     this.undoManager = undoManager;
@@ -29,29 +22,29 @@ export class EditMode {
     this.project = project;
     this.el = null;
 
-    /** Currently editing snippet (reference) */
+    this.onSnippetRenamed = null;
+
     this._snippet = null;
     this._clipId = null;
 
-    /** Selected note index */
     this._selectedNoteIdx = null;
 
-    /** Grid subdivision: ticks per grid line */
-    this._gridSize = 480; // Default: quarter note
+    this._gridSize = 480;
 
-    /** Piano roll elements */
-    this._gridContainer = null;
-    this._gridEl = null;
-    this._keysEl = null;
-    this._velocityLane = null;
+    this._noteHeight = DEFAULT_NOTE_HEIGHT;
+    this._pitchMin = 36;
+    this._pitchMax = 84;
+
+    this._splitMode = false;
+
+    this._panes = [];
   }
 
   render() {
     this.el = document.createElement('div');
     this.el.className = 'edit-mode';
-    this.el.style.setProperty('--note-height', `${NOTE_HEIGHT}px`);
+    this.el.style.setProperty('--note-height', `${this._noteHeight}px`);
 
-    // Show empty state if no clip loaded
     if (!this._snippet) {
       this._renderEmpty();
     } else {
@@ -61,13 +54,11 @@ export class EditMode {
     return this.el;
   }
 
-  /** Load a snippet for editing */
   loadSnippet(snippet, clipId = null) {
     this._snippet = snippet;
     this._clipId = clipId;
     this._selectedNoteIdx = null;
 
-    // Re-render
     this.el.innerHTML = '';
     if (this._snippet) {
       this._renderEditor();
@@ -87,13 +78,41 @@ export class EditMode {
   }
 
   _renderEditor() {
-    // Toolbar
+    this._panes = [];
+
     const toolbar = document.createElement('div');
     toolbar.className = 'edit-toolbar';
     const noteCount = (this._snippet.notes?.length || 0) + (this._snippet.hits?.length || 0);
-    toolbar.innerHTML = `
+    toolbar.innerHTML = this._buildToolbarHTML(noteCount);
+    this.el.appendChild(toolbar);
+
+    if (this._splitMode) {
+      const midPitch = Math.floor((this._pitchMin + this._pitchMax) / 2);
+      const midC = Math.ceil(midPitch / 12) * 12;
+
+      const paneA = this._renderRollPane(this._pitchMin, midC, 'a');
+      const paneB = this._renderRollPane(midC, this._pitchMax, 'b');
+
+      this.el.appendChild(paneA.el);
+      this.el.appendChild(paneB.el);
+
+      this._panes = [paneA, paneB];
+    } else {
+      const pane = this._renderRollPane(this._pitchMin, this._pitchMax, 'single');
+      this.el.appendChild(pane.el);
+      this._panes = [pane];
+    }
+
+    this._bindEvents(toolbar);
+  }
+
+  _buildToolbarHTML(noteCount) {
+    const pitchMinOct = Math.floor(this._pitchMin / 12) - 1;
+    const pitchMaxOct = Math.floor(this._pitchMax / 12) - 1;
+
+    return `
       <div class="edit-toolbar__group">
-        <input type="text" class="edit-toolbar__name-input" id="edit-snippet-name" value="${this._snippet.name || 'Snippet'}" placeholder="Snippet name" title="Edit snippet name" style="background:var(--surface-2); color:var(--text-primary); border:1px solid var(--surface-3); border-radius:4px; padding:2px 6px; font-size:var(--font-size-sm); font-weight:var(--font-weight-medium); outline:none; max-width:150px;" />
+        <input type="text" class="edit-toolbar__name-input" id="edit-snippet-name" value="${this._snippet.name || 'Snippet'}" placeholder="Snippet name" title="Edit snippet name" style="background:var(--surface-2);color:var(--text-primary);border:1px solid var(--surface-3);border-radius:4px;padding:2px 6px;font-size:var(--font-size-sm);font-weight:var(--font-weight-medium);outline:none;max-width:120px;" />
         <span class="edit-toolbar__value">${noteCount} notes</span>
       </div>
       <div class="edit-toolbar__group">
@@ -105,68 +124,86 @@ export class EditMode {
           <option value="960" ${this._gridSize === 960 ? 'selected' : ''}>1/2</option>
         </select>
       </div>
+      <div class="edit-toolbar__group">
+        <span class="edit-toolbar__label">Zoom</span>
+        <button class="btn btn--ghost" id="edit-zoom-out" style="min-height:26px;padding:0 6px;font-size:0.7rem;" title="Vertical zoom out">-</button>
+        <button class="btn btn--ghost" id="edit-zoom-in" style="min-height:26px;padding:0 6px;font-size:0.7rem;" title="Vertical zoom in">+</button>
+      </div>
+      <div class="edit-toolbar__group">
+        <span class="edit-toolbar__label">Range</span>
+        <select class="edit-toolbar__select" id="edit-oct-low" aria-label="Low octave">
+          ${[1,2,3,4,5].map(o => `<option value="${o}" ${pitchMinOct === o ? 'selected' : ''}>C${o}</option>`).join('')}
+        </select>
+        <span style="font-size:0.7rem;color:var(--text-tertiary);">to</span>
+        <select class="edit-toolbar__select" id="edit-oct-high" aria-label="High octave">
+          ${[2,3,4,5,6].map(o => `<option value="${o}" ${pitchMaxOct === o ? 'selected' : ''}>C${o}</option>`).join('')}
+        </select>
+      </div>
+      <button class="btn btn--ghost${this._splitMode ? ' is-active' : ''}" id="edit-split-btn" style="font-size:0.7rem;min-height:26px;padding:2px 8px;" title="Split view">Split</button>
       <div class="edit-toolbar__spacer"></div>
       <div class="edit-toolbar__group">
         <button class="btn btn--ghost" id="edit-delete-btn" style="font-size:0.7rem;min-height:26px;padding:2px 8px;">Delete Note</button>
       </div>
     `;
-    this.el.appendChild(toolbar);
+  }
 
-    // Piano roll container
-    const rollContainer = document.createElement('div');
-    rollContainer.className = 'piano-roll';
+  _renderRollPane(pitchMin, pitchMax, paneId) {
+    const pitchRange = pitchMax - pitchMin;
 
-    // Piano keys
-    this._keysEl = this._renderKeys();
-    rollContainer.appendChild(this._keysEl);
+    const paneEl = document.createElement('div');
+    paneEl.className = 'piano-roll-pane';
+    paneEl.dataset.pane = paneId;
 
-    // Grid area
+    const keysEl = this._renderKeysForRange(pitchMin, pitchMax);
+    keysEl.dataset.pane = paneId;
+    paneEl.appendChild(keysEl);
+
     const gridWrapper = document.createElement('div');
     gridWrapper.style.cssText = 'flex:1;display:flex;flex-direction:column;overflow:hidden;';
 
-    // Mini ruler
     const ruler = this._renderRuler();
     gridWrapper.appendChild(ruler);
 
-    // Grid
-    this._gridContainer = document.createElement('div');
-    this._gridContainer.className = 'piano-roll__grid-container';
-    this._gridContainer.id = 'piano-roll-grid-container';
+    const gridContainer = document.createElement('div');
+    gridContainer.className = 'piano-roll__grid-container';
+    gridContainer.dataset.pane = paneId;
 
-    this._gridEl = this._renderGrid();
-    this._gridContainer.appendChild(this._gridEl);
-    gridWrapper.appendChild(this._gridContainer);
+    const gridEl = this._renderGridForRange(pitchMin, pitchMax, paneId);
+    gridContainer.appendChild(gridEl);
+    gridWrapper.appendChild(gridContainer);
 
-    rollContainer.appendChild(gridWrapper);
-    this.el.appendChild(rollContainer);
+    paneEl.appendChild(gridWrapper);
 
-    // Velocity lane
-    this._velocityLane = this._renderVelocityLane();
-    this.el.appendChild(this._velocityLane);
-
-    // Sync piano keys scroll with grid scroll
-    this._gridContainer.addEventListener('scroll', () => {
-      this._keysEl.scrollTop = this._gridContainer.scrollTop;
+    gridContainer.addEventListener('scroll', () => {
+      keysEl.scrollTop = gridContainer.scrollTop;
     });
 
-    // Bind events
-    this._bindEvents(toolbar);
+    const result = {
+      el: paneEl,
+      paneId,
+      pitchMin,
+      pitchMax,
+      pitchRange,
+      keysEl,
+      gridContainer,
+      gridEl,
+    };
 
-    // Scroll to middle of pitch range
     requestAnimationFrame(() => {
-      const midScroll = (PITCH_RANGE * NOTE_HEIGHT) / 2 - this._gridContainer.clientHeight / 2;
-      this._gridContainer.scrollTop = midScroll;
-      this._keysEl.scrollTop = midScroll;
+      const midScroll = (pitchRange * this._noteHeight) / 2 - gridContainer.clientHeight / 2;
+      gridContainer.scrollTop = Math.max(0, midScroll);
+      keysEl.scrollTop = gridContainer.scrollTop;
     });
+
+    return result;
   }
 
-  /** Render the piano keys sidebar */
-  _renderKeys() {
+  _renderKeysForRange(pitchMin, pitchMax) {
     const el = document.createElement('div');
     el.className = 'piano-roll__keys';
 
     let html = '';
-    for (let pitch = PITCH_MAX; pitch >= PITCH_MIN; pitch--) {
+    for (let pitch = pitchMax - 1; pitch >= pitchMin; pitch--) {
       const info = midiToNoteName(pitch);
       const isBlack = info.name.includes('#');
       const isC = info.name === 'C';
@@ -178,7 +215,6 @@ export class EditMode {
     return el;
   }
 
-  /** Render the mini time ruler */
   _renderRuler() {
     const el = document.createElement('div');
     el.className = 'piano-roll__ruler';
@@ -188,7 +224,6 @@ export class EditMode {
     el.style.width = `${width}px`;
     el.style.minWidth = '100%';
 
-    // Add beat markers
     const ticksPerBeat = 480;
     let html = '';
     for (let tick = 0; tick < duration; tick += ticksPerBeat) {
@@ -203,21 +238,23 @@ export class EditMode {
     return el;
   }
 
-  /** Render the note grid */
-  _renderGrid() {
+  _renderGridForRange(pitchMin, pitchMax, paneId) {
     const duration = this._snippet.durationTicks || (480 * 4);
     const width = duration * TICK_WIDTH;
-    const height = PITCH_RANGE * NOTE_HEIGHT;
+    const pitchRange = pitchMax - pitchMin;
+    const height = pitchRange * this._noteHeight;
 
     const grid = document.createElement('div');
     grid.className = 'piano-roll__grid';
     grid.style.width = `${width}px`;
     grid.style.height = `${height}px`;
     grid.style.position = 'relative';
+    grid.dataset.pane = paneId;
+    grid.dataset.pitchMin = pitchMin;
+    grid.dataset.pitchMax = pitchMax;
 
-    // Background rows
     let rowsHtml = '';
-    for (let pitch = PITCH_MAX; pitch >= PITCH_MIN; pitch--) {
+    for (let pitch = pitchMax - 1; pitch >= pitchMin; pitch--) {
       const info = midiToNoteName(pitch);
       const isBlack = info.name.includes('#');
       const isC = info.name === 'C';
@@ -225,13 +262,11 @@ export class EditMode {
       const cCls = isC ? ' piano-roll__row--c' : '';
       rowsHtml += `<div class="piano-roll__row${cls}${cCls}"></div>`;
     }
-
     const bgEl = document.createElement('div');
     bgEl.className = 'piano-roll__grid-bg';
     bgEl.innerHTML = rowsHtml;
     grid.appendChild(bgEl);
 
-    // Beat lines
     const ticksPerBeat = 480;
     for (let tick = 0; tick <= duration; tick += this._gridSize) {
       const x = tick * TICK_WIDTH;
@@ -246,33 +281,35 @@ export class EditMode {
       grid.appendChild(line);
     }
 
-    // Render notes
-    this._renderNotes(grid);
+    this._renderNotesForPane(grid, pitchMin, pitchMax);
 
     return grid;
   }
 
-  /** Render note blocks on the grid */
-  _renderNotes(grid) {
+  _renderNotesForPane(grid, pitchMin, pitchMax) {
     const notes = this._snippet.notes || [];
     notes.forEach((note, idx) => {
-      const el = this._createNoteElement(note, idx);
-      grid.appendChild(el);
+      if (note.pitch >= pitchMin && note.pitch < pitchMax) {
+        const el = this._createNoteElementForPane(note, idx, pitchMax);
+        grid.appendChild(el);
+      }
     });
 
-    // Render drum hits as dots
     const hits = this._snippet.hits || [];
+    const pitchMap = { kick: 36, snare: 40, clap: 40, hihat: 44, cymbal: 46 };
     hits.forEach((hit, idx) => {
-      const el = this._createHitElement(hit, idx);
-      grid.appendChild(el);
+      const pitch = pitchMap[hit.type] || 38;
+      if (pitch >= pitchMin && pitch < pitchMax) {
+        const el = this._createHitElementForPane(hit, idx, pitchMax);
+        grid.appendChild(el);
+      }
     });
   }
 
-  /** Create a note DOM element */
-  _createNoteElement(note, idx) {
+  _createNoteElementForPane(note, idx, pitchMax) {
     const x = note.startTick * TICK_WIDTH;
     const w = Math.max(6, note.durationTick * TICK_WIDTH);
-    const y = (PITCH_MAX - note.pitch) * NOTE_HEIGHT;
+    const y = (pitchMax - 1 - note.pitch) * this._noteHeight;
 
     const el = document.createElement('div');
     el.className = 'piano-roll__note piano-roll__note--midi';
@@ -282,21 +319,18 @@ export class EditMode {
     el.style.top = `${y}px`;
     el.style.width = `${w}px`;
 
-    // Velocity indicator
     const velHeight = Math.max(1, (note.velocity || 0.8) * 2);
     el.innerHTML = `
       <div class="piano-roll__note-velocity" style="height:${velHeight}px;"></div>
       <div class="piano-roll__note-resize"></div>
     `;
 
-    // Click to select
     el.addEventListener('pointerdown', (e) => {
       e.stopPropagation();
       this._selectNote(idx);
       this._startNoteDrag(e, note, idx, el);
     });
 
-    // Resize handle
     const resizeHandle = el.querySelector('.piano-roll__note-resize');
     resizeHandle.addEventListener('pointerdown', (e) => {
       e.stopPropagation();
@@ -306,19 +340,17 @@ export class EditMode {
     return el;
   }
 
-  /** Create a drum hit element */
-  _createHitElement(hit, idx) {
-    // Map drum hits to a pitch-like position
+  _createHitElementForPane(hit, idx, pitchMax) {
     const pitchMap = { kick: 36, snare: 40, clap: 40, hihat: 44, cymbal: 46 };
     const pitch = pitchMap[hit.type] || 38;
     const x = hit.startTick * TICK_WIDTH;
-    const y = (PITCH_MAX - pitch) * NOTE_HEIGHT;
+    const y = (pitchMax - 1 - pitch) * this._noteHeight;
 
     const el = document.createElement('div');
     el.className = 'piano-roll__note piano-roll__note--drum';
     el.style.left = `${x}px`;
     el.style.top = `${y}px`;
-    el.style.width = `${NOTE_HEIGHT - 2}px`;
+    el.style.width = `${this._noteHeight - 2}px`;
     el.title = hit.type;
 
     el.addEventListener('pointerdown', (e) => {
@@ -328,51 +360,20 @@ export class EditMode {
     return el;
   }
 
-  /** Render the velocity lane */
-  _renderVelocityLane() {
-    const el = document.createElement('div');
-    el.className = 'velocity-lane';
-    el.id = 'velocity-lane';
-
-    const notes = this._snippet.notes || [];
-    const duration = this._snippet.durationTicks || (480 * 4);
-
-    notes.forEach((note, idx) => {
-      const x = note.startTick * TICK_WIDTH;
-      const h = Math.max(4, (note.velocity || 0.8) * 44);
-      const bar = document.createElement('div');
-      bar.className = 'velocity-lane__bar';
-      if (idx === this._selectedNoteIdx) bar.classList.add('is-selected');
-      bar.dataset.noteIdx = idx;
-      bar.style.left = `${x}px`;
-      bar.style.height = `${h}px`;
-
-      // Drag to change velocity
-      bar.addEventListener('pointerdown', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        this._startVelocityDrag(e, note, idx, bar);
-      });
-
-      el.appendChild(bar);
-    });
-
-    return el;
-  }
-
-  /** Select a note */
   _selectNote(idx) {
     this._selectedNoteIdx = idx;
-    // Update visual selection
-    this._gridEl?.querySelectorAll('.piano-roll__note').forEach(n => {
+    this.el.querySelectorAll('.piano-roll__note').forEach(n => {
       n.classList.toggle('is-selected', parseInt(n.dataset.noteIdx) === idx);
-    });
-    this._velocityLane?.querySelectorAll('.velocity-lane__bar').forEach(b => {
-      b.classList.toggle('is-selected', parseInt(b.dataset.noteIdx) === idx);
     });
   }
 
-  /** Start dragging a note to move it */
+  _paneForPitch(pitch) {
+    for (const pane of this._panes) {
+      if (pitch >= pane.pitchMin && pitch < pane.pitchMax) return pane;
+    }
+    return this._panes[0];
+  }
+
   _startNoteDrag(e, note, idx, el) {
     const startX = e.clientX;
     const startY = e.clientY;
@@ -383,15 +384,14 @@ export class EditMode {
       const dx = me.clientX - startX;
       const dy = me.clientY - startY;
 
-      // Quantize movement to grid
       const deltaTick = Math.round(dx / TICK_WIDTH / this._gridSize) * this._gridSize;
-      const deltaPitch = -Math.round(dy / NOTE_HEIGHT);
+      const deltaPitch = -Math.round(dy / this._noteHeight);
 
       const newTick = Math.max(0, origTick + deltaTick);
-      const newPitch = Math.max(PITCH_MIN, Math.min(PITCH_MAX, origPitch + deltaPitch));
+      const newPitch = Math.max(this._pitchMin, Math.min(this._pitchMax - 1, origPitch + deltaPitch));
 
       el.style.left = `${newTick * TICK_WIDTH}px`;
-      el.style.top = `${(PITCH_MAX - newPitch) * NOTE_HEIGHT}px`;
+      el.style.top = `${(this._pitchMax - 1 - newPitch) * this._noteHeight}px`;
     };
 
     const onUp = () => {
@@ -401,11 +401,11 @@ export class EditMode {
       const finalLeft = parseFloat(el.style.left);
       const finalTop = parseFloat(el.style.top);
       const newTick = Math.round(finalLeft / TICK_WIDTH / this._gridSize) * this._gridSize;
-      const newPitch = PITCH_MAX - Math.round(finalTop / NOTE_HEIGHT);
+      const newPitch = this._pitchMax - 1 - Math.round(finalTop / this._noteHeight);
 
       if (newTick !== origTick || newPitch !== origPitch) {
         note.startTick = Math.max(0, newTick);
-        note.pitch = Math.max(PITCH_MIN, Math.min(PITCH_MAX, newPitch));
+        note.pitch = Math.max(this._pitchMin, Math.min(this._pitchMax - 1, newPitch));
         this._onEdit('Move note');
       }
     };
@@ -414,7 +414,6 @@ export class EditMode {
     document.addEventListener('pointerup', onUp);
   }
 
-  /** Start resizing a note (change duration) */
   _startNoteResize(e, note, idx, el) {
     const startX = e.clientX;
     const origDuration = note.durationTick;
@@ -443,42 +442,12 @@ export class EditMode {
     document.addEventListener('pointerup', onUp);
   }
 
-  /** Start dragging a velocity bar */
-  _startVelocityDrag(e, note, idx, bar) {
-    const startY = e.clientY;
-    const origVel = note.velocity || 0.8;
-    const laneHeight = 44;
-
-    const onMove = (me) => {
-      const dy = startY - me.clientY;
-      const deltaVel = dy / laneHeight;
-      const newVel = Math.max(0.05, Math.min(1.0, origVel + deltaVel));
-      bar.style.height = `${Math.max(4, newVel * laneHeight)}px`;
-    };
-
-    const onUp = () => {
-      document.removeEventListener('pointermove', onMove);
-      document.removeEventListener('pointerup', onUp);
-
-      const finalHeight = parseFloat(bar.style.height);
-      const newVel = Math.max(0.05, Math.min(1.0, finalHeight / laneHeight));
-      note.velocity = Math.round(newVel * 100) / 100;
-      this._onEdit('Change velocity');
-    };
-
-    document.addEventListener('pointermove', onMove);
-    document.addEventListener('pointerup', onUp);
-  }
-
-  /** Bind toolbar events */
   _bindEvents(toolbar) {
-    // Grid size selector
     toolbar.querySelector('#edit-grid-select')?.addEventListener('change', (e) => {
       this._gridSize = parseInt(e.target.value, 10);
-      this._refreshGrid();
+      this._rebuildGrids();
     });
 
-    // Snippet name input
     const nameInput = toolbar.querySelector('#edit-snippet-name');
     if (nameInput) {
       const saveName = () => {
@@ -486,6 +455,7 @@ export class EditMode {
         if (this._snippet && this._snippet.name !== newName) {
           this._snippet.name = newName;
           this.store?.scheduleAutoSave(this.project);
+          if (this.onSnippetRenamed) this.onSnippetRenamed(this._snippet);
           showToast('Snippet renamed');
         }
       };
@@ -498,33 +468,76 @@ export class EditMode {
       });
     }
 
-    // Delete note button
     toolbar.querySelector('#edit-delete-btn')?.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       this._deleteSelectedNote();
     });
 
-    // Click on empty grid to add a note
-    this._gridContainer?.addEventListener('pointerdown', (e) => {
-      if (e.target.closest('.piano-roll__note')) return;
-
-      const rect = this._gridEl.getBoundingClientRect();
-      const x = e.clientX - rect.left + this._gridContainer.scrollLeft;
-      const y = e.clientY - rect.top + this._gridContainer.scrollTop;
-
-      const tick = Math.round(x / TICK_WIDTH / this._gridSize) * this._gridSize;
-      const pitch = PITCH_MAX - Math.floor(y / NOTE_HEIGHT);
-
-      if (pitch >= PITCH_MIN && pitch <= PITCH_MAX && tick >= 0) {
-        this._addNote(tick, pitch);
+    toolbar.querySelector('#edit-zoom-out')?.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      if (this._noteHeight > MIN_NOTE_HEIGHT) {
+        this._noteHeight -= 4;
+        this.el.style.setProperty('--note-height', `${this._noteHeight}px`);
+        this._rebuildAll();
       }
     });
 
-    // Delete with keyboard
+    toolbar.querySelector('#edit-zoom-in')?.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      if (this._noteHeight < MAX_NOTE_HEIGHT) {
+        this._noteHeight += 4;
+        this.el.style.setProperty('--note-height', `${this._noteHeight}px`);
+        this._rebuildAll();
+      }
+    });
+
+    toolbar.querySelector('#edit-oct-low')?.addEventListener('change', (e) => {
+      const oct = parseInt(e.target.value, 10);
+      const newMin = (oct + 1) * 12;
+      if (newMin < this._pitchMax) {
+        this._pitchMin = newMin;
+        this._rebuildAll();
+      }
+    });
+
+    toolbar.querySelector('#edit-oct-high')?.addEventListener('change', (e) => {
+      const oct = parseInt(e.target.value, 10);
+      const newMax = (oct + 1) * 12;
+      if (newMax > this._pitchMin) {
+        this._pitchMax = newMax;
+        this._rebuildAll();
+      }
+    });
+
+    toolbar.querySelector('#edit-split-btn')?.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      this._splitMode = !this._splitMode;
+      const btn = toolbar.querySelector('#edit-split-btn');
+      btn.classList.toggle('is-active', this._splitMode);
+      showToast(this._splitMode ? 'Split view enabled' : 'Split view disabled');
+      this._rebuildAll();
+    });
+
+    this._panes.forEach(pane => {
+      pane.gridContainer.addEventListener('pointerdown', (e) => {
+        if (e.target.closest('.piano-roll__note')) return;
+
+        const rect = pane.gridEl.getBoundingClientRect();
+        const x = e.clientX - rect.left + pane.gridContainer.scrollLeft;
+        const y = e.clientY - rect.top + pane.gridContainer.scrollTop;
+
+        const tick = Math.round(x / TICK_WIDTH / this._gridSize) * this._gridSize;
+        const pitch = pane.pitchMax - 1 - Math.floor(y / this._noteHeight);
+
+        if (pitch >= pane.pitchMin && pitch < pane.pitchMax && tick >= 0) {
+          this._addNote(tick, pitch);
+        }
+      });
+    });
+
     document.addEventListener('keydown', (e) => {
       if ((e.code === 'Delete' || e.code === 'Backspace') && this._selectedNoteIdx !== null) {
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-        // Only handle if Edit mode is visible
         if (this.el.closest('.mode-view.is-active')) {
           e.preventDefault();
           this._deleteSelectedNote();
@@ -533,7 +546,6 @@ export class EditMode {
     });
   }
 
-  /** Add a new note at the given position */
   _addNote(startTick, pitch) {
     if (!this._snippet) return;
     if (!this._snippet.notes) this._snippet.notes = [];
@@ -551,7 +563,6 @@ export class EditMode {
     showToast(`Added ${midiToNoteName(pitch).display}`);
   }
 
-  /** Delete the selected note */
   _deleteSelectedNote() {
     if (this._selectedNoteIdx === null || !this._snippet?.notes) return;
     if (this._selectedNoteIdx >= this._snippet.notes.length) return;
@@ -562,35 +573,28 @@ export class EditMode {
     showToast('Note deleted');
   }
 
-  /** Called after any edit — refresh UI and save */
   _onEdit(description) {
-    this._refreshGrid();
-    this._refreshVelocityLane();
+    this._rebuildGrids();
 
-    // Update toolbar note count
     const countEl = this.el.querySelector('.edit-toolbar__value');
     if (countEl) {
       const count = (this._snippet.notes?.length || 0) + (this._snippet.hits?.length || 0);
       countEl.textContent = `${count} notes`;
     }
 
-    // Save
     this.store?.scheduleAutoSave(this.project);
   }
 
-  /** Refresh just the grid (notes) */
-  _refreshGrid() {
-    if (!this._gridContainer || !this._snippet) return;
-    const newGrid = this._renderGrid();
-    this._gridContainer.replaceChild(newGrid, this._gridEl);
-    this._gridEl = newGrid;
+  _rebuildGrids() {
+    this._panes.forEach(pane => {
+      const newGrid = this._renderGridForRange(pane.pitchMin, pane.pitchMax, pane.paneId);
+      pane.gridContainer.replaceChild(newGrid, pane.gridEl);
+      pane.gridEl = newGrid;
+    });
   }
 
-  /** Refresh the velocity lane */
-  _refreshVelocityLane() {
-    if (!this._velocityLane || !this._snippet) return;
-    const newLane = this._renderVelocityLane();
-    this._velocityLane.replaceWith(newLane);
-    this._velocityLane = newLane;
+  _rebuildAll() {
+    this.el.innerHTML = '';
+    this._renderEditor();
   }
 }

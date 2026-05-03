@@ -1,22 +1,54 @@
 /**
- * MicroPiano — Condensed 12-key (1 octave) chromatic piano.
- * Designed for quick chromatic ideas on small touchscreens.
+ * MicroPiano — Chromatic piano keyboard.
+ * Supports 1 or 2 stacked keyboards with configurable key count via Settings.
  */
 
-import { midiToNoteName, NOTE_NAMES } from '../engine/MusicTheory.js';
-
 export class MicroPiano {
-  /**
-   * @param {WebAudioSynth} synth
-   */
-  constructor(synth) {
+  constructor(synth, project) {
     this.synth = synth;
+    this._project = project;
     this.el = null;
-    this.octave = 4;
+    this._baseOctave = 4;
     this._activeKeys = new Set();
 
     this._onNoteOn = null;
     this._onNoteOff = null;
+
+    window.addEventListener('settings-piano-changed', () => {
+      if (this.el) this._refreshAll();
+    });
+  }
+
+  set project(p) {
+    this._project = p;
+    if (this.el) this._refreshAll();
+  }
+  get project() { return this._project; }
+
+  get _pianoCount() {
+    return this.project?.settings?.pianoCount || 1;
+  }
+
+  get _pianoKeys() {
+    return this.project?.settings?.pianoKeys || 12;
+  }
+
+  _baseMidi(offset) {
+    return (this._baseOctave + 1) * 12 + offset;
+  }
+
+  _pianoLabel(index) {
+    const startMidi = this._baseMidi(index * this._pianoKeys);
+    const endMidi = startMidi + this._pianoKeys - 1;
+    const startOct = Math.floor(startMidi / 12) - 1;
+    const endOct = Math.floor(endMidi / 12) - 1;
+    if (startOct === endOct) return `Oct ${startOct}`;
+    return `Oct ${startOct}–${endOct}`;
+  }
+
+  _octaveDisplay() {
+    if (this._pianoCount === 1) return this._pianoLabel(0);
+    return `A: ${this._pianoLabel(0)} · B: ${this._pianoLabel(1)}`;
   }
 
   setNoteCallbacks(onNoteOn, onNoteOff) {
@@ -24,16 +56,6 @@ export class MicroPiano {
     this._onNoteOff = onNoteOff;
   }
 
-  /** Get the 12 MIDI notes for the current octave */
-  get _notes() {
-    const base = (this.octave + 1) * 12;
-    return Array.from({ length: 12 }, (_, i) => base + i);
-  }
-
-  /**
-   * Render the piano UI.
-   * @returns {HTMLElement}
-   */
   render() {
     this.el = document.createElement('div');
     this.el.className = 'micropiano';
@@ -42,20 +64,31 @@ export class MicroPiano {
     this.el.innerHTML = `
       <div class="micropiano__controls">
         <button class="btn btn--icon btn--ghost" id="mp-oct-down" aria-label="Octave down">▼</button>
-        <span class="micropiano__oct-display" id="mp-oct-display">Oct ${this.octave}</span>
+        <span class="micropiano__oct-display" id="mp-oct-display">${this._octaveDisplay()}</span>
         <button class="btn btn--icon btn--ghost" id="mp-oct-up" aria-label="Octave up">▲</button>
       </div>
-      <div class="micropiano__keyboard" id="mp-keyboard">
-        ${this._renderKeys()}
+      <div class="micropiano__boards" id="mp-boards">
+        ${this._renderAllKeyboards()}
       </div>
     `;
 
     this._bindEvents();
+
     return this.el;
   }
 
-  _renderKeys() {
-    // White and black key pattern for one octave
+  _renderAllKeyboards() {
+    let html = '';
+    for (let i = 0; i < this._pianoCount; i++) {
+      html += `<div class="micropiano__keyboard" id="mp-keyboard-${i}">
+        ${this._renderKeys(i)}
+      </div>`;
+    }
+    return html;
+  }
+
+  _renderKeys(boardIndex) {
+    const startMidi = this._baseMidi(boardIndex * this._pianoKeys);
     const keyPattern = [
       { white: true,  name: 'C' },
       { white: false, name: 'C#' },
@@ -71,39 +104,55 @@ export class MicroPiano {
       { white: true,  name: 'B' },
     ];
 
-    const notes = this._notes;
-    return keyPattern.map((key, i) => {
-      const midi = notes[i];
+    let html = '';
+    for (let k = 0; k < this._pianoKeys; k++) {
+      const midi = startMidi + k;
+      const key = keyPattern[midi % 12];
       const cls = key.white ? 'micropiano__key--white' : 'micropiano__key--black';
-      return `<button class="micropiano__key ${cls}" data-midi="${midi}" data-index="${i}"
-                aria-label="${key.name}${this.octave}">
-                <span class="micropiano__key-label">${key.name}</span>
+      const oct = Math.floor(midi / 12) - 1;
+      const label = (key.name === 'C' && this._pianoKeys > 12)
+        ? `C${oct}`
+        : key.name;
+      html += `<button class="micropiano__key ${cls}" data-midi="${midi}"
+                aria-label="${key.name}${oct}">
+                <span class="micropiano__key-label">${label}</span>
               </button>`;
-    }).join('');
+    }
+    return html;
   }
 
   _refreshKeys() {
-    const kb = this.el.querySelector('#mp-keyboard');
-    kb.innerHTML = this._renderKeys();
+    const boards = this.el.querySelector('#mp-boards');
+    boards.innerHTML = this._renderAllKeyboards();
     this._bindKeyEvents();
   }
 
+  _refreshAll() {
+    const display = this.el.querySelector('#mp-oct-display');
+    if (display) display.textContent = this._octaveDisplay();
+    this._refreshKeys();
+  }
+
+  _maxBaseOctave() {
+    const totalKeys = this._pianoCount * this._pianoKeys;
+    return Math.max(1, Math.floor((97 - totalKeys) / 12));
+  }
+
   _bindEvents() {
-    // Octave controls
     this.el.querySelector('#mp-oct-down').addEventListener('pointerdown', (e) => {
       e.preventDefault();
-      if (this.octave > 2) {
-        this.octave--;
-        this.el.querySelector('#mp-oct-display').textContent = `Oct ${this.octave}`;
+      if (this._baseOctave > 1) {
+        this._baseOctave--;
+        this.el.querySelector('#mp-oct-display').textContent = this._octaveDisplay();
         this._refreshKeys();
       }
     });
 
     this.el.querySelector('#mp-oct-up').addEventListener('pointerdown', (e) => {
       e.preventDefault();
-      if (this.octave < 6) {
-        this.octave++;
-        this.el.querySelector('#mp-oct-display').textContent = `Oct ${this.octave}`;
+      if (this._baseOctave < this._maxBaseOctave()) {
+        this._baseOctave++;
+        this.el.querySelector('#mp-oct-display').textContent = this._octaveDisplay();
         this._refreshKeys();
       }
     });

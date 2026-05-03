@@ -86,6 +86,11 @@ class App {
       editView.appendChild(this.editMode.render());
     }
 
+    // Wire snippet rename: EditMode → SnippetTray
+    this.editMode.onSnippetRenamed = () => {
+      this.creativeMode.snippetTray._renderSnippets();
+    };
+
     // Wire snippet selection: SnippetTray → EditMode
     this.creativeMode.snippetTray.onSnippetSelected((snippet) => {
       this.editMode.loadSnippet(snippet);

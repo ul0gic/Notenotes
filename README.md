@@ -10,8 +10,8 @@ Notenotes is designed for musicians, producers, and anyone who wants a zero-fric
 
 ### 🎹 Creative Mode — The Jam Space
 - **Scale Board** — Dynamic multi-pad controller (up to 16 pads) locked to any scale (Major, Minor, Pentatonic, Blues, Dorian, Mixolydian, Chromatic)
-- **Micro Piano** — Full chromatic 12-key keyboard with octave shifting
-- **Sketch Kit** — 5-pad synthesized drum kit (Kick, Snare, Clap, Hi-Hat, Cymbal)
+- **Micro Piano** — Configurable chromatic keyboard (1 or 2 stacked, 10–32 keys each) with octave shifting
+- **Sketch Kit** — 10-pad synthesized drum kit (Kick, Snare, Clap, Hi-Hat, Cymbal, Toms, Rim, Shaker), fully configurable pad count
 - **Mic Recorder** — Record audio from your microphone with live waveform visualization
 - **8 Synth Presets** — Retro (Chip Lead, Warm Pad), Modern (Glass Pluck, Sub Bass, Bright Lead), Lo-fi (Tape Keys, Dusty Organ, Vinyl Strings)
 - **Loop Recording** — Punch-in recording with automatic snippet capture on loop wrap
@@ -157,6 +157,107 @@ The UI uses a **charcoal + silver** palette with glass-effect surfaces:
 | `--accent` | `#a0a0a0` → silver gradient | Interactive highlights |
 | `--accent-light` | `#d0d0d0` | Active states |
 | Font | [Inter](https://fonts.google.com/specimen/Inter) | All text |
+
+---
+
+## 🛠️ Creating Custom Instruments
+
+Notenotes instruments are vanilla JavaScript classes that follow a consistent pattern. You can add new sounds or entire instruments by creating a file in `src/instruments/`.
+
+### Instrument Pattern
+
+Every instrument implements this interface:
+
+```js
+export class MyInstrument {
+  constructor(synth, project) {
+    // Store dependencies
+    // this.el = null — DOM will be created in render()
+  }
+
+  // Optional: called once after audio engine is ready
+  init() {}
+
+  // Required: return the instrument's DOM element
+  render() {
+    this.el = document.createElement('div');
+    this.el.className = 'my-instrument';
+    // Build DOM, bind events
+    return this.el;
+  }
+
+  // Optional: callback wiring for recording
+  setHitCallback(onHit) {}       // for drum/percussion
+  setNoteCallbacks(onNoteOn, onNoteOff) {} // for pitched instruments
+}
+```
+
+### Wiring It In
+
+1. **Create your instrument file** in `src/instruments/MyInstrument.js`
+2. **Import it in `CreativeMode.js`**:
+   ```js
+   import { MyInstrument } from '../instruments/MyInstrument.js';
+   ```
+3. **Instantiate it** in the constructor:
+   ```js
+   this.myInstrument = new MyInstrument(this.synth, this.project);
+   ```
+4. **Pass the project reference** in the `set project(p)` setter:
+   ```js
+   if (this.myInstrument) this.myInstrument.project = p;
+   ```
+5. **Add it to the render** in the `views` array inside `render()`:
+   ```js
+   { id: 'myinstrument', content: this.myInstrument.render() }
+   ```
+6. **Add a tab** in the instrument switcher:
+   ```js
+   { id: 'myinstrument', icon: '🎸', label: 'MyInstr' }
+   ```
+7. **Wire recording callbacks** in `init()`:
+   ```js
+   this.myInstrument.setNoteCallbacks(noteOn, noteOff);
+   ```
+
+### Audio Example: Synthesized Drum Sound
+
+All drum sounds in SketchKit are synthesized from oscillators and noise:
+
+```js
+_synthMyDrum(ctx, t) {
+  // White noise burst through a bandpass filter
+  const len = 0.1, bs = ctx.sampleRate * len;
+  const buf = ctx.createBuffer(1, bs, ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < bs; i++) d[i] = Math.random() * 2 - 1;
+
+  const noise = ctx.createBufferSource(); noise.buffer = buf;
+  const filter = ctx.createBiquadFilter();
+  filter.type = 'bandpass'; filter.frequency.value = 2000; filter.Q.value = 5;
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.8, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + len);
+
+  noise.connect(filter); filter.connect(gain); gain.connect(this._output);
+  noise.start(t);
+}
+```
+
+Key techniques:
+- `ctx.createOscillator()` + frequency ramp → tone-based sounds (kick, toms)
+- `ctx.createBuffer()` with random samples + filter → noise-based sounds (snare, hi-hat, shaker)
+- `gain.exponentialRampToValueAtTime()` → natural decay envelope
+- Layer multiple sources for richer sounds (snare = noise + tone body)
+
+### CSS
+
+Add styles in `src/instruments/instruments.css` following BEM conventions:
+```css
+.my-instrument { /* container layout */ }
+.my-instrument__pad { /* interactive element */ }
+.my-instrument__pad.is-active { /* pressed state */ }
+```
 
 ---
 

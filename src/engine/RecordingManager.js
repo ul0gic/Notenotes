@@ -154,11 +154,13 @@ export class RecordingManager {
    */
   _finalizeSnippet() {
     const loopLengthTicks = this.transport.loopEndTick - this.transport.loopStartTick;
+    const noteCount = this._capturedNotes.length + this._capturedHits.length;
 
     const snippet = {
       id: crypto.randomUUID(),
       createdAt: Date.now(),
       type: this._capturedHits.length > 0 && this._capturedNotes.length === 0 ? 'drum' : 'midi',
+      name: `${noteCount} notes`,
       notes: [...this._capturedNotes],
       hits: [...this._capturedHits],
       durationTicks: loopLengthTicks,

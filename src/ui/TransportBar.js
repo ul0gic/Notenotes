@@ -57,14 +57,6 @@ export class TransportBar {
       <div class="transport-bar__spacer"></div>
 
       <div class="transport-bar__section">
-        <div class="transport-bar__loop-length">
-          <select id="loop-length" class="btn btn--ghost" aria-label="Loop length" style="padding: 4px 8px; font-size: 0.75rem; min-height: 36px;">
-            <option value="1">1 Bar</option>
-            <option value="2">2 Bars</option>
-            <option value="4" selected>4 Bars</option>
-            <option value="8">8 Bars</option>
-          </select>
-        </div>
         <div class="metronome-toggle" id="metronome-toggle">
           <button class="btn btn--icon btn--ghost" id="btn-metronome" title="Metronome" aria-label="Toggle metronome">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -115,12 +107,6 @@ export class TransportBar {
     bpmInput.addEventListener('change', () => {
       this.transport.bpm = parseInt(bpmInput.value, 10) || 120;
       bpmInput.value = this.transport.bpm;
-    });
-
-    // Loop length
-    this.el.querySelector('#loop-length').addEventListener('change', (e) => {
-      const bars = parseInt(e.target.value, 10);
-      this.transport.setLoop(0, bars);
     });
 
     // Metronome toggle

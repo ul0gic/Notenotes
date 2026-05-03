@@ -80,6 +80,7 @@ export class SnippetTray {
       const noteCount = (s.notes?.length || 0) + (s.hits?.length || 0);
       const typeIcon = s.type === 'drum' ? '🥁' : '🎵';
       const bars = Math.ceil(s.durationTicks / (480 * (s.timeSignature?.beats || 4)));
+      const displayName = s.name || `${noteCount} notes · ${bars} bar${bars > 1 ? 's' : ''}`;
 
       return `
         <div class="snippet-tray__item" data-id="${s.id}">
@@ -88,7 +89,7 @@ export class SnippetTray {
           </div>
           <div class="snippet-tray__item-info">
             <span class="snippet-tray__item-icon">${typeIcon}</span>
-            <span class="snippet-tray__item-meta">${noteCount} notes · ${bars} bar${bars > 1 ? 's' : ''}</span>
+            <span class="snippet-tray__item-meta">${displayName}</span>
           </div>
           <div class="snippet-tray__item-actions">
             <button class="snippet-tray__action-btn snippet-tray__delete-btn" data-delete="${s.id}" aria-label="Delete snippet" title="Delete">✕</button>

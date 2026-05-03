@@ -38,8 +38,8 @@ export class CreativeMode {
 
     // Instruments
     this.scaleBoard = new ScaleBoard(this.synth, this.project);
-    this.microPiano = new MicroPiano(this.synth);
-    this.sketchKit = new SketchKit();
+    this.microPiano = new MicroPiano(this.synth, this.project);
+    this.sketchKit = new SketchKit(this.project);
     this.micRecorder = new MicRecorder();
 
     // Recording
@@ -55,6 +55,8 @@ export class CreativeMode {
   set project(p) {
     this._project = p;
     if (this.scaleBoard) this.scaleBoard.project = p;
+    if (this.microPiano) this.microPiano.project = p;
+    if (this.sketchKit) this.sketchKit.project = p;
     if (this.loopProgress) this.loopProgress.project = p;
   }
 

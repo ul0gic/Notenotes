@@ -34,7 +34,10 @@ export function createProject(name = 'Untitled Sketch') {
       metronomeOn: false,
       metronomeVolume: 0.5,
       loopBars: 4,
-      masterVolume: 0.8
+      masterVolume: 0.8,
+      pianoCount: 1,
+      pianoKeys: 12,
+      drumPads: 10
     }
   };
 }

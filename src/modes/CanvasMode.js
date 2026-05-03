@@ -44,6 +44,18 @@ export class CanvasMode {
     this.onTrackInstrumentChanged = null;
   }
 
+  _autoSetLoopFromClips() {
+    if (!this.project?.tracks) return;
+    let maxEndBar = 4;
+    for (const track of this.project.tracks) {
+      for (const clip of (track.clips || [])) {
+        const endBar = (clip.startBar || 0) + (clip.durationBars || 1);
+        if (endBar > maxEndBar) maxEndBar = endBar;
+      }
+    }
+    this.transport.setLoop(0, maxEndBar);
+  }
+
   render() {
     this.el = document.createElement('div');
     this.el.className = 'canvas-mode';
@@ -112,6 +124,7 @@ export class CanvasMode {
     this._renderSnippetDock();
     this._bindEvents();
     this._startPlayheadAnimation();
+    this._autoSetLoopFromClips();
 
     return this.el;
   }
@@ -340,6 +353,7 @@ export class CanvasMode {
       });
 
       this._renderTracks();
+      this._autoSetLoopFromClips();
       showToast(`Clip added to ${track.name}`);
     });
   }
@@ -375,6 +389,7 @@ export class CanvasMode {
       if (newBar !== originalBar) {
         clip.startBar = newBar;
         el.style.left = `${newBar * this.barWidth}px`;
+        this._autoSetLoopFromClips();
         this.store?.scheduleAutoSave(this.project);
 
         this.undoManager?.push({
@@ -639,6 +654,7 @@ export class CanvasMode {
           redo: () => { track.clips = track.clips.filter(c => c.id !== removed.id); this._renderTracks(); },
         });
         this._renderTracks();
+        this._autoSetLoopFromClips();
         showToast('Clip deleted');
         return;
       }
@@ -677,6 +693,7 @@ export class CanvasMode {
     this._renderRuler();
     this._renderTracks();
     this._renderSnippetDock();
+    this._autoSetLoopFromClips();
   }
 
   /** Set the zoom level for the canvas timeline */

@@ -5,6 +5,7 @@
  */
 
 import { getScaleNotes, midiToNoteName, SCALES, NOTE_NAMES } from '../engine/MusicTheory.js';
+import { showToast } from '../ui/Toast.js';
 
 export class ScaleBoard {
   /**
@@ -31,6 +32,15 @@ export class ScaleBoard {
     // Callbacks for note recording
     this._onNoteOn = null;
     this._onNoteOff = null;
+
+    this._onResize = () => {
+      if (this.el) {
+        const container = this.el.querySelector('#sb-pads');
+        if (container) {
+          container.style.gridTemplateColumns = this._gridColumns();
+        }
+      }
+    };
     
     // Now that state is initialized, set the project to trigger updates
     this.project = project;
@@ -66,11 +76,21 @@ export class ScaleBoard {
   /** Recalculate scale notes */
   _updateNotes(overrideCount) {
     this._fullScaleNotes = getScaleNotes(this.scaleName, this.rootNote, this.octave);
-    const count = overrideCount || this.project?.settings?.scalePadsCount || 7;
-    this._notes = this._fullScaleNotes.slice(0, count);
-    while (this.customPadTypes.length < count) {
+
+    if (this.padMode === 'custom') {
+      const count = overrideCount || this.project?.settings?.scalePadsCount || 7;
+      this._notes = this._fullScaleNotes.slice(0, Math.min(count, this._fullScaleNotes.length));
+    } else {
+      const scaleDef = SCALES[this.scaleName];
+      const degreeCount = scaleDef ? scaleDef.intervals.length : 7;
+      this._notes = this._fullScaleNotes.slice(0, degreeCount);
+    }
+
+    const noteCount = this._notes.length;
+    while (this.customPadTypes.length < noteCount) {
       this.customPadTypes.push('single');
     }
+    this.customPadTypes.length = noteCount;
   }
 
   /**
@@ -101,7 +121,7 @@ export class ScaleBoard {
           </select>
         </div>
         <div class="scaleboard__control-group">
-          <label class="scaleboard__label">Mode</label>
+          <label class="scaleboard__label">Pad Mode</label>
           <select class="scaleboard__select" id="sb-pad-mode" aria-label="Pad mode">
             <option value="single" ${this.padMode === 'single' ? 'selected' : ''}>Single</option>
             <option value="chords" ${this.padMode === 'chords' ? 'selected' : ''}>Chords</option>
@@ -121,13 +141,27 @@ export class ScaleBoard {
         </div>
         ` : ''}
       </div>
-      <div class="scaleboard__pads" id="sb-pads" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(60px, 1fr)); gap: 10px; width: 100%;">
+      <div class="scaleboard__pads" id="sb-pads" style="grid-template-columns: ${this._gridColumns()}; gap: ${this._gridGap()};">
         ${this._renderPads()}
       </div>
     `;
 
     this._bindEvents();
+    window.addEventListener('resize', this._onResize);
     return this.el;
+  }
+
+  _gridColumns() {
+    const idealCols = Math.ceil(Math.sqrt(this._notes.length));
+    const container = this.el?.querySelector('#sb-pads');
+    const width = container?.clientWidth || 360;
+    const maxCols = Math.max(1, Math.floor((width - 4) / 72));
+    const cols = Math.min(idealCols, maxCols);
+    return `repeat(${cols}, 1fr)`;
+  }
+
+  _gridGap() {
+    return this._notes.length > 9 ? '6px' : 'var(--space-md)';
   }
 
   _renderPads() {
@@ -140,7 +174,7 @@ export class ScaleBoard {
                 aria-label="Scale degree ${i + 1}, ${noteInfo.display}">
           <span class="scaleboard__pad-degree">${i + 1}</span>
           <span class="scaleboard__pad-note">${noteInfo.display}</span>
-          ${this.padMode === 'custom' ? `<span class="scaleboard__pad-type" style="font-size: 10px; opacity: 0.7;">${typeLabel}</span>` : ''}
+          ${this.padMode === 'custom' ? `<span class="scaleboard__pad-type">${typeLabel}</span>` : ''}
         </button>
       `;
     }).join('');
@@ -148,10 +182,10 @@ export class ScaleBoard {
 
   _refreshLayout() {
     const parent = this.el.parentNode;
+    const oldEl = this.el;
     if (parent) {
-      // Re-render completely to update controls
       const newEl = this.render();
-      parent.replaceChild(newEl, this.el);
+      parent.replaceChild(newEl, oldEl);
     } else {
       this._refreshPads();
     }
@@ -160,6 +194,7 @@ export class ScaleBoard {
   _refreshPads() {
     this._updateNotes();
     const padsContainer = this.el.querySelector('#sb-pads');
+    padsContainer.style.gridTemplateColumns = this._gridColumns();
     padsContainer.innerHTML = this._renderPads();
     this._bindPadEvents();
   }
@@ -201,6 +236,9 @@ export class ScaleBoard {
       this.padMode = e.target.value;
       if (this.padMode !== 'custom') this.isEditingLayout = false;
       this._refreshLayout();
+      if (this.padMode === 'custom') {
+        showToast('Tap "Edit Layout" to set each pad to Note or Chord');
+      }
     });
 
     // Edit Layout toggle
