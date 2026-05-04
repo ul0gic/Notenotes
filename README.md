@@ -19,15 +19,15 @@ Notenotes is a tiny, browser-based musical 'post it note' for capturing the idea
 I built this app primarily to experiment with music myself, and to understand ways to think about music outside of the constraints of what I've learned in music theory. I am a long time musician who has trouble putting ideas into a DAW, so I needed a noodling board of sorts. This is not ever meant to replace a DAW, and as such I don't want to focus on production and effects. In my head you come up with a hook on Notenotes and then you build it into a song elsewhere. 
 
 
-**Color over notation.** Beats can be colors. Pads can be colors (this is in progress). I want people to read songs in different ways.
+**Color over notation** Beats can be colors. Pads can be colors (this is in progress). I want people to read songs in different ways.
 
-**Unconventional instruments.** Plug in a controller — the buttons become your scale. Extremely intuitive, easy to pick up.
+**Unconventional instruments** Plug in a controller — the buttons become your scale. Extremely intuitive, easy to pick up.
 
 **Always in scale** Lock the pads to a key to narrow your options to the notes you need to see. 
 
-**Songs canvas.** Drag blocks of sound onto a simplified, minimalistic canvas grid.
+**Songs canvas** Drag blocks of sound onto a simplified, minimalistic canvas grid.
  
-**Local, no API or other connections** Everything lives in your browser. No cloud, no account."
+**Local, offline** Runs in your computer and does not require anything, not even an online connection.
 
 
 ---
