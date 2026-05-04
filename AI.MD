@@ -703,3 +703,17 @@ This means the music sounds at the same tick positions, while the bar lines and 
 **Canvas / Controller visuals**:
 - Audio snippets render a deterministic lightweight bar waveform preview in Canvas. It is intentionally a visual presence indicator, not decoded waveform analysis.
 - Controller Mode uses `public/controller.png` as the base controller art with absolute-positioned highlight overlays for D-pad, face buttons, bumpers, and sticks.
+
+<!-- --- NEW CONTEXT ADDED 2026-05-04 (INITIAL TIMING SYNC + INSPECT QUANTIZE) --- -->
+
+## ⏱️ Initial Timing UI Sync
+
+- `TransportBar.render()` runs before the saved project is loaded, so it initially draws beat dots from the default `4/4` transport.
+- After loading a project, `main.js` must call `transportBar.syncFromTransport()` after assigning `transport.bpm` and `transport.timeSignature`. This keeps the BPM input and beat-dot count correct for saved projects such as `5/4`.
+- Settings changes still use the `project-time-signature-changed` event path for live updates.
+
+## ✏️ Inspect Quantize All
+
+- Inspect's `Quantize all` button appears to the right of `Split` for MIDI-note snippets only.
+- It sets every note's `durationTick` to the current Inspect grid size (`1/2`, `1/4`, `1/8`, or `1/16`) without changing `startTick` or pitch.
+- It affects only the currently loaded snippet/clip in Inspect. Drum snippets are excluded because drum hits do not have note durations.

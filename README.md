@@ -49,6 +49,7 @@ Notenotes is built for visual thinkers and non-traditional musicians who feel fr
 - Vertical zoom (+/−) and configurable octave range (C1–C6)
 - **Split view** — dual stacked piano rolls for separate octave ranges
 - **2x** / **½** buttons to double or halve snippet length (halving deletes out-of-range notes)
+- **Quantize all** sets every MIDI note in the inspected clip to the selected grid duration without moving note starts
 - Auto-generated names ("20 notes") update dynamically as you edit
 - Configurable grid quantization (1/4, 1/8, 1/16, 1/2)
 - Delete notes via keyboard or button

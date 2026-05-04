@@ -193,6 +193,9 @@ export class EditMode {
         <button class="btn btn--ghost" id="edit-zoom-in" style="min-height:26px;padding:0 6px;font-size:0.7rem;" title="Vertical zoom in">+</button>
       </div>
     `;
+    const quantizeAllHTML = isDrum ? '' : `
+      <button class="btn btn--ghost" id="edit-quantize-all-btn" style="font-size:0.7rem;min-height:26px;padding:2px 8px;" title="Set every note duration to the selected grid">Quantize all</button>
+    `;
 
     return `
       <div class="edit-toolbar__group">
@@ -213,6 +216,7 @@ export class EditMode {
       ${zoomHTML}
       ${rangeHTML}
       <button class="btn btn--ghost${this._splitMode ? ' is-active' : ''}" id="edit-split-btn" style="font-size:0.7rem;min-height:26px;padding:2px 8px;" title="Split view">Split</button>
+      ${quantizeAllHTML}
       <div class="edit-toolbar__spacer"></div>
       <div class="edit-toolbar__group">
         <button class="btn btn--ghost" id="edit-delete-btn" style="font-size:0.7rem;min-height:26px;padding:2px 8px;">Delete ${isDrum ? 'Hit' : 'Note'}</button>
@@ -733,6 +737,11 @@ export class EditMode {
       this._rebuildAll();
     });
 
+    toolbar.querySelector('#edit-quantize-all-btn')?.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      this._quantizeAllNoteDurations();
+    });
+
     this._panes.forEach(pane => {
       pane.gridContainer.addEventListener('pointerdown', (e) => {
         if (e.target.closest('.piano-roll__note')) return;
@@ -819,6 +828,40 @@ export class EditMode {
     this._selectedNoteIdx = null;
     this._onEdit('Delete note');
     showToast('Note deleted');
+  }
+
+  _quantizeAllNoteDurations() {
+    const notes = this._snippet?.notes || [];
+    if (notes.length === 0) {
+      showToast('No notes to quantize');
+      return;
+    }
+
+    let changed = 0;
+    for (const note of notes) {
+      if (note.durationTick !== this._gridSize) {
+        note.durationTick = this._gridSize;
+        changed++;
+      }
+    }
+
+    if (changed === 0) {
+      showToast('Notes already match grid');
+      return;
+    }
+
+    this._onEdit('Quantize all note durations');
+    showToast(`Quantized ${notes.length} notes to ${this._gridLabel()}`);
+  }
+
+  _gridLabel() {
+    const labels = new Map([
+      [960, '1/2'],
+      [480, '1/4'],
+      [240, '1/8'],
+      [120, '1/16'],
+    ]);
+    return labels.get(this._gridSize) || `${this._gridSize} ticks`;
   }
 
   _onEdit(description) {

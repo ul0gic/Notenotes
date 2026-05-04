@@ -339,9 +339,11 @@ class App {
       this.project = await this.store.load(projects[0].id);
       if (this.project) {
         this.transport.bpm = this.project.bpm;
-        this.transport.timeSignature = this.project.timeSignature;
+        this.transport.timeSignature = this.project.timeSignature || { beats: 4, subdivision: 4 };
+        this.project.timeSignature = this.transport.timeSignature;
         this.quantizer.setGrid(this.project.settings.quantize || 0);
         this.metronome.enabled = this.project.settings.metronomeOn || false;
+        this.transportBar.syncFromTransport();
         console.log('[App] Loaded project:', this.project.name);
         return;
       }

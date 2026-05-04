@@ -209,6 +209,13 @@ export class TransportBar {
     if (m) m.textContent = `${mod}%`;
   }
 
+  syncFromTransport() {
+    const bpmInput = this.el?.querySelector('#bpm-input');
+    if (bpmInput) bpmInput.value = this.transport.bpm;
+    this.updateTimeSignature();
+    this._clearBeatIndicator();
+  }
+
   updateTimeSignature() {
     const indicator = this.el?.querySelector('#beat-indicator');
     if (!indicator) return;
