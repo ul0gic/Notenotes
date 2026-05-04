@@ -20,9 +20,13 @@ I built this app primarily to experiment with music myself, and to understand wa
 
 
 **Color over notation.** Beats can be colors. Pads can be colors (this is in progress). I want people to read songs in different ways.
+
 **Unconventional instruments.** Plug in a controller — the buttons become your scale. Extremely intuitive, easy to pick up.
+
 **Always in scale** Lock the pads to a key to narrow your options to the notes you need to see. 
- **Songs canvas.** Drag blocks of sound onto a simplified, minimalistic canvas grid.
+
+**Songs canvas.** Drag blocks of sound onto a simplified, minimalistic canvas grid.
+ 
 **Local, no API or other connections** Everything lives in your browser. No cloud, no account."
 
 
