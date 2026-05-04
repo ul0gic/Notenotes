@@ -151,6 +151,14 @@ class App {
       this.transportBar.setModDisplay(this.modManager.pitchPercent, this.modManager.modPercent);
     };
 
+    window.addEventListener('project-time-signature-changed', () => {
+      this.transportBar.updateTimeSignature();
+      this.canvasMode?.refresh();
+      if (this.editMode?._snippet) {
+        this.editMode.loadSnippet(this.editMode._snippet, this.editMode._clipId);
+      }
+    });
+
     // First user interaction will init audio
     this._setupAudioInit();
 
@@ -358,6 +366,26 @@ class App {
         e.preventDefault();
         if (this._initialized) {
           this.transport.toggle();
+        }
+      }
+
+      // Enter â†’ Stop and rewind
+      if (e.code === 'Enter') {
+        e.preventDefault();
+        if (this._initialized) {
+          this.transport.stop();
+        }
+      }
+
+      // R â†’ Toggle recording
+      if (e.code === 'KeyR' && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        if (this._initialized) {
+          if (this.transport.state === TransportState.RECORDING) {
+            this.transport.pause();
+          } else {
+            this.transport.record();
+          }
         }
       }
 

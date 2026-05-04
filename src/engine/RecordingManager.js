@@ -43,10 +43,10 @@ export class RecordingManager {
   init() {
     if (this._initialized) return;
     this._initialized = true;
-    this._unsubState = this.transport.onStateChange((state) => {
+    this._unsubState = this.transport.onStateChange((state, meta = {}) => {
       if (state === 'stopped' && this.armed) {
+        const endTick = this._getRelativeTick(meta.rawTick);
         for (const [midi, noteData] of this._heldNotes.entries()) {
-          const endTick = this.transport.currentTick;
           this._capturedNotes.push({
             pitch: midi,
             startTick: noteData.startTick,
@@ -89,8 +89,8 @@ export class RecordingManager {
   setArmed(armed) {
     this.armed = armed;
     if (!armed) {
+      const endTick = this._getRelativeTick();
       for (const [midi, noteData] of this._heldNotes.entries()) {
-        const endTick = this.transport.currentTick;
         this._capturedNotes.push({
           pitch: midi,
           startTick: noteData.startTick,
@@ -160,8 +160,8 @@ export class RecordingManager {
    * Get the current tick position relative to the loop start.
    * @returns {number}
    */
-  _getRelativeTick() {
-    const current = this.transport.currentTick;
+  _getRelativeTick(currentTick = null) {
+    const current = currentTick ?? this.transport.currentRawTick ?? this.transport.currentTick;
     const loopStart = this.transport.loopStartTick;
     return current - loopStart;
   }

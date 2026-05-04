@@ -646,3 +646,35 @@ This also creates a version history snapshot. Max 5 versions kept per project.
 
 **README**:
 - Node.js prerequisite updated from 18+ to 20+.
+
+<!-- --- NEW CONTEXT ADDED 2026-05-03 (CODEX TIMING REVIEW) --- -->
+
+## ⏱️ Transport Visual Timing vs Scheduler Lookahead
+
+**Problem**: The Transport scheduler used to reset `_startTime` / `_startTick` inside `_schedulerTick()` when it saw a loop boundary inside the 100ms lookahead window. Because Canvas playhead and LoopProgress read `transport.currentTick` on `requestAnimationFrame`, visuals could wrap early, before the scheduled audio actually reached the loop boundary.
+
+**Fix**:
+- Scheduler lookahead no longer mutates playback start anchors.
+- `currentTick` is now the loop-normalized tick for visuals/playback.
+- `currentRawTick` is the unlooped tick for long recordings.
+- Loop callbacks are emitted by comparing raw loop-cycle numbers and receive the scheduled `audioTime`.
+
+**Important Pattern**: Do not use scheduler lookahead state as visual clock state. Visuals should derive from `AudioContext.currentTime` and stable playback anchors, then normalize into the active loop only at read time.
+
+**Recording Note**: MIDI recording uses `currentRawTick` so recordings can continue past loop boundaries. Stop/pause state-change callbacks receive `{ tick, rawTick }` metadata so held notes can finalize before the transport rewinds visually.
+
+<!-- --- NEW CONTEXT ADDED 2026-05-03 (PROJECT TIME SIGNATURES) --- -->
+
+## 🎼 Project-Level Time Signatures
+
+**Supported Scope**: Notenotes supports one project-level time signature at a time: 2/4, 3/4, 4/4, or 5/4. These are intentionally quarter-note pulse meters. Do not add timeline meter changes yet without introducing a proper meter map.
+
+**Conversion Rule**: Changing the project time signature preserves absolute tick positions. Clips store visual placement as `startBar` / `durationBars`, so `SettingsPanel._setProjectTimeSignature()` converts existing clips through absolute ticks:
+- old `startTick = clip.startBar * oldTicksPerBar`
+- old `durationTicks = clip.snippet.durationTicks`
+- new `clip.startBar = startTick / newTicksPerBar`
+- new `clip.durationBars = durationTicks / newTicksPerBar`
+
+This means the music sounds at the same tick positions, while the bar lines and bar.beat labels move around it. A 4/4 clip can therefore become a fractional number of bars in 3/4 or 5/4.
+
+**Known Boundary**: Avoid 6/8, 7/8, 12/8, and mid-song meter changes until the app has explicit UX and engine support for denominator/pulse semantics. The current transport treats `timeSignature.beats` as the beat count and keeps one beat equal to 480 ticks.

@@ -47,10 +47,7 @@ export class TransportBar {
       </div>
 
       <div class="beat-indicator" id="beat-indicator">
-        <div class="beat-indicator__dot" data-beat="0"></div>
-        <div class="beat-indicator__dot" data-beat="1"></div>
-        <div class="beat-indicator__dot" data-beat="2"></div>
-        <div class="beat-indicator__dot" data-beat="3"></div>
+        ${this._renderBeatDots()}
       </div>
 
       <div class="transport-bar__bpm">
@@ -203,6 +200,20 @@ export class TransportBar {
     const m = this.el?.querySelector('#mod-mod');
     if (p) p.textContent = `${pitch}%`;
     if (m) m.textContent = `${mod}%`;
+  }
+
+  updateTimeSignature() {
+    const indicator = this.el?.querySelector('#beat-indicator');
+    if (!indicator) return;
+    indicator.innerHTML = this._renderBeatDots();
+    this._beatDots = this.el.querySelectorAll('.beat-indicator__dot');
+  }
+
+  _renderBeatDots() {
+    const beats = Math.max(1, this.transport?.timeSignature?.beats || 4);
+    return Array.from({ length: beats }, (_, i) =>
+      `<div class="beat-indicator__dot" data-beat="${i}"></div>`
+    ).join('');
   }
 
   _updatePlayButton(state) {

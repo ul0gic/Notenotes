@@ -9,6 +9,13 @@ import { SheetMusicView } from '../export/SheetMusicView.js';
 import { CHORD_TYPES, ARP_PATTERNS, ARP_RATES } from '../engine/ArpeggioManager.js';
 import { showToast } from './Toast.js';
 
+const TIME_SIGNATURE_OPTIONS = [
+  { beats: 2, subdivision: 4, label: '2/4' },
+  { beats: 3, subdivision: 4, label: '3/4' },
+  { beats: 4, subdivision: 4, label: '4/4' },
+  { beats: 5, subdivision: 4, label: '5/4' },
+];
+
 export class SettingsPanel {
   /**
    * @param {object} deps - { transport, metronome, quantizer, store, project }
@@ -56,6 +63,9 @@ export class SettingsPanel {
     const q = this.project?.settings?.quantize || 0;
     const metVol = this.project?.settings?.metronomeVolume ?? 0.5;
     const masterVol = this.project?.settings?.masterVolume ?? 0.8;
+    const timeSig = this.project?.timeSignature || this.transport?.timeSignature || { beats: 4, subdivision: 4 };
+    const timeSigValue = `${timeSig.beats}/${timeSig.subdivision}`;
+    const beatColors = this._beatColorsForBeats(timeSig.beats);
 
     return `
       <div class="settings-section" id="section-settings">
@@ -68,6 +78,15 @@ export class SettingsPanel {
           <div class="settings-row">
             <label class="settings-label">BPM</label>
             <input class="settings-input settings-input--sm" id="setting-bpm" type="number" min="40" max="240" value="${this.transport?.bpm || 120}" aria-label="BPM"/>
+          </div>
+          <div class="settings-row">
+            <label class="settings-label">Time Signature</label>
+            <select class="settings-select" id="setting-time-signature" aria-label="Project time signature">
+              ${TIME_SIGNATURE_OPTIONS.map(ts => {
+                const value = `${ts.beats}/${ts.subdivision}`;
+                return `<option value="${value}" ${timeSigValue === value ? 'selected' : ''}>${ts.label}</option>`;
+              }).join('')}
+            </select>
           </div>
         </div>
 
@@ -175,7 +194,7 @@ export class SettingsPanel {
           <div class="settings-row">
             <label class="settings-label">Beat Colors</label>
             <div style="display: flex; gap: 4px;">
-              ${(this.project?.settings?.beatColors || ['#1e1e2e', '#2a2a3e', '#1e1e2e', '#2a2a3e']).map((c, i) => 
+              ${beatColors.map((c, i) => 
                 `<input type="color" class="setting-vis-color" data-index="${i}" value="${c}" aria-label="Beat ${i+1} color" style="width: 24px; height: 24px; padding: 0; border: none; border-radius: 4px;" />`
               ).join('')}
             </div>
@@ -246,6 +265,11 @@ export class SettingsPanel {
         }
         showToast(`BPM: ${bpm}`);
       }
+    });
+
+    body.querySelector('#setting-time-signature')?.addEventListener('change', (e) => {
+      const [beats, subdivision] = e.target.value.split('/').map(v => parseInt(v, 10));
+      this._setProjectTimeSignature({ beats, subdivision });
     });
 
     // Quantize
@@ -380,7 +404,7 @@ export class SettingsPanel {
           if (this.project) {
             const idx = parseInt(e.target.dataset.index, 10);
             if (!this.project.settings.beatColors) {
-              this.project.settings.beatColors = ['#1e1e2e', '#2a2a3e', '#1e1e2e', '#2a2a3e'];
+              this.project.settings.beatColors = this._beatColorsForBeats(this.project.timeSignature?.beats || 4);
             }
             this.project.settings.beatColors[idx] = e.target.value;
             this.store?.scheduleAutoSave(this.project);
@@ -393,6 +417,60 @@ export class SettingsPanel {
         this.close();
       });
     }
+
+  _beatColorsForBeats(beats = 4) {
+    const defaults = ['#1e1e2e', '#2a2a3e', '#1e1e2e', '#2a2a3e', '#242436'];
+    const existing = this.project?.settings?.beatColors || defaults;
+    return Array.from({ length: beats }, (_, i) => existing[i] || defaults[i] || defaults[0]);
+  }
+
+  _setProjectTimeSignature(next) {
+    if (!this.project || !this.transport || !Number.isFinite(next.beats) || !Number.isFinite(next.subdivision)) {
+      return;
+    }
+
+    const current = this.project.timeSignature || this.transport.timeSignature || { beats: 4, subdivision: 4 };
+    if (current.beats === next.beats && current.subdivision === next.subdivision) return;
+
+    const oldTicksPerBar = this.transport.ticksPerBar;
+    const clipPositions = [];
+    for (const track of (this.project.tracks || [])) {
+      for (const clip of (track.clips || [])) {
+        clipPositions.push({
+          clip,
+          startTick: (clip.startBar || 0) * oldTicksPerBar,
+          durationTicks: clip.snippet?.durationTicks || (clip.durationBars || 1) * oldTicksPerBar,
+        });
+      }
+    }
+
+    if (this.transport.state !== 'stopped') {
+      this.transport.stop();
+    }
+
+    this.project.timeSignature = { beats: next.beats, subdivision: next.subdivision };
+    this.transport.timeSignature = this.project.timeSignature;
+    const newTicksPerBar = this.transport.ticksPerBar;
+
+    for (const item of clipPositions) {
+      item.clip.startBar = item.startTick / newTicksPerBar;
+      item.clip.durationBars = item.durationTicks / newTicksPerBar;
+    }
+
+    this.project.settings.beatColors = this._beatColorsForBeats(next.beats);
+    this.store?.scheduleAutoSave(this.project);
+    window.dispatchEvent(new CustomEvent('project-time-signature-changed', {
+      detail: { timeSignature: { ...this.project.timeSignature } },
+    }));
+
+    const body = this.el.querySelector('#settings-body');
+    if (body && this._activeSection === 'settings') {
+      body.innerHTML = this._renderSettingsSection();
+      this._bindSettingsEvents();
+    }
+
+    showToast(`Time signature: ${next.beats}/${next.subdivision}`);
+  }
 
   _switchSection(section) {
     this._activeSection = section;

@@ -305,17 +305,28 @@ export class EditMode {
     el.style.minWidth = '100%';
 
     const ticksPerBeat = 480;
+    const beatsPerBar = this._beatsPerBar();
     let html = '';
     for (let tick = 0; tick < duration; tick += ticksPerBeat) {
       const x = tick * TICK_WIDTH;
       const beat = tick / ticksPerBeat;
-      const bar = Math.floor(beat / 4) + 1;
-      const beatInBar = (beat % 4) + 1;
+      const bar = Math.floor(beat / beatsPerBar) + 1;
+      const beatInBar = (beat % beatsPerBar) + 1;
       const label = beatInBar === 1 ? `${bar}` : `${bar}.${beatInBar}`;
       html += `<span class="piano-roll__ruler-label" style="left:${x}px">${label}</span>`;
     }
     el.innerHTML = html;
     return el;
+  }
+
+  _beatsPerBar() {
+    return Math.max(
+      1,
+      this._snippet?.timeSignature?.beats ||
+      this.transport?.timeSignature?.beats ||
+      this.project?.timeSignature?.beats ||
+      4
+    );
   }
 
   _renderGridForRange(pitchMin, pitchMax, paneId) {
@@ -356,11 +367,12 @@ export class EditMode {
     grid.appendChild(bgEl);
 
     const ticksPerBeat = 480;
+    const ticksPerBar = ticksPerBeat * this._beatsPerBar();
     for (let tick = 0; tick <= duration; tick += this._gridSize) {
       const x = tick * TICK_WIDTH;
       const line = document.createElement('div');
       line.className = 'piano-roll__beat-line';
-      if (tick % (ticksPerBeat * 4) === 0) {
+      if (tick % ticksPerBar === 0) {
         line.classList.add('piano-roll__beat-line--bar');
       } else if (tick % ticksPerBeat !== 0) {
         line.classList.add('piano-roll__beat-line--sub');

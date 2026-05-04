@@ -45,6 +45,7 @@ export class PlaybackEngine {
     this._audioBuffers = new Map();
     this._engine = AudioEngine.getInstance();
     this._lastModIdx = new Map();   // snippetId → last modulation index processed
+    this._lastClipLocalTick = new Map();
   }
 
   /**
@@ -67,7 +68,15 @@ export class PlaybackEngine {
       if (state === TransportState.STOPPED) {
         this._allNotesOff();
         this._lastProcessedTick = -1;
+        this._lastModIdx.clear();
+        this._lastClipLocalTick.clear();
       }
+    });
+
+    this.transport.onLoop((tick, audioTime) => {
+      this._releaseActiveNotes(audioTime);
+      this._lastModIdx.clear();
+      this._lastClipLocalTick.clear();
     });
 
     this._initialized = true;
@@ -138,6 +147,12 @@ export class PlaybackEngine {
         if (tick < clipStartTick || tick >= clipEndTick) continue;
 
         const localTick = tick - clipStartTick;
+        const clipKey = clip.id || `${track.id}-${clip.snippetId}-${clipStartTick}`;
+        const lastLocalTick = this._lastClipLocalTick.get(clipKey);
+        if (lastLocalTick !== undefined && localTick < lastLocalTick) {
+          this._lastModIdx.delete(clipKey);
+        }
+        this._lastClipLocalTick.set(clipKey, localTick);
 
         // Play melodic notes
         const synth = instDef.type === 'synth' ? this._getSynthForTrack(track) : null;
@@ -168,7 +183,7 @@ export class PlaybackEngine {
 
         // Apply recorded modulation
         if (snippet.modulation?.length && instDef.type === 'synth') {
-          this._applyModulation(snippet, synth, localTick);
+          this._applyModulation(snippet, synth, localTick, clipKey, nextTickTime);
         }
       }
     }
@@ -188,15 +203,19 @@ export class PlaybackEngine {
    * Release all currently active notes.
    */
   _allNotesOff() {
-    for (const [key, entry] of this._activeNotes) {
-      entry.synth.noteOff(entry.pitch);
-    }
-    this._activeNotes.clear();
+    this._releaseActiveNotes();
 
     // Also stop all track synths
     for (const [, entry] of this._trackSynths) {
       entry.synth.allNotesOff();
     }
+  }
+
+  _releaseActiveNotes(time = null) {
+    for (const [key, entry] of this._activeNotes) {
+      entry.synth.noteOff(entry.pitch, time ?? undefined);
+    }
+    this._activeNotes.clear();
   }
 
   /**
@@ -236,9 +255,9 @@ export class PlaybackEngine {
     }
   }
 
-  _applyModulation(snippet, synth, localTick) {
+  _applyModulation(snippet, synth, localTick, clipKey, audioTime = null) {
     if (!synth?._voices || !snippet.modulation) return;
-    const key = snippet.id;
+    const key = clipKey || snippet.id;
     let idx = this._lastModIdx.get(key) || 0;
     const mod = snippet.modulation;
 
@@ -252,9 +271,10 @@ export class PlaybackEngine {
       const pt = mod[idx];
       for (const [, voice] of synth._voices) {
         try {
-          voice.osc.detune.setTargetAtTime(pt.pitchBend * 200, this._engine.ctx.currentTime, 0.02);
+          const time = audioTime ?? this._engine.ctx.currentTime;
+          voice.osc.detune.setTargetAtTime(pt.pitchBend * 200, time, 0.02);
           const modFreq = 400 + (pt.modulation / 2) * 7600;
-          voice.filter.frequency.setTargetAtTime(modFreq, this._engine.ctx.currentTime, 0.05);
+          voice.filter.frequency.setTargetAtTime(modFreq, time, 0.05);
         } catch (e) { /* ignore */ }
       }
     }

@@ -56,7 +56,7 @@ Notenotes is built for visual thinkers and non-traditional musicians who feel fr
 
 ### ⚙️ Settings & Export
 - **Sheet Music Export** — Render snippets as sheet music via [abcjs](https://paulrosen.github.io/abcjs/). Drum snippets use percussion clef. Export as SVG or ABC text.
-- **Project Settings** — Name, BPM, quantization grid, metronome volume, master volume, Time Signature background visualizer with custom beat colors
+- **Project Settings** — Name, BPM, project time signature (2/4, 3/4, 4/4, 5/4), quantization grid, metronome volume, master volume, Time Signature background visualizer with custom beat colors
 - **Instrument Settings** — Scale Board pad count, Piano count/keys, Drum Kit pad count
 - **Arpeggio Settings** — Rate, chord type, pattern, hold duration (1–30s)
 - **Version History** — Auto-saves up to 5 snapshots; restore any previous version

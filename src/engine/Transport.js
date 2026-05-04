@@ -47,6 +47,7 @@ export class Transport {
     this._schedulerInterval = 25;    // 25ms timer interval
     this._schedulerTimerId = null;
     this._nextTickTime = 0;
+    this._lastLoopCycle = 0;
 
     // Callbacks
     this._onTick = [];
@@ -76,9 +77,13 @@ export class Transport {
   /** Current tick position */
   get currentTick() {
     if (this.state === TransportState.STOPPED) return this._currentTick;
-    const elapsed = this.engine.currentTime - this._startTime;
-    const ticksPerSecond = (this._bpm / 60) * this.ticksPerBeat;
-    return this._startTick + Math.floor(elapsed * ticksPerSecond);
+    return this._normalizeTick(this._rawTickAtTime(this.engine.currentTime));
+  }
+
+  /** Current unlooped tick position, useful for long recordings */
+  get currentRawTick() {
+    if (this.state === TransportState.STOPPED) return this._currentTick;
+    return Math.max(0, this._rawTickAtTime(this.engine.currentTime));
   }
 
   /** Current beat (0-indexed within bar) */
@@ -148,6 +153,7 @@ export class Transport {
     this._startTime = this.engine.currentTime;
     this._startTick = this._currentTick;
     this._nextTickTime = this.engine.currentTime;
+    this._lastLoopCycle = this._loopCycleForRawTick(this._startTick);
 
     this.state = TransportState.PLAYING;
     this._emit(this._onStateChange, this.state);
@@ -161,6 +167,7 @@ export class Transport {
     this._startTime = this.engine.currentTime;
     this._startTick = this._currentTick;
     this._nextTickTime = this.engine.currentTime;
+    this._lastLoopCycle = this._loopCycleForRawTick(this._startTick);
 
     this.state = TransportState.RECORDING;
     this._emit(this._onStateChange, this.state);
@@ -169,17 +176,22 @@ export class Transport {
 
   pause() {
     if (this.state === TransportState.STOPPED) return;
-    this._currentTick = this.currentTick;
+    const stoppedAtTick = this.currentTick;
+    const stoppedAtRawTick = this.currentRawTick;
+    this._currentTick = stoppedAtTick;
     this.state = TransportState.STOPPED;
     this._stopScheduler();
-    this._emit(this._onStateChange, this.state);
+    this._emit(this._onStateChange, this.state, { tick: stoppedAtTick, rawTick: stoppedAtRawTick });
   }
 
   stop() {
+    const stoppedAtTick = this.currentTick;
+    const stoppedAtRawTick = this.currentRawTick;
     this.state = TransportState.STOPPED;
     this._currentTick = this.loopEnabled ? this.loopStartTick : 0;
+    this._lastLoopCycle = 0;
     this._stopScheduler();
-    this._emit(this._onStateChange, this.state);
+    this._emit(this._onStateChange, this.state, { tick: stoppedAtTick, rawTick: stoppedAtRawTick });
   }
 
   /** Toggle play/pause */
@@ -205,6 +217,34 @@ export class Transport {
     this.loopEndBar = Math.min(this.maxBars, Math.max(this.loopStartBar + 1, endBar));
   }
 
+  _rawTickAtTime(audioTime) {
+    const elapsed = audioTime - this._startTime;
+    const ticksPerSecond = (this._bpm / 60) * this.ticksPerBeat;
+    return this._startTick + Math.floor(elapsed * ticksPerSecond);
+  }
+
+  _normalizeTick(rawTick) {
+    if (!this.loopEnabled) return Math.max(0, rawTick);
+
+    const loopStart = this.loopStartTick;
+    const loopEnd = this.loopEndTick;
+    const loopLength = loopEnd - loopStart;
+    if (loopLength <= 0 || rawTick < loopEnd) return Math.max(0, rawTick);
+
+    return loopStart + ((rawTick - loopStart) % loopLength);
+  }
+
+  _loopCycleForRawTick(rawTick) {
+    if (!this.loopEnabled) return 0;
+
+    const loopStart = this.loopStartTick;
+    const loopEnd = this.loopEndTick;
+    const loopLength = loopEnd - loopStart;
+    if (loopLength <= 0 || rawTick < loopEnd) return 0;
+
+    return Math.floor((rawTick - loopStart) / loopLength);
+  }
+
   // --- Internal Scheduler ---
 
   _startScheduler() {
@@ -225,20 +265,14 @@ export class Transport {
 
     while (this._nextTickTime < lookAheadEnd) {
       // Calculate the tick index for this scheduled moment
-      const elapsed = this._nextTickTime - this._startTime;
-      const ticksPerSecond = (this._bpm / 60) * this.ticksPerBeat;
-      let tick = this._startTick + Math.floor(elapsed * ticksPerSecond);
+      const rawTick = this._rawTickAtTime(this._nextTickTime);
+      const loopCycle = this._loopCycleForRawTick(rawTick);
+      const tick = this._normalizeTick(rawTick);
 
       // Handle looping
-      if (this.loopEnabled && tick >= this.loopEndTick) {
-        const loopLength = this.loopEndTick - this.loopStartTick;
-        if (loopLength > 0) {
-          tick = this.loopStartTick + ((tick - this.loopStartTick) % loopLength);
-          // Reset start references for the new loop cycle
-          this._startTick = tick;
-          this._startTime = this._nextTickTime;
-          this._emit(this._onLoop, tick);
-        }
+      if (loopCycle > this._lastLoopCycle) {
+        this._lastLoopCycle = loopCycle;
+        this._emit(this._onLoop, tick, this._nextTickTime);
       }
 
       // Store current tick

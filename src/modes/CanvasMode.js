@@ -33,7 +33,7 @@ export class CanvasMode {
 
     this._zoomLevel = 1;
     this.barWidth = DEFAULT_BAR_WIDTH;
-    this.beatWidth = DEFAULT_BAR_WIDTH / 4;
+    this.beatWidth = DEFAULT_BAR_WIDTH / this._beatsPerBar();
     this._selectedClip = null;
     this._playheadEl = null;
     this._animFrame = null;
@@ -42,6 +42,20 @@ export class CanvasMode {
 
     /** Called when a track's instrument changes */
     this.onTrackInstrumentChanged = null;
+  }
+
+  _beatsPerBar() {
+    return Math.max(1, this.transport?.timeSignature?.beats || 4);
+  }
+
+  _syncTimelineMetrics() {
+    this.barWidth = DEFAULT_BAR_WIDTH * this._zoomLevel;
+    this.beatWidth = this.barWidth / this._beatsPerBar();
+
+    if (this.el) {
+      this.el.style.setProperty('--bar-width', `${this.barWidth}px`);
+      this.el.style.setProperty('--beat-width', `${this.beatWidth}px`);
+    }
   }
 
   _autoSetLoopFromClips() {
@@ -59,6 +73,7 @@ export class CanvasMode {
   render() {
     this.el = document.createElement('div');
     this.el.className = 'canvas-mode';
+    this._syncTimelineMetrics();
 
     // Set CSS custom properties for grid
     this.el.style.setProperty('--bar-width', `${this.barWidth}px`);
@@ -146,12 +161,13 @@ export class CanvasMode {
   _renderRuler() {
     if (!this._rulerEl) return;
     const totalBars = Math.min(this.transport.maxBars, 80);
-    const totalBeats = totalBars * 4;
+    const beatsPerBar = this._beatsPerBar();
+    const totalBeats = totalBars * beatsPerBar;
     let html = '';
     html += `<div class="canvas-ruler__bar" style="width:140px;flex-shrink:0;border-right:1px solid var(--surface-4);"></div>`;
     for (let beat = 0; beat < totalBeats; beat++) {
-      const bar = Math.floor(beat / 4) + 1;
-      const beatInBar = (beat % 4) + 1;
+      const bar = Math.floor(beat / beatsPerBar) + 1;
+      const beatInBar = (beat % beatsPerBar) + 1;
       const label = beatInBar === 1 ? `${bar}` : `${bar}.${beatInBar}`;
       const isBar = beatInBar === 1;
       html += `<div class="canvas-ruler__beat" style="width:${this.beatWidth}px;${isBar ? 'font-weight:var(--font-weight-semibold);color:var(--accent-light);' : ''}">${label}</div>`;
@@ -364,7 +380,8 @@ export class CanvasMode {
 
       // Calculate bar position from drop point
       const rect = contentEl.getBoundingClientRect();
-      const offsetX = e.clientX - rect.left + contentEl.parentElement?.closest('.canvas-tracks')?.scrollLeft || 0;
+      const scrollLeft = contentEl.parentElement?.closest('.canvas-tracks')?.scrollLeft || 0;
+      const offsetX = e.clientX - rect.left + scrollLeft;
       const startBar = Math.max(0, Math.floor(offsetX / this.barWidth));
       const durationBars = snippet.durationTicks / this.transport.ticksPerBar || 1;
 
@@ -469,7 +486,7 @@ export class CanvasMode {
 
       const finalWidth = parseInt(el.style.width, 10);
       const newBeats = Math.max(1, Math.round(finalWidth / this.beatWidth));
-      const newBars = newBeats / 4;
+      const newBars = newBeats / this._beatsPerBar();
       if (newBars !== originalBars) {
         clip.durationBars = newBars;
         el.style.width = `${newBars * this.barWidth}px`;
@@ -566,7 +583,7 @@ export class CanvasMode {
               const scrollLeft = lane.parentElement?.closest('.canvas-tracks')?.scrollLeft || 0;
               const offsetX = t.clientX - rect.left + scrollLeft;
               const startBar = Math.max(0, Math.floor(offsetX / this.barWidth));
-              const durationBars = Math.ceil(snippet.durationTicks / this.transport.ticksPerBar) || 1;
+              const durationBars = snippet.durationTicks / this.transport.ticksPerBar || 1;
               const clip = {
                 id: crypto.randomUUID(),
                 snippetId: snippet.id,
@@ -843,6 +860,7 @@ export class CanvasMode {
 
   /** Refresh the view (call after project changes) */
   refresh() {
+    this._syncTimelineMetrics();
     this._renderRuler();
     this._renderTracks();
     this._renderSnippetDock();
@@ -907,13 +925,9 @@ export class CanvasMode {
   /** Set the zoom level for the canvas timeline */
   _setZoom(level) {
     this._zoomLevel = Math.max(0.125, Math.min(8, level));
-    this.barWidth = DEFAULT_BAR_WIDTH * this._zoomLevel;
-    this.beatWidth = this.barWidth / 4;
+    this._syncTimelineMetrics();
     
     if (this.el) {
-      this.el.style.setProperty('--bar-width', `${this.barWidth}px`);
-      this.el.style.setProperty('--beat-width', `${this.beatWidth}px`);
-      
       const scrollRatio = this._tracksContainer.scrollLeft / this._tracksContainer.scrollWidth || 0;
       
       this._renderRuler();
