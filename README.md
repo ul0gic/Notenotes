@@ -22,25 +22,34 @@ Notenotes is built for visual thinkers and non-traditional musicians who feel fr
 - **Micro Piano** — Configurable chromatic keyboard (1 or 2 stacked, 10–32 keys each) with octave shifting
 - **Sketch Kit** — 10-pad synthesized drum kit (Kick, Snare, Clap, Hi-Hat, Cymbal, Toms, Rim, Shaker), 4 selectable kits (Classic, 808, Electronic, Acoustic), configurable pad count
 - **Mic Recorder** — Record audio from your microphone with live waveform visualization. Audio snippets save as playable clips on the timeline.
-- **Arpeggio / Hold** — Toggle Normal / Hold (latch notes) / Arpeggio (repeat strikes). 10 chord types, 4 patterns, 4 rates. Drums not affected.
+- **Controller Mode** — Gamepad instrument using Web Gamepad API. D-pad + face buttons mapped to scale notes, analog sticks for pitch bend and modulation. Shows live controller overlay with button highlighting. Chords mode supported.
+- **Arpeggio / Hold** — Toggle Normal / Hold (latch notes with auto-release) / Arpeggio (repeat strikes). 10 chord types, 4 patterns, 4 rates. Drums not affected. Hold duration configurable from 1–30s.
 - **8 Synth Presets** — Retro (Chip Lead, Warm Pad), Modern (Glass Pluck, Sub Bass, Bright Lead), Lo-fi (Tape Keys, Dusty Organ, Vinyl Strings)
-- **Loop Recording** — Punch-in recording with automatic snippet capture on loop wrap
+- **Pitch Bend & Modulation** — Number keys 1–9 mapped to Korg K25-style pitch/mod (hold to ramp). Header displays Pitch % and Mod %. Analog sticks on controller also feed in. Recorded modulation plays back on Canvas.
+- **Loop Recording** — Record as long as you want. Snippet finalized on Stop, not on loop wrap.
 
 ### 🎼 Canvas Mode — The Arranger
-- Multi-track horizontal timeline with bar/beat grid
-- Drag snippets from the dock onto track lanes (MIDI, drum, and audio clips)
-- Move, resize, and delete clips with full undo/redo
+- Multi-track horizontal timeline with bar/beat ruler (1.1, 1.2, 1.3, 1.4, 2.1... matching Inspect)
+- Drag snippets from the dock onto track lanes (MIDI, drum, and audio clips). Touch drag supported on iOS.
+- **Ctrl+click** to delete clips, **Alt+drag** to resize from right edge (shrink only, snaps to 1/4 beats)
+- Drag to move clips with full undo/redo
 - **✂️ Trim** button — remove empty space at start/end of all snippets
+- Clip widths reflect actual content duration (not rounded to whole bars)
 - Per-track Mute/Solo controls
 - Loop region auto-calculated from clip positions (no manual bar selection needed)
 - Animated playhead synchronized to transport
 - Audio tracks auto-hide instrument selector, showing "🎤 Audio"
+- Modulation/pitch data shown as orange/pink lines through clips
 
 ### ✏️ Inspect Mode — Piano Roll & Audio
-- Click-to-add notes on a pitch/time grid
+- Click-to-add notes on a pitch/time grid. Drum snippets use a dedicated drum grid.
+- Dropdown in empty state to select any snippet for editing
 - Drag notes to move (pitch + time), resize for duration
+- **Ctrl+click** to delete notes, **Alt+drag** to resize notes
 - Vertical zoom (+/−) and configurable octave range (C1–C6)
 - **Split view** — dual stacked piano rolls for separate octave ranges
+- **2x** / **½** buttons to double or halve snippet length (halving deletes out-of-range notes)
+- Auto-generated names ("20 notes") update dynamically as you edit
 - Configurable grid quantization (1/4, 1/8, 1/16, 1/2)
 - Delete notes via keyboard or button
 - **Audio snippets** open an audio player with controls and metadata
@@ -49,9 +58,10 @@ Notenotes is built for visual thinkers and non-traditional musicians who feel fr
 - **Sheet Music Export** — Render snippets as sheet music via [abcjs](https://paulrosen.github.io/abcjs/). Drum snippets use percussion clef. Export as SVG or ABC text.
 - **Project Settings** — Name, BPM, quantization grid, metronome volume, master volume, Time Signature background visualizer with custom beat colors
 - **Instrument Settings** — Scale Board pad count, Piano count/keys, Drum Kit pad count
-- **Arpeggio Settings** — Rate, chord type, pattern, hold duration
+- **Arpeggio Settings** — Rate, chord type, pattern, hold duration (1–30s)
 - **Version History** — Auto-saves up to 5 snapshots; restore any previous version
 - **Metronome** — Available in every mode, with accent on beat 1
+- **Mobile** — Transport bar collapses right-side controls into a "⋯" dropdown on narrow screens. Pinch/zoom disabled for app-like feel.
 
 ---
 
@@ -306,7 +316,11 @@ Each phase was built iteratively — code first, then browser testing with scree
 | `Ctrl+Z` | Undo |
 | `Ctrl+Shift+Z` | Redo |
 | `Delete` / `Backspace` | Delete selected note or clip |
+| `Ctrl+click` | Delete note (Inspect) or clip (Canvas) |
+| `Alt+drag` | Resize note (Inspect) or clip (Canvas, shrink only) |
 | `Click HLD/ARP button` | Cycle between Normal / Hold / Arpeggio modes |
+| `1` / `4` / `7` (hold) | Modulation down / reset / up (ramp) |
+| `3` / `6` / `9` (hold) | Pitch bend down / reset / up (ramp) |
 
 ---
 

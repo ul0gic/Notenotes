@@ -522,3 +522,127 @@ This also creates a version history snapshot. Max 5 versions kept per project.
 **CSS**
 - Canvas: `.canvas-lane__inst-label` for "🎤 Audio" instrument display on audio tracks.
 - Edit/Inspect: `.piano-roll-pane` for split view, `.edit-audio` for audio player, `.edit-toolbar .btn.is-active` for split button state.
+
+<!-- --- NEW CONTEXT ADDED 2026-05-03 (SESSION 2) --- -->
+
+## ⏱️ Duration Logic Consistency
+
+**Problem**: Canvas clips used `Math.ceil(durationTicks / ticksPerBar)` for `durationBars`, rounding to whole bars. A 5-beat clip displayed as 2 bars wide on Canvas but only showed content through beat 2.1 in Inspect. Same data, conflicting visual representations.
+
+**Decision**: All time representation should be consistent across views. The data model uses ticks (480/beat) as the canonical unit — tempo-relative, correct for sheet music and clip arrangement. The fix was to make Canvas and Inspect agree on the visual interpretation.
+
+**Fix**:
+- **`clip.durationBars` is now a float**: `snippet.durationTicks / ticksPerBar` (e.g., 1.25 for 5 beats in 4/4). No `Math.ceil` rounding. Clip pixel width = `durationBars * barWidth` — exact content width.
+- **Canvas ruler matches Inspect**: Shows `1.1, 1.2, 1.3, 1.4, 2.1, 2.2...` (bar.beat format) instead of whole bar numbers. Bar boundaries (beat 1) are bold/accent, other beats subtle. Same labels in both views — no mental translation.
+- **All `durationBars` setters updated**: Drop handler, touch drag handler, and `_trimEmptySpace` all use float division. `_autoSetLoopFromClips` still works correctly with float addition.
+- **Why not pure seconds/milliseconds?** Switching would require rewriting the transport scheduler, recording system, ABC export, PlaybackEngine, and data model — all built on 480 ticks/beat. Ticks are tempo-relative: the same tick count means the same musical duration regardless of BPM. This is what sheet music and clip arrangement need.
+
+**Ruler CSS**: Added `.canvas-ruler__beat` class (8px font, centered) alongside existing `.canvas-ruler__bar`. Beat markers are narrower, bar-number markers get inline bold styling.
+
+---
+
+## 📱 iOS / Mobile Fixes
+
+**AudioContext — Synchronous Init**
+- iOS Safari requires `AudioContext` creation AND `resume()` in the same synchronous call stack as the user gesture. Using `async/await` in the event handler broke this — Chrome rejected the `resume()` because the gesture context expired during the `await`.
+- **Fix**: Added `AudioEngine.initSync()` — creates context and calls `resume()` immediately. Also plays a 10ms silent oscillator burst (gain 0.001) because iOS requires actual AudioContext *usage* (e.g., `createOscillator` + `start`), not just `resume()`.
+- Event handler now uses synchronous `initAudio()` instead of `async`. Catches init failures and falls through.
+- **Persistent resume**: A handler on `pointerdown`/`keydown`/`touchstart`/`touchend` calls `ctx.resume()` every touch until the context is running. Added `touchend` specifically because iOS prefers it for audio gestures.
+- **Visibility change**: Resumes context when page becomes visible again (iOS suspends on background).
+
+**Touch Drag-and-Drop for Canvas Dock**
+- iOS Safari doesn't support HTML5 `dragstart`/`dragover`/`drop` events with touch.
+- **Fix**: Added `touchstart`/`touchmove`/`touchend` handlers to canvas dock items. Creates a floating clone on drag, drops onto the lane under the finger via `document.elementFromPoint()`. Minimum drag threshold of 10px to distinguish from tap. Works alongside existing desktop drag events.
+
+**Pinch/Zoom Prevention**
+- **CSS**: `touch-action: manipulation` on `html` and `body` — prevents double-tap zoom and pinch gesture.
+- `user-select: none` on everything except form inputs.
+- `overscroll-behavior: none` — prevents pull-to-refresh.
+
+**Mobile Transport Bar Dropdown**
+- On screens ≤560px, the right-side items (ARP toggle, Pitch/Mod display, metronome, keys help, settings) collapse into a `⋯` dropdown button.
+- **CSS**: `.transport-bar__more` hidden by default in mobile, shown when `.is-open` class toggled via the `#tb-more-btn` click. Positioned absolutely below the transport bar with `top: 100%` (adapts to bar height). `z-index: 100` with shadow.
+- **ARP toggle moved into the dropdown** — was previously outside `.transport-bar__more`, pushing the ⋯ button off-screen on iPhone 15 (393px).
+- Breakpoint: `@media (max-width: 560px)`.
+
+---
+
+## 🔍 Inspect Mode — Empty State Dropdown
+
+- When no snippet is loaded, Inspect's empty state now shows a `<select>` listing all non-audio snippets with icons: `🎵 Melody (15 notes)` or `🥁 Drums (8 hits)`.
+- Selecting a snippet loads it directly into the editor.
+- CSS: `.edit-empty__select` styled to match the app design system.
+
+---
+
+## 🏷️ Auto-Updating Snippet Names
+
+- Auto-generated names matching `/^\d+\s+(notes|hits)$/` (e.g., "20 notes") are now dynamically updated when the note count changes via editing.
+- `_onEdit()` checks the pattern and updates `this._snippet.name` and the name input field.
+- Custom-named snippets are left unchanged.
+
+---
+
+## 🛑 Recording Stability
+
+**No More Loop Auto-Finalize**
+- Removed the `onLoop` subscription in `RecordingManager.init()`. Previously, every loop wrap finalized a snippet, cutting recordings at the loop boundary (default 4 bars).
+- Now recordings only finalize when the user hits Stop — record as long as you want.
+
+**Duplicate Subscription Guard**
+- Added `_initialized` flag to `RecordingManager.init()` — prevents duplicate transport state subscriptions if init is called multiple times.
+- `setArmed(false)` now finalizes held notes (not just clears them) to prevent losing notes on transport state transitions.
+
+**Missing Methods Restored**
+- `onSnippetCreated()`, `setModManager()`, `captureModulation()` were accidentally lost in a file edit. All three restored.
+
+---
+
+## ✂️ Canvas Clip Controls
+
+**Modifier Key Actions** (matching Inspect):
+- **Ctrl+click** (Cmd on Mac) on a clip → delete it instantly.
+- **Alt+drag** the right edge → resize (shrink only), erasing notes that fall past the new end.
+- **Regular drag** → move the clip (unchanged).
+
+**Alt+drag resize details**:
+- Snaps to 1/4 beats via `this.beatWidth` (not whole bars).
+- `Math.min(startWidth, startWidth + dx)` ensures clips can only shrink, never extend.
+- Filters out `notes` and `hits` with `startTick >= newEndTick`.
+- Updates `snippet.durationTicks` and saves.
+
+---
+
+## 🎮 Controller Mode — Octave Release
+
+- `_releaseAllNotes()` fires before changing octaves via bumpers. Prevents stuck notes when holding a button while shifting octaves.
+
+---
+
+## 📈 Modulation Playback & Visual Indicators
+
+**Playback Formula Fixed**
+- `PlaybackEngine._applyModulation()` now uses the same filter formula as `ModulationManager._applyMod()`: `400 + (modulation / 2) * 7600` Hz.
+- Previously used `8000 + modulation * 1000` which produced a much narrower, less audible range.
+
+**Visual Modulation/Pitch Lines on Clips**
+- Each Canvas clip now renders a thin 10px SVG overlay when its snippet has `modulation[]` data.
+- **Orange path** = pitch bend (height scales with absolute bend value).
+- **Pink path** = modulation (height scales with modulation level).
+- Transparent when values are 0, becomes visible when there's activity.
+- `_renderModOverlay()` creates the SVG inline; `.canvas-clip` CSS changed to `overflow: visible`.
+
+---
+
+## ⚙️ GitHub Pages Deploy Configuration
+
+**Workflow Fix** (`deploy.yml`):
+- `node-version` bumped from `18` to `22` (Vite 8.x requires Node 20.19+).
+- `npm install --legacy-peer-deps` added (vite-plugin-pwa@1.2.0 doesn't declare Vite 8.x compatibility but works fine).
+
+**Vite Config**:
+- `base: '/Notenotes/'` added so assets load from the correct subdirectory on GitHub Pages.
+- PWA `start_url` changed to `/Notenotes/`.
+
+**README**:
+- Node.js prerequisite updated from 18+ to 20+.
