@@ -127,38 +127,33 @@ Recommendation:
 
 Pair this with the storage meter instead of doing it as a separate abstract settings pass.
 
-## Still Needs Work
+## Newly Completed: Storage Meter and Backup Clarity
 
-## 1. Storage Meter and Backup Clarity
-
-This is now my recommended next product-facing task.
+Status: implemented in the current local build.
 
 Goal:
 
-- Add a storage meter in Settings.
-- Show estimated browser storage usage and quota with `navigator.storage.estimate()`.
-- Show a warning when storage usage is getting high.
-- Clarify that browser/PWA storage is local and can be cleared by browser data cleanup.
-- Encourage workspace backup when recordings exist.
+- Add a storage meter in Settings -> Save.
+- Show estimated browser storage usage and quota.
+- Show referenced audio recordings and audio storage size.
+- Estimate current workspace backup size.
+- Clarify that browser/PWA storage is local and a workspace backup is the safer handoff point.
 
-Suggested UI:
+Current behavior:
 
-- Put this in Settings -> Save.
-- Show:
-  - `Browser storage used`
-  - `Estimated storage available`
-  - `Audio recordings stored`
-  - `Workspace backup recommended`
+- Uses `navigator.storage.estimate()` when available.
+- Uses local audio asset stats from the project store.
+- Estimates workspace backup size by combining project JSON and audio backup overhead.
+- Shows stronger guidance when storage is high, recordings exist, or missing audio assets are detected.
 
-Expected scope:
+Still worth checking manually:
 
-Small to medium.
+- How the meter reads on iPhone Safari and Chrome.
+- Whether the storage quota shown by mobile browsers is understandable enough for normal users.
 
-Why this comes next:
+## Still Needs Work
 
-The storage foundation is now better, but users still need to understand what is safe, what is local, and when to export a backup.
-
-## 2. WAV Export Hardening
+## 1. WAV Export Hardening
 
 Goal:
 
@@ -180,9 +175,9 @@ Small to medium.
 
 Recommendation:
 
-Do this soon after the storage meter, or immediately if export trust feels more urgent.
+Do this next. Export trust matters for beta, and the storage/track-type foundation is now in better shape.
 
-## 3. Backup Options and History Limits
+## 2. Backup Options and History Limits
 
 Goal:
 
@@ -208,7 +203,7 @@ Expected scope:
 
 Medium.
 
-## 4. Tone Presets and Clip Tone Editing
+## 3. Tone Presets and Clip Tone Editing
 
 Goal:
 
@@ -241,7 +236,7 @@ Expected scope:
 
 Medium if kept to presets and badges.
 
-## 5. Google Drive Backup
+## 4. Google Drive Backup
 
 Goal:
 
@@ -261,7 +256,7 @@ Recommendation:
 
 Do not start this until local backups, storage meter, and export reliability feel solid. This is useful, but it brings account permissions, cloud failures, and support burden.
 
-## 6. Optional Later: Audio File Import
+## 5. Optional Later: Audio File Import
 
 Goal:
 
@@ -283,8 +278,8 @@ Small to medium.
 
 ## Current Recommendation
 
-Move next to `Storage Meter and Backup Clarity`, unless WAV export reliability feels more urgent.
+Move next to `WAV Export Hardening`.
 
 Reason:
 
-Track type enforcement already exists. The next user-facing risk is that people may trust browser/PWA storage more than they should. A visible storage meter plus clearer backup language will make the new audio storage foundation understandable and safer for beta users.
+Track type enforcement already exists, durable audio storage now exists, and the Save tab now explains local storage better. The next beta risk is export trust: Canvas WAV export should honor mute/solo, clearly report unavailable audio, and be checked against mixed MIDI, drum, and audio arrangements.
