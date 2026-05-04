@@ -90,6 +90,7 @@ export class SketchKit {
     this._output = null;
     this._kitId = 'classic';
     this._onHit = null;
+    this._activePadTimers = new Map();
 
     window.addEventListener('settings-pads-changed', () => {
       if (this.el) this._refreshPads();
@@ -186,12 +187,36 @@ export class SketchKit {
       pad.addEventListener('pointerdown', (e) => {
         e.preventDefault();
         const sid = pad.dataset.pad;
-        this._triggerSound(sid);
-        pad.classList.add('is-active');
-        if (this._onHit) this._onHit(sid);
-        setTimeout(() => pad.classList.remove('is-active'), 120);
+        this.triggerPad(sid);
       });
     });
+  }
+
+  visiblePadIds() {
+    return [...(this.el?.querySelectorAll('.sketchkit__pad') || [])]
+      .map(pad => pad.dataset.pad)
+      .filter(Boolean);
+  }
+
+  triggerVisiblePad(index) {
+    const sid = this.visiblePadIds()[index];
+    if (sid) this.triggerPad(sid);
+  }
+
+  triggerPad(sid) {
+    const pad = this.el?.querySelector(`.sketchkit__pad[data-pad="${sid}"]`);
+    this._triggerSound(sid);
+    if (pad) {
+      pad.classList.add('is-active');
+      const oldTimer = this._activePadTimers.get(sid);
+      if (oldTimer) clearTimeout(oldTimer);
+      const timer = setTimeout(() => {
+        pad.classList.remove('is-active');
+        this._activePadTimers.delete(sid);
+      }, 120);
+      this._activePadTimers.set(sid, timer);
+    }
+    if (this._onHit) this._onHit(sid);
   }
 
   _triggerSound(sid, atTime) {

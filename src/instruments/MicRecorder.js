@@ -11,12 +11,15 @@ export class MicRecorder {
     this.el = null;
     this._stream = null;
     this._recorder = null;
+    this._source = null;
     this._analyser = null;
     this._chunks = [];
     this._isRecording = false;
     this._hasPermission = false;
     this._animFrame = null;
     this._onRecordingComplete = null;
+    this._devices = [];
+    this._selectedDeviceId = '';
   }
 
   setRecordingCallback(fn) { this._onRecordingComplete = fn; }
@@ -28,10 +31,16 @@ export class MicRecorder {
     this.el.innerHTML = `
       <div class="mic-recorder__visual">
         <canvas class="mic-recorder__meter" id="mic-meter" width="280" height="120"></canvas>
-        <div class="mic-recorder__status" id="mic-status">Tap to enable microphone</div>
+        <div class="mic-recorder__status" id="mic-status">Tap to enable audio input</div>
+      </div>
+      <div class="mic-recorder__device-row">
+        <label class="mic-recorder__device-label" for="mic-device-select">Input</label>
+        <select class="mic-recorder__device-select" id="mic-device-select" aria-label="Audio input device">
+          <option value="">Default input</option>
+        </select>
       </div>
       <div class="mic-recorder__controls">
-        <button class="btn btn--record mic-recorder__btn" id="mic-btn" aria-label="Record from microphone">
+        <button class="btn btn--record mic-recorder__btn" id="mic-btn" aria-label="Record audio input">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
             <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
@@ -57,38 +66,96 @@ export class MicRecorder {
         this._startRecording();
       }
     });
+
+    this.el.querySelector('#mic-device-select')?.addEventListener('change', async (e) => {
+      this._selectedDeviceId = e.target.value;
+      if (this._hasPermission) {
+        await this._openStream();
+      }
+    });
   }
 
   async _requestPermission() {
     const status = this.el.querySelector('#mic-status');
     try {
-      status.textContent = 'Requesting mic access...';
-      this._stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      status.textContent = 'Requesting audio input access...';
+      await this._openStream();
       this._hasPermission = true;
-      status.textContent = 'Mic ready. Tap to record.';
-
-      // Set up analyser for level meter
-      const source = this.engine.ctx.createMediaStreamSource(this._stream);
-      this._analyser = this.engine.ctx.createAnalyser();
-      this._analyser.fftSize = 256;
-      source.connect(this._analyser);
-      this._drawMeter();
+      await this._refreshDeviceList();
+      status.textContent = 'Audio input ready. Tap to record.';
     } catch (err) {
-      status.textContent = 'Mic access denied';
+      status.textContent = 'Audio input access denied';
       console.warn('[MicRecorder] Permission denied:', err);
     }
   }
 
+  async _openStream() {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      throw new Error('Media input is not available in this browser');
+    }
+
+    const constraints = {
+      audio: this._selectedDeviceId
+        ? { deviceId: { exact: this._selectedDeviceId } }
+        : true,
+    };
+
+    this._stopStream();
+    this._stream = await navigator.mediaDevices.getUserMedia(constraints);
+    this._setupAnalyser();
+  }
+
+  _setupAnalyser() {
+    if (!this.engine.ctx || !this._stream) return;
+
+    this._source = this.engine.ctx.createMediaStreamSource(this._stream);
+    this._analyser = this.engine.ctx.createAnalyser();
+    this._analyser.fftSize = 256;
+    this._source.connect(this._analyser);
+
+    if (!this._animFrame) {
+      this._drawMeter();
+    }
+  }
+
+  async _refreshDeviceList() {
+    if (!navigator.mediaDevices?.enumerateDevices) return;
+    this._devices = (await navigator.mediaDevices.enumerateDevices())
+      .filter(d => d.kind === 'audioinput');
+
+    const select = this.el?.querySelector('#mic-device-select');
+    if (!select) return;
+
+    const current = this._selectedDeviceId;
+    select.innerHTML = `
+      <option value="">Default input</option>
+      ${this._devices.map((d, i) => `
+        <option value="${d.deviceId}" ${d.deviceId === current ? 'selected' : ''}>
+          ${d.label || `Audio input ${i + 1}`}
+        </option>
+      `).join('')}
+    `;
+    select.value = current;
+  }
+
   _startRecording() {
-    if (!this._stream) return;
+    if (!this._stream) {
+      this._requestPermission().then(() => {
+        if (this._stream) this._startRecording();
+      });
+      return;
+    }
     this._chunks = [];
     this._startTime = Date.now();
-    this._recorder = new MediaRecorder(this._stream, { mimeType: 'audio/webm;codecs=opus' });
+    const mimeType = this._preferredMimeType();
+    this._recorder = mimeType
+      ? new MediaRecorder(this._stream, { mimeType })
+      : new MediaRecorder(this._stream);
     this._recorder.ondataavailable = (e) => {
       if (e.data.size > 0) this._chunks.push(e.data);
     };
     this._recorder.onstop = () => {
-      const blob = new Blob(this._chunks, { type: 'audio/webm' });
+      const blob = new Blob(this._chunks, { type: this._recorder?.mimeType || mimeType || 'audio/webm' });
       this._chunks = [];
       if (this._onRecordingComplete) this._onRecordingComplete(blob);
     };
@@ -104,7 +171,7 @@ export class MicRecorder {
     }
     this._isRecording = false;
     this.el.querySelector('#mic-btn').classList.remove('is-active');
-    this.el.querySelector('#mic-status').textContent = 'Mic ready. Tap to record.';
+    this.el.querySelector('#mic-status').textContent = 'Audio input ready. Tap to record.';
   }
 
   _drawMeter() {
@@ -135,10 +202,32 @@ export class MicRecorder {
     draw();
   }
 
-  destroy() {
-    if (this._animFrame) cancelAnimationFrame(this._animFrame);
+  _stopStream() {
+    if (this._isRecording) this._stopRecording();
+    if (this._animFrame) {
+      cancelAnimationFrame(this._animFrame);
+      this._animFrame = null;
+    }
     if (this._stream) {
       this._stream.getTracks().forEach(t => t.stop());
+      this._stream = null;
     }
+    this._source = null;
+    this._analyser = null;
+  }
+
+  _preferredMimeType() {
+    const candidates = [
+      'audio/webm;codecs=opus',
+      'audio/webm',
+      'audio/mp4',
+      'audio/aac',
+    ];
+    if (!window.MediaRecorder?.isTypeSupported) return '';
+    return candidates.find(type => MediaRecorder.isTypeSupported(type)) || '';
+  }
+
+  destroy() {
+    this._stopStream();
   }
 }

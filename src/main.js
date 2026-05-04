@@ -359,7 +359,7 @@ class App {
   _bindKeyboard() {
     document.addEventListener('keydown', (e) => {
       // Don't capture when typing in inputs
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName) || e.target.isContentEditable) return;
 
       // Space → Play/Pause
       if (e.code === 'Space') {
@@ -468,17 +468,34 @@ class App {
           <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Ctrl+Z</td><td style="padding:4px 8px;color:var(--text-secondary);">Undo</td></tr>
           <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Ctrl+Shift+Z</td><td style="padding:4px 8px;color:var(--text-secondary);">Redo</td></tr>
           <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Ctrl+S</td><td style="padding:4px 8px;color:var(--text-secondary);">Save Project</td></tr>
-          <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Delete</td><td style="padding:4px 8px;color:var(--text-secondary);">Delete selected note/clip</td></tr>
+        </table>
+        <hr style="border:none;border-top:1px solid var(--surface-3);margin:var(--space-sm) 0;" />
+        <h4 style="margin:var(--space-sm) 0;font-size:var(--font-size-sm);">Creative Mode</h4>
+        <table style="width:100%;font-size:var(--font-size-sm);border-collapse:collapse;">
+          <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Scale: 1-9, 0</td><td style="padding:4px 8px;color:var(--text-secondary);">Hold visible scale pads</td></tr>
+          <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Kit: 1-9, 0</td><td style="padding:4px 8px;color:var(--text-secondary);">Trigger visible drum pads</td></tr>
+          <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Piano: \`- =</td><td style="padding:4px 8px;color:var(--text-secondary);">Hold visible piano keys left to right</td></tr>
+          <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">1/4/7</td><td style="padding:4px 8px;color:var(--text-secondary);">Modulation down/reset/up when not playing Scale/Kit/Piano keys</td></tr>
+          <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">3/6/9</td><td style="padding:4px 8px;color:var(--text-secondary);">Pitch bend down/reset/up when not playing Scale/Kit/Piano keys</td></tr>
         </table>
         <hr style="border:none;border-top:1px solid var(--surface-3);margin:var(--space-sm) 0;" />
         <h4 style="margin:var(--space-sm) 0;font-size:var(--font-size-sm);">Inspect Mode (Piano Roll)</h4>
         <table style="width:100%;font-size:var(--font-size-sm);border-collapse:collapse;">
           <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Click</td><td style="padding:4px 8px;color:var(--text-secondary);">Add note / Select note</td></tr>
-          <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Shift+drag</td><td style="padding:4px 8px;color:var(--text-secondary);">Move note (pitch + time)</td></tr>
+          <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Drag</td><td style="padding:4px 8px;color:var(--text-secondary);">Move note or hit</td></tr>
           <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Alt+drag</td><td style="padding:4px 8px;color:var(--text-secondary);">Resize note (extend/shrink)</td></tr>
           <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Ctrl+click</td><td style="padding:4px 8px;color:var(--text-secondary);">Delete note</td></tr>
           <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Click empty space</td><td style="padding:4px 8px;color:var(--text-secondary);">Add new note</td></tr>
           <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Scroll</td><td style="padding:4px 8px;color:var(--text-secondary);">Pan pitch range</td></tr>
+          <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Delete</td><td style="padding:4px 8px;color:var(--text-secondary);">Delete selected note or hit</td></tr>
+        </table>
+        <hr style="border:none;border-top:1px solid var(--surface-3);margin:var(--space-sm) 0;" />
+        <h4 style="margin:var(--space-sm) 0;font-size:var(--font-size-sm);">Canvas Mode</h4>
+        <table style="width:100%;font-size:var(--font-size-sm);border-collapse:collapse;">
+          <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Drag clip</td><td style="padding:4px 8px;color:var(--text-secondary);">Move clip on the timeline</td></tr>
+          <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Alt+drag edge</td><td style="padding:4px 8px;color:var(--text-secondary);">Shrink clip</td></tr>
+          <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Ctrl+click</td><td style="padding:4px 8px;color:var(--text-secondary);">Delete clip</td></tr>
+          <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Delete</td><td style="padding:4px 8px;color:var(--text-secondary);">Delete selected clip</td></tr>
         </table>
       </div>
     `;

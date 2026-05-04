@@ -678,3 +678,22 @@ This also creates a version history snapshot. Max 5 versions kept per project.
 This means the music sounds at the same tick positions, while the bar lines and bar.beat labels move around it. A 4/4 clip can therefore become a fractional number of bars in 3/4 or 5/4.
 
 **Known Boundary**: Avoid 6/8, 7/8, 12/8, and mid-song meter changes until the app has explicit UX and engine support for denominator/pulse semantics. The current transport treats `timeSignature.beats` as the beat count and keeps one beat equal to 480 ticks.
+
+<!-- --- NEW CONTEXT ADDED 2026-05-04 (AUDIO IN + KEYBOARD PERFORMANCE) --- -->
+
+## 🎹 Hardware Keyboard Performance & Audio In
+
+**Creative Mode mappings**:
+- Scale Board: number row `1`–`9`, `0` hold visible scale pads 1–10.
+- SketchKit: number row `1`–`9`, `0` trigger visible drum pads 1–10.
+- MicroPiano: `` ` 1 2 3 4 5 6 7 8 9 0 - = `` hold visible piano keys left-to-right.
+- These mappings are scoped to Creative Mode and the active instrument. They run in capture phase so they can override global pitch/mod shortcuts when appropriate.
+
+**Input method pattern**:
+- `ScaleBoard.pressPad()` / `releasePad()` and `MicroPiano.pressMidi()` / `releaseMidi()` are the canonical methods for both pointer and keyboard input.
+- `SketchKit.triggerPad()` is the canonical method for pointer and keyboard drum hits.
+
+**Audio In**:
+- The former Mic tab is labeled **Audio In**.
+- `MicRecorder` now includes an audio input selector. Browser device labels usually appear only after the first successful `getUserMedia()` permission grant.
+- Recording MIME type uses `MediaRecorder.isTypeSupported()` fallback (`audio/webm;codecs=opus`, `audio/webm`, `audio/mp4`, `audio/aac`) instead of assuming WebM, which is important for Safari/iOS.

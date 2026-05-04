@@ -438,6 +438,31 @@
   text-align: center;
 }
 
+.mic-recorder__device-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+}
+
+.mic-recorder__device-label {
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.mic-recorder__device-select {
+  max-width: 260px;
+  min-width: 180px;
+  background: var(--surface-3);
+  border: var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--font-size-sm);
+}
+
 .mic-recorder__controls {
   display: flex;
   gap: var(--space-md);

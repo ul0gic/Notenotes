@@ -21,11 +21,11 @@ Notenotes is built for visual thinkers and non-traditional musicians who feel fr
 - **Scale Board** — Dynamic multi-pad controller (up to 16 pads) locked to any scale (Major, Minor, Pentatonic, Blues, Dorian, Mixolydian, Chromatic). Pad count follows scale degrees in Single/Chords mode; fully configurable in Custom mode.
 - **Micro Piano** — Configurable chromatic keyboard (1 or 2 stacked, 10–32 keys each) with octave shifting
 - **Sketch Kit** — 10-pad synthesized drum kit (Kick, Snare, Clap, Hi-Hat, Cymbal, Toms, Rim, Shaker), 4 selectable kits (Classic, 808, Electronic, Acoustic), configurable pad count
-- **Mic Recorder** — Record audio from your microphone with live waveform visualization. Audio snippets save as playable clips on the timeline.
+- **Audio In** — Record audio from a selectable input device with live waveform visualization. Audio snippets save as playable clips on the timeline.
 - **Controller Mode** — Gamepad instrument using Web Gamepad API. D-pad + face buttons mapped to scale notes, analog sticks for pitch bend and modulation. Shows live controller overlay with button highlighting. Chords mode supported.
 - **Arpeggio / Hold** — Toggle Normal / Hold (latch notes with auto-release) / Arpeggio (repeat strikes). 10 chord types, 4 patterns, 4 rates. Drums not affected. Hold duration configurable from 1–30s.
 - **8 Synth Presets** — Retro (Chip Lead, Warm Pad), Modern (Glass Pluck, Sub Bass, Bright Lead), Lo-fi (Tape Keys, Dusty Organ, Vinyl Strings)
-- **Pitch Bend & Modulation** — Number keys 1–9 mapped to Korg K25-style pitch/mod (hold to ramp). Header displays Pitch % and Mod %. Analog sticks on controller also feed in. Recorded modulation plays back on Canvas.
+- **Pitch Bend & Modulation** — Number keys 1/4/7 and 3/6/9 map to Korg K25-style mod and pitch controls when they are not being used for Scale, Kit, or Piano performance. Header displays Pitch % and Mod %. Analog sticks on controller also feed in. Recorded modulation plays back on Canvas.
 - **Loop Recording** — Record as long as you want. Snippet finalized on Stop, not on loop wrap.
 
 ### 🎼 Canvas Mode — The Arranger
@@ -315,12 +315,15 @@ Each phase was built iteratively — code first, then browser testing with scree
 | `M` | Toggle metronome |
 | `Ctrl+Z` | Undo |
 | `Ctrl+Shift+Z` | Redo |
+| Scale `1`–`9`, `0` | Hold visible scale pads |
+| Kit `1`–`9`, `0` | Trigger visible drum pads |
+| Piano `` ` ``–`=` | Hold visible piano keys from left to right |
 | `Delete` / `Backspace` | Delete selected note or clip |
 | `Ctrl+click` | Delete note (Inspect) or clip (Canvas) |
 | `Alt+drag` | Resize note (Inspect) or clip (Canvas, shrink only) |
 | `Click HLD/ARP button` | Cycle between Normal / Hold / Arpeggio modes |
-| `1` / `4` / `7` (hold) | Modulation down / reset / up (ramp) |
-| `3` / `6` / `9` (hold) | Pitch bend down / reset / up (ramp) |
+| `1` / `4` / `7` (hold) | Modulation down / reset / up when not used by active instrument |
+| `3` / `6` / `9` (hold) | Pitch bend down / reset / up when not used by active instrument |
 
 ---
 

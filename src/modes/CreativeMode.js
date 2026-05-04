@@ -28,6 +28,7 @@ const INSTRUMENTS = {
 
 const SCALE_KEYS = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9', 'Digit0'];
 const PIANO_KEYS = ['Backquote', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9', 'Digit0', 'Minus', 'Equal'];
+const KIT_KEYS = SCALE_KEYS;
 
 export class CreativeMode {
   constructor(engine, transport, quantizer, store, project, modManager) {
@@ -146,7 +147,7 @@ export class CreativeMode {
         id: crypto.randomUUID(),
         createdAt: Date.now(),
         type: 'audio',
-        name: 'Mic recording',
+        name: 'Audio in recording',
         notes: [],
         hits: [],
         durationTicks,
@@ -159,7 +160,7 @@ export class CreativeMode {
         this.project.snippets.push(snippet);
         this.store?.scheduleAutoSave(this.project);
       }
-      showToast('Mic snippet captured!');
+      showToast('Audio snippet captured!');
     });
 
     this._initialized = true;
@@ -206,7 +207,7 @@ export class CreativeMode {
       { id: INSTRUMENTS.CONTROLLER, icon: '🎮', label: 'Ctrl' },
       { id: INSTRUMENTS.PIANO, icon: '🎵', label: 'Piano' },
       { id: INSTRUMENTS.KIT, icon: '🥁', label: 'Kit' },
-      { id: INSTRUMENTS.MIC, icon: '🎤', label: 'Mic' },
+      { id: INSTRUMENTS.MIC, icon: '🎤', label: 'Audio In' },
     ];
     tabs.forEach(t => {
       const btn = document.createElement('button');
@@ -298,6 +299,18 @@ export class CreativeMode {
         this.ensureAudioReady();
         this._heldPianoKeyIndexes.set(e.code, idx);
         this.microPiano.pressVisibleKey(idx);
+        return;
+      }
+
+      if (this.activeInstrument === INSTRUMENTS.KIT) {
+        const idx = KIT_KEYS.indexOf(e.code);
+        if (idx === -1) return;
+        if (idx >= this.sketchKit.visiblePadIds().length) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+        this.ensureAudioReady();
+        this.sketchKit.triggerVisiblePad(idx);
       }
     }, true);
 
