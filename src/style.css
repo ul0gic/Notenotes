@@ -255,6 +255,8 @@ input, textarea, select, [contenteditable] {
   display: flex;
   align-items: center;
   gap: var(--space-md);
+  position: relative;
+  z-index: 200;
   padding: var(--space-sm) var(--space-lg);
   background: var(--surface-1);
   border-bottom: var(--border-subtle);
@@ -341,13 +343,15 @@ input, textarea, select, [contenteditable] {
     position: absolute;
     top: 100%;
     right: var(--space-sm);
+    min-width: 172px;
     flex-direction: column;
+    align-items: stretch;
     gap: var(--space-xs);
     background: var(--surface-1);
     border: var(--border-subtle);
     border-radius: var(--radius-sm);
     padding: var(--space-sm);
-    z-index: 100;
+    z-index: 250;
     box-shadow: 0 4px 16px rgba(0,0,0,0.5);
   }
 
@@ -362,6 +366,8 @@ input, textarea, select, [contenteditable] {
 
   .transport-bar__more-btn {
     display: flex;
+    position: relative;
+    z-index: 260;
     min-width: 36px;
     min-height: 36px;
     align-items: center;

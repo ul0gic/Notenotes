@@ -325,9 +325,9 @@ class App {
     const events = ['pointerdown', 'keydown', 'touchstart', 'touchend'];
     const handler = () => {
       maybeResume();
-      events.forEach(e => document.removeEventListener(e, handler));
+      events.forEach(e => document.removeEventListener(e, handler, { capture: true }));
     };
-    events.forEach(e => document.addEventListener(e, handler, { passive: true }));
+    events.forEach(e => document.addEventListener(e, handler, { passive: true, capture: true }));
   }
 
   /**

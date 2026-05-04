@@ -26,6 +26,9 @@ const INSTRUMENTS = {
   CONTROLLER: 'controller',
 };
 
+const SCALE_KEYS = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9', 'Digit0'];
+const PIANO_KEYS = ['Backquote', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9', 'Digit0', 'Minus', 'Equal'];
+
 export class CreativeMode {
   constructor(engine, transport, quantizer, store, project, modManager) {
     this.engine = engine;
@@ -58,6 +61,8 @@ export class CreativeMode {
     this.loopProgress = new LoopProgress(transport, project);
 
     this._initialized = false;
+    this._heldScaleKeyPads = new Map();
+    this._heldPianoKeyIndexes = new Map();
   }
 
   set project(p) {
@@ -160,6 +165,24 @@ export class CreativeMode {
     this._initialized = true;
   }
 
+  ensureAudioReady() {
+    try {
+      if (!this.engine._initialized) {
+        this.engine.initSync();
+      }
+      if (!this._initialized) {
+        this.init();
+      }
+      if (this.engine.ctx?.state === 'suspended') {
+        this.engine.ctx.resume().catch(() => {});
+      }
+      return true;
+    } catch (err) {
+      console.warn('[CreativeMode] Audio unlock failed:', err);
+      return false;
+    }
+  }
+
   /**
    * Render the Creative Mode view.
    * @returns {HTMLElement}
@@ -168,6 +191,8 @@ export class CreativeMode {
     this.el = document.createElement('div');
     this.el.className = 'creative-mode';
     this.el.style.cssText = 'display:flex;flex-direction:column;height:100%;';
+    this.el.addEventListener('pointerdown', () => this.ensureAudioReady(), { capture: true });
+    this.el.addEventListener('touchstart', () => this.ensureAudioReady(), { capture: true, passive: true });
 
     // Loop progress bar (top of creative mode)
     this.el.appendChild(this.loopProgress.render());
@@ -238,12 +263,75 @@ export class CreativeMode {
 
     // Snippet tray (bottom)
     this.el.appendChild(this.snippetTray.render());
+    this._bindKeyboardPerformance();
 
     return this.el;
   }
 
+  _bindKeyboardPerformance() {
+    if (this._keyboardBound) return;
+    this._keyboardBound = true;
+
+    document.addEventListener('keydown', (e) => {
+      if (!this._isCreativeActive() || this._isTextInput(e.target) || e.repeat) return;
+
+      if (this.activeInstrument === INSTRUMENTS.SCALEBOARD) {
+        const idx = SCALE_KEYS.indexOf(e.code);
+        if (idx === -1) return;
+        if (idx >= this.scaleBoard._notes.length) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+        this.ensureAudioReady();
+        this._heldScaleKeyPads.set(e.code, idx);
+        this.scaleBoard.pressPad(idx);
+        return;
+      }
+
+      if (this.activeInstrument === INSTRUMENTS.PIANO) {
+        const idx = PIANO_KEYS.indexOf(e.code);
+        if (idx === -1) return;
+        if (idx >= this.microPiano.visibleMidis().length) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+        this.ensureAudioReady();
+        this._heldPianoKeyIndexes.set(e.code, idx);
+        this.microPiano.pressVisibleKey(idx);
+      }
+    }, true);
+
+    document.addEventListener('keyup', (e) => {
+      if (this._heldScaleKeyPads.has(e.code)) {
+        e.preventDefault();
+        e.stopPropagation();
+        const idx = this._heldScaleKeyPads.get(e.code);
+        this.scaleBoard.releasePad(idx);
+        this._heldScaleKeyPads.delete(e.code);
+        return;
+      }
+
+      if (this._heldPianoKeyIndexes.has(e.code)) {
+        e.preventDefault();
+        e.stopPropagation();
+        const idx = this._heldPianoKeyIndexes.get(e.code);
+        this.microPiano.releaseVisibleKey(idx);
+        this._heldPianoKeyIndexes.delete(e.code);
+      }
+    }, true);
+  }
+
+  _isCreativeActive() {
+    return !!this.el?.closest('.mode-view.is-active');
+  }
+
+  _isTextInput(target) {
+    return ['INPUT', 'TEXTAREA', 'SELECT'].includes(target?.tagName) || target?.isContentEditable;
+  }
+
   _switchInstrument(id) {
     if (id === this.activeInstrument) return;
+    this._releaseKeyboardPerformance();
     this.synth.allNotesOff();
     this.arpManager.setMode(ARP_MODES.OFF);
     this.activeInstrument = id;
@@ -259,5 +347,16 @@ export class CreativeMode {
     const patchSel = this.el.querySelector('#patch-selector');
     const isSynth = id === INSTRUMENTS.SCALEBOARD || id === INSTRUMENTS.PIANO || id === INSTRUMENTS.CONTROLLER;
     patchSel.style.display = isSynth ? 'flex' : 'none';
+  }
+
+  _releaseKeyboardPerformance() {
+    for (const idx of this._heldScaleKeyPads.values()) {
+      this.scaleBoard.releasePad(idx);
+    }
+    for (const idx of this._heldPianoKeyIndexes.values()) {
+      this.microPiano.releaseVisibleKey(idx);
+    }
+    this._heldScaleKeyPads.clear();
+    this._heldPianoKeyIndexes.clear();
   }
 }

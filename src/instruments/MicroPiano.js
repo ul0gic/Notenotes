@@ -167,28 +167,55 @@ export class MicroPiano {
         e.preventDefault();
         key.setPointerCapture(e.pointerId);
         const midi = parseInt(key.dataset.midi, 10);
-        this.synth.noteOn(midi);
-        key.classList.add('is-active');
-        this._activeKeys.add(midi);
-        if (this._onNoteOn) this._onNoteOn(midi, 0.8);
+        this.pressMidi(midi);
       });
 
       key.addEventListener('pointerup', (e) => {
         e.preventDefault();
         const midi = parseInt(key.dataset.midi, 10);
-        this.synth.noteOff(midi);
-        key.classList.remove('is-active');
-        this._activeKeys.delete(midi);
-        if (this._onNoteOff) this._onNoteOff(midi);
+        this.releaseMidi(midi);
       });
 
       key.addEventListener('pointercancel', () => {
         const midi = parseInt(key.dataset.midi, 10);
-        this.synth.noteOff(midi);
-        key.classList.remove('is-active');
-        this._activeKeys.delete(midi);
-        if (this._onNoteOff) this._onNoteOff(midi);
+        this.releaseMidi(midi);
       });
     });
+  }
+
+  visibleMidis() {
+    return [...(this.el?.querySelectorAll('.micropiano__key') || [])]
+      .map(key => parseInt(key.dataset.midi, 10))
+      .filter(Number.isFinite);
+  }
+
+  pressVisibleKey(index) {
+    const midi = this.visibleMidis()[index];
+    if (midi !== undefined) this.pressMidi(midi);
+  }
+
+  releaseVisibleKey(index) {
+    const midi = this.visibleMidis()[index];
+    if (midi !== undefined) this.releaseMidi(midi);
+  }
+
+  pressMidi(midi) {
+    if (this._activeKeys.has(midi)) return;
+    const key = this.el?.querySelector(`.micropiano__key[data-midi="${midi}"]`);
+    if (!key) return;
+
+    this.synth.noteOn(midi);
+    key.classList.add('is-active');
+    this._activeKeys.add(midi);
+    if (this._onNoteOn) this._onNoteOn(midi, 0.8);
+  }
+
+  releaseMidi(midi) {
+    if (!this._activeKeys.has(midi)) return;
+    const key = this.el?.querySelector(`.micropiano__key[data-midi="${midi}"]`);
+    this.synth.noteOff(midi);
+    if (key) key.classList.remove('is-active');
+    this._activeKeys.delete(midi);
+    if (this._onNoteOff) this._onNoteOff(midi);
   }
 }

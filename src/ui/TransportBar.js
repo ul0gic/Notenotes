@@ -20,6 +20,7 @@ export class TransportBar {
     this.onArpClick = null;
     this.onKeysClick = null;
     this.onModResetClick = null;
+    this._lastMoreToggle = 0;
   }
 
   /**
@@ -173,11 +174,17 @@ export class TransportBar {
     });
 
     // More dropdown toggle
-    this.el.querySelector('#tb-more-btn')?.addEventListener('pointerdown', (e) => {
+    const toggleMore = (e) => {
       e.preventDefault();
+      e.stopPropagation();
+      const now = Date.now();
+      if (now - this._lastMoreToggle < 250) return;
+      this._lastMoreToggle = now;
       const more = this.el.querySelector('#tb-more');
       if (more) more.classList.toggle('is-open');
-    });
+    };
+    this.el.querySelector('#tb-more-btn')?.addEventListener('pointerdown', toggleMore);
+    this.el.querySelector('#tb-more-btn')?.addEventListener('touchend', toggleMore);
   }
 
   setArpLabel(mode) {

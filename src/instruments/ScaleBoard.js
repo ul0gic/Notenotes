@@ -28,6 +28,7 @@ export class ScaleBoard {
     this._fullScaleNotes = [];
     this._activePads = new Set();
     this._activeChords = new Map(); // padIndex -> array of midis
+    this._activePadIndexes = new Set();
 
     // Callbacks for note recording
     this._onNoteOn = null;
@@ -279,45 +280,14 @@ export class ScaleBoard {
         }
 
         pad.setPointerCapture(e.pointerId);
-        pad.classList.add('is-active');
-
-        const isChord = this.padMode === 'chords' || (this.padMode === 'custom' && this.customPadTypes[i] === 'chord');
-        
-        if (isChord) {
-          const chordMidis = this._getChordMidis(i);
-          this._activeChords.set(i, chordMidis);
-          chordMidis.forEach(m => {
-            this.synth.noteOn(m);
-            this._activePads.add(m);
-            if (this._onNoteOn) this._onNoteOn(m, 0.8);
-          });
-        } else {
-          this.synth.noteOn(midi);
-          this._activePads.add(midi);
-          if (this._onNoteOn) this._onNoteOn(midi, 0.8);
-        }
+        this.pressPad(i);
       });
 
       const handleRelease = (e) => {
         e.preventDefault();
         if (this.isEditingLayout) return;
 
-        pad.classList.remove('is-active');
-        const isChord = this.padMode === 'chords' || (this.padMode === 'custom' && this.customPadTypes[i] === 'chord');
-
-        if (isChord) {
-          const chordMidis = this._activeChords.get(i) || [];
-          chordMidis.forEach(m => {
-            this.synth.noteOff(m);
-            this._activePads.delete(m);
-            if (this._onNoteOff) this._onNoteOff(m);
-          });
-          this._activeChords.delete(i);
-        } else {
-          this.synth.noteOff(midi);
-          this._activePads.delete(midi);
-          if (this._onNoteOff) this._onNoteOff(midi);
-        }
+        this.releasePad(i);
       };
 
       // Pointer up → note off
@@ -326,5 +296,53 @@ export class ScaleBoard {
       // Pointer cancel/leave → note off
       pad.addEventListener('pointercancel', handleRelease);
     });
+  }
+
+  pressPad(index) {
+    if (this.isEditingLayout || this._activePadIndexes.has(index)) return;
+    const pad = this.el?.querySelector(`.scaleboard__pad[data-index="${index}"]`);
+    const midi = this._notes[index];
+    if (!pad || midi === undefined) return;
+
+    pad.classList.add('is-active');
+    this._activePadIndexes.add(index);
+
+    const isChord = this.padMode === 'chords' || (this.padMode === 'custom' && this.customPadTypes[index] === 'chord');
+    if (isChord) {
+      const chordMidis = this._getChordMidis(index);
+      this._activeChords.set(index, chordMidis);
+      chordMidis.forEach(m => this._noteOn(m));
+    } else {
+      this._noteOn(midi);
+    }
+  }
+
+  releasePad(index) {
+    if (!this._activePadIndexes.has(index)) return;
+    const pad = this.el?.querySelector(`.scaleboard__pad[data-index="${index}"]`);
+    const midi = this._notes[index];
+    if (pad) pad.classList.remove('is-active');
+
+    if (this._activeChords.has(index)) {
+      const chordMidis = this._activeChords.get(index) || [];
+      chordMidis.forEach(m => this._noteOff(m));
+      this._activeChords.delete(index);
+    } else if (midi !== undefined) {
+      this._noteOff(midi);
+    }
+
+    this._activePadIndexes.delete(index);
+  }
+
+  _noteOn(midi) {
+    this.synth.noteOn(midi);
+    this._activePads.add(midi);
+    if (this._onNoteOn) this._onNoteOn(midi, 0.8);
+  }
+
+  _noteOff(midi) {
+    this.synth.noteOff(midi);
+    this._activePads.delete(midi);
+    if (this._onNoteOff) this._onNoteOff(midi);
   }
 }
