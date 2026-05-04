@@ -116,6 +116,11 @@ export class ControllerMode {
             <span class="ctrlmode__stick" id="ct-stick-l"></span>
             <span class="ctrlmode__stick" id="ct-stick-r"></span>
           </div>
+          <div class="ctrlmode__guide" aria-label="Controller controls">
+            <span>Left stick: modulation</span>
+            <span>Right stick: pitch bend</span>
+            <span>Shoulders: octave down / up</span>
+          </div>
         </div>
       </div>
     `;

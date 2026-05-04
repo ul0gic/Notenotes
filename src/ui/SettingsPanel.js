@@ -1,11 +1,13 @@
 /**
  * SettingsPanel — Slide-out panel for app-wide settings.
  * Includes quantization, metronome settings, project management,
- * version history, and sheet music export.
+ * version history, project milestones, install help, and export.
  */
 
 import { QuantizeGrid } from '../engine/Quantizer.js';
 import { SheetMusicView } from '../export/SheetMusicView.js';
+import { downloadBlob, projectToMidiBlob, safeFilename, snippetToMidiBlob } from '../export/MidiExporter.js';
+import { projectToWavBlob, snippetToWavBlob } from '../export/WavExporter.js';
 import { CHORD_TYPES, ARP_PATTERNS, ARP_RATES } from '../engine/ArpeggioManager.js';
 import { showToast } from './Toast.js';
 
@@ -45,9 +47,9 @@ export class SettingsPanel {
           <button class="btn btn--icon btn--ghost settings-panel__close" id="settings-close" aria-label="Close settings">✕</button>
         </div>
         <div class="settings-panel__tabs">
-          <button class="settings-panel__tab is-active" data-section="settings">⚙️ Settings</button>
-          <button class="settings-panel__tab" data-section="sheet">🎼 Sheet Music</button>
-          <button class="settings-panel__tab" data-section="history">📋 History</button>
+          <button class="settings-panel__tab is-active" data-section="settings">Settings</button>
+          <button class="settings-panel__tab" data-section="sheet">Export</button>
+          <button class="settings-panel__tab" data-section="history">Save</button>
         </div>
         <div class="settings-panel__body" id="settings-body">
           ${this._renderSettingsSection()}
@@ -87,6 +89,15 @@ export class SettingsPanel {
                 return `<option value="${value}" ${timeSigValue === value ? 'selected' : ''}>${ts.label}</option>`;
               }).join('')}
             </select>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <h3 class="settings-group__title">Install App</h3>
+          <p class="settings-desc">Install Notenotes from your browser for an app-window experience. Chrome and Edge can show an install prompt here; Safari uses Share, then Add to Home Screen.</p>
+          <div class="settings-row">
+            <label class="settings-label">PWA</label>
+            <button class="btn btn--ghost" id="setting-install-app" style="font-size:0.75rem;min-height:30px;padding:2px 10px;">Install / Help</button>
           </div>
         </div>
 
@@ -208,12 +219,78 @@ export class SettingsPanel {
   }
 
   _renderSheetSection() {
-    return `<div class="settings-section" id="section-sheet"></div>`;
+    const snippets = (this.project?.snippets || []).filter(s => s.type !== 'audio');
+    const allSnippets = this.project?.snippets || [];
+    const options = snippets.length
+      ? snippets.map(s => `<option value="${s.id}">${s.name || `${(s.notes?.length || 0) + (s.hits?.length || 0)} events`}</option>`).join('')
+      : '<option value="">No MIDI snippets yet</option>';
+    const wavOptions = allSnippets.length
+      ? allSnippets.map(s => `<option value="${s.id}">${s.name || (s.type === 'audio' ? 'Audio in recording' : `${(s.notes?.length || 0) + (s.hits?.length || 0)} events`)}</option>`).join('')
+      : '<option value="">No snippets yet</option>';
+
+    return `
+      <div class="settings-section" id="section-sheet">
+        <div class="settings-group">
+          <h3 class="settings-group__title">MIDI Export</h3>
+          <p class="settings-desc">Export the whole Canvas arrangement or an individual MIDI/drum snippet as a standard .mid file.</p>
+          <div class="settings-row">
+            <label class="settings-label">Canvas</label>
+            <button class="btn btn--ghost" id="export-canvas-midi" style="font-size:0.75rem;min-height:30px;padding:2px 10px;">Export MIDI</button>
+          </div>
+          <div class="settings-row">
+            <label class="settings-label">Snippet</label>
+            <select class="settings-select" id="export-snippet-select" aria-label="MIDI snippet to export">
+              ${options}
+            </select>
+          </div>
+          <div class="settings-row">
+            <label class="settings-label"></label>
+            <button class="btn btn--ghost" id="export-snippet-midi" style="font-size:0.75rem;min-height:30px;padding:2px 10px;" ${snippets.length ? '' : 'disabled'}>Export Snippet MIDI</button>
+          </div>
+        </div>
+        <div class="settings-group">
+          <h3 class="settings-group__title">Audio Export</h3>
+          <p class="settings-desc">Export browser-rendered WAV files for a snippet or the whole Canvas. MP3 will need an optional encoder dependency later.</p>
+          <div class="settings-row">
+            <label class="settings-label">Canvas</label>
+            <button class="btn btn--ghost" id="export-canvas-wav" style="font-size:0.75rem;min-height:30px;padding:2px 10px;">Export WAV</button>
+          </div>
+          <div class="settings-row">
+            <label class="settings-label">Snippet</label>
+            <select class="settings-select" id="export-snippet-wav-select" aria-label="WAV snippet to export">
+              ${wavOptions}
+            </select>
+          </div>
+          <div class="settings-row">
+            <label class="settings-label"></label>
+            <button class="btn btn--ghost" id="export-snippet-wav" style="font-size:0.75rem;min-height:30px;padding:2px 10px;" ${allSnippets.length ? '' : 'disabled'}>Export Snippet WAV</button>
+          </div>
+        </div>
+        <div class="settings-group">
+          <h3 class="settings-group__title">Sheet Music</h3>
+          <div id="section-sheet-music"></div>
+        </div>
+      </div>`;
   }
 
   _renderHistorySection() {
     return `
       <div class="settings-section" id="section-history">
+        <div class="settings-group">
+          <h3 class="settings-group__title">Milestones</h3>
+          <p class="settings-desc">Save named project checkpoints when you reach an important idea. Milestones are kept until browser data is cleared.</p>
+          <div class="settings-row">
+            <label class="settings-label">Name</label>
+            <input class="settings-input" id="milestone-name" type="text" placeholder="Verse idea, Beta 1..." aria-label="Milestone name"/>
+          </div>
+          <div class="settings-row">
+            <label class="settings-label"></label>
+            <button class="btn btn--primary" id="milestone-save" style="font-size:0.75rem;min-height:30px;padding:2px 10px;">Save Milestone</button>
+          </div>
+          <div id="milestone-list" class="version-list">
+            <div class="version-list__loading">Loading milestones...</div>
+          </div>
+        </div>
         <div class="settings-group">
           <h3 class="settings-group__title">Version History</h3>
           <p class="settings-desc">Restore to a previous save (up to 5 versions kept).</p>
@@ -235,10 +312,12 @@ export class SettingsPanel {
 
     // Section tabs
     this.el.querySelectorAll('.settings-panel__tab').forEach(tab => {
-      tab.addEventListener('pointerdown', (e) => {
+      const activate = (e) => {
         e.preventDefault();
         this._switchSection(tab.dataset.section);
-      });
+      };
+      tab.addEventListener('pointerdown', activate);
+      tab.addEventListener('click', activate);
     });
   }
 
@@ -270,6 +349,19 @@ export class SettingsPanel {
     body.querySelector('#setting-time-signature')?.addEventListener('change', (e) => {
       const [beats, subdivision] = e.target.value.split('/').map(v => parseInt(v, 10));
       this._setProjectTimeSignature({ beats, subdivision });
+    });
+
+    body.querySelector('#setting-install-app')?.addEventListener('pointerdown', async (e) => {
+      e.preventDefault();
+      const promptEvent = window.notenotesInstallPrompt;
+      if (promptEvent) {
+        promptEvent.prompt();
+        await promptEvent.userChoice;
+        window.notenotesInstallPrompt = null;
+        showToast('Install prompt closed');
+        return;
+      }
+      showToast('Install from browser menu: Chrome/Edge Install app, Safari Share > Add to Home Screen', 6000);
     });
 
     // Quantize
@@ -491,11 +583,14 @@ export class SettingsPanel {
       case 'sheet':
         body.innerHTML = this._renderSheetSection();
         this._sheetMusicView = new SheetMusicView(this.project);
-        body.querySelector('#section-sheet')?.appendChild(this._sheetMusicView.render());
+        body.querySelector('#section-sheet-music')?.appendChild(this._sheetMusicView.render());
+        this._bindExportEvents();
         break;
 
       case 'history':
         body.innerHTML = this._renderHistorySection();
+        this._bindMilestoneEvents();
+        this._loadMilestones();
         this._loadVersionHistory();
         break;
     }
@@ -544,6 +639,121 @@ export class SettingsPanel {
     } catch (err) {
       listEl.innerHTML = '<div class="version-list__empty">Error loading versions</div>';
       console.error('[Settings] Version history error:', err);
+    }
+  }
+
+  _bindExportEvents() {
+    const body = this.el.querySelector('#settings-body');
+    body.querySelector('#export-canvas-midi')?.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      if (!this.project) return;
+      downloadBlob(projectToMidiBlob(this.project), safeFilename(`${this.project.name || 'notenotes'}-canvas`, 'mid'));
+      showToast('Canvas MIDI exported');
+    });
+
+    body.querySelector('#export-canvas-wav')?.addEventListener('pointerdown', async (e) => {
+      e.preventDefault();
+      if (!this.project) return;
+      const btn = e.currentTarget;
+      btn.disabled = true;
+      showToast('Rendering Canvas WAV...');
+      try {
+        const blob = await projectToWavBlob(this.project);
+        downloadBlob(blob, safeFilename(`${this.project.name || 'notenotes'}-canvas`, 'wav'));
+        showToast('Canvas WAV exported');
+      } catch (err) {
+        console.error('[Settings] Canvas WAV export failed:', err);
+        showToast('Canvas WAV export failed');
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    body.querySelector('#export-snippet-midi')?.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      const snippetId = body.querySelector('#export-snippet-select')?.value;
+      const snippet = this.project?.snippets?.find(s => s.id === snippetId);
+      if (!snippet) return;
+      downloadBlob(snippetToMidiBlob(snippet, this.project), safeFilename(snippet.name || 'snippet', 'mid'));
+      showToast('Snippet MIDI exported');
+    });
+
+    body.querySelector('#export-snippet-wav')?.addEventListener('pointerdown', async (e) => {
+      e.preventDefault();
+      const snippetId = body.querySelector('#export-snippet-wav-select')?.value;
+      const snippet = this.project?.snippets?.find(s => s.id === snippetId);
+      if (!snippet) return;
+      const btn = e.currentTarget;
+      btn.disabled = true;
+      showToast('Rendering snippet WAV...');
+      try {
+        const blob = await snippetToWavBlob(snippet, this.project);
+        downloadBlob(blob, safeFilename(snippet.name || 'snippet', 'wav'));
+        showToast('Snippet WAV exported');
+      } catch (err) {
+        console.error('[Settings] Snippet WAV export failed:', err);
+        showToast('Snippet WAV export failed');
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  }
+
+  _bindMilestoneEvents() {
+    const body = this.el.querySelector('#settings-body');
+    body.querySelector('#milestone-save')?.addEventListener('pointerdown', async (e) => {
+      e.preventDefault();
+      if (!this.project || !this.store) return;
+      const input = body.querySelector('#milestone-name');
+      const label = input?.value || '';
+      await this.store.save(this.project);
+      await this.store.saveMilestone(this.project, label);
+      if (input) input.value = '';
+      await this._loadMilestones();
+      showToast('Milestone saved');
+    });
+  }
+
+  async _loadMilestones() {
+    if (!this.project || !this.store) return;
+    const listEl = this.el.querySelector('#milestone-list');
+    if (!listEl) return;
+
+    try {
+      const milestones = await this.store.getMilestones(this.project.id);
+      if (milestones.length === 0) {
+        listEl.innerHTML = '<div class="version-list__empty">No milestones yet</div>';
+        return;
+      }
+
+      listEl.innerHTML = milestones.map(m => {
+        const date = new Date(m.timestamp);
+        return `
+          <div class="version-list__item" data-milestone-id="${m.milestoneId}">
+            <div class="version-list__info">
+              <span class="version-list__time">${m.label}</span>
+              <span class="version-list__meta">${date.toLocaleString()} - ${m.bpm} BPM</span>
+            </div>
+            <button class="btn btn--ghost milestone-list__restore" data-milestone-id="${m.milestoneId}">Load</button>
+          </div>
+        `;
+      }).join('');
+
+      listEl.querySelectorAll('.milestone-list__restore').forEach(btn => {
+        btn.addEventListener('pointerdown', async (e) => {
+          e.preventDefault();
+          const id = parseInt(btn.dataset.milestoneId, 10);
+          if (confirm('Load this milestone? Current changes will be saved first.')) {
+            await this.store.save(this.project);
+            await this.store.restoreMilestone(id);
+            showToast('Milestone loaded. Reloading...');
+            setTimeout(() => window.location.reload(), 500);
+          }
+        });
+      });
+    } catch (err) {
+      listEl.innerHTML = '<div class="version-list__empty">Error loading milestones</div>';
+      console.error('[Settings] Milestone error:', err);
     }
   }
 

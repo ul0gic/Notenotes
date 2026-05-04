@@ -6,10 +6,11 @@
 import { openDB } from 'idb';
 
 const DB_NAME = 'notenotes';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 const STORE_PROJECTS = 'projects';
 const STORE_VERSIONS = 'versions';
+const STORE_MILESTONES = 'milestones';
 
 /** Maximum number of version history snapshots per project */
 const MAX_VERSIONS = 5;
@@ -65,6 +66,14 @@ async function getDB() {
         });
         versionStore.createIndex('projectId', 'projectId', { unique: false });
         versionStore.createIndex('timestamp', 'timestamp', { unique: false });
+      }
+      if (!db.objectStoreNames.contains(STORE_MILESTONES)) {
+        const milestoneStore = db.createObjectStore(STORE_MILESTONES, {
+          keyPath: 'milestoneId',
+          autoIncrement: true
+        });
+        milestoneStore.createIndex('projectId', 'projectId', { unique: false });
+        milestoneStore.createIndex('timestamp', 'timestamp', { unique: false });
       }
     }
   });
@@ -129,6 +138,40 @@ export class ProjectStore {
       cursor = await cursor.continue();
     }
     await tx.done;
+  }
+
+  async saveMilestone(project, name = '') {
+    const snapshot = {
+      projectId: project.id,
+      timestamp: Date.now(),
+      label: name.trim() || `Milestone ${new Date().toLocaleString()}`,
+      data: JSON.parse(JSON.stringify(project))
+    };
+    return this._db.add(STORE_MILESTONES, snapshot);
+  }
+
+  async getMilestones(projectId) {
+    const tx = this._db.transaction(STORE_MILESTONES, 'readonly');
+    const index = tx.store.index('projectId');
+    const milestones = await index.getAll(projectId);
+    return milestones
+      .map(m => ({
+        milestoneId: m.milestoneId,
+        timestamp: m.timestamp,
+        label: m.label,
+        name: m.data.name,
+        bpm: m.data.bpm,
+      }))
+      .sort((a, b) => b.timestamp - a.timestamp);
+  }
+
+  async restoreMilestone(milestoneId) {
+    const milestone = await this._db.get(STORE_MILESTONES, milestoneId);
+    if (!milestone) throw new Error(`Milestone ${milestoneId} not found`);
+    const project = milestone.data;
+    project.updatedAt = Date.now();
+    await this.save(project);
+    return project;
   }
 
   /**

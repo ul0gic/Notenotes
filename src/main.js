@@ -57,6 +57,7 @@ class App {
 
     // Build UI shell
     this._buildUI();
+    this._setupInstallPrompt();
 
     // Bind keyboard shortcuts
     this._bindKeyboard();
@@ -163,6 +164,18 @@ class App {
     this._setupAudioInit();
 
     console.log('[App] Notenotes ready.');
+  }
+
+  _setupInstallPrompt() {
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      window.notenotesInstallPrompt = e;
+    });
+
+    window.addEventListener('appinstalled', () => {
+      window.notenotesInstallPrompt = null;
+      showToast('Notenotes installed');
+    });
   }
 
   /**
