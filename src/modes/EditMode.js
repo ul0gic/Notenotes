@@ -91,7 +91,7 @@ export class EditMode {
           <span class="edit-audio__title">🎤 ${this._snippet.name || 'Audio'}</span>
         </div>
         <div class="edit-audio__body">
-          <audio class="edit-audio__player" controls src="${this._snippet.audioUrl || ''}"></audio>
+          <audio class="edit-audio__player" controls src="${this._snippet.audioDataUrl || this._snippet.audioUrl || ''}"></audio>
           <p class="edit-audio__meta">
             BPM: ${this._snippet.bpm} · 
             Duration: ${(this._snippet.durationTicks / 480).toFixed(1)} beats

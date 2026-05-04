@@ -145,6 +145,17 @@
   color: var(--accent-light);
 }
 
+.canvas-lane__type {
+  flex: 0 0 auto;
+  border: 1px solid var(--surface-4);
+  border-radius: 3px;
+  color: var(--text-tertiary);
+  font-size: 9px;
+  line-height: 1;
+  padding: 2px 3px;
+  text-transform: uppercase;
+}
+
 .canvas-lane__name-input {
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);

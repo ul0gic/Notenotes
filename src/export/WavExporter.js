@@ -94,13 +94,23 @@ function renderSnippetEvents(buffer, snippet, startSec, bpm) {
   }
 }
 
-async function decodeAudioUrl(audioUrl) {
-  if (!audioUrl) return null;
-  const response = await fetch(audioUrl);
-  const arrayBuffer = await response.arrayBuffer();
-  const Ctx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
-  const ctx = new Ctx(1, 1, SAMPLE_RATE);
-  return ctx.decodeAudioData(arrayBuffer.slice(0));
+function audioSource(snippet) {
+  return snippet?.audioDataUrl || snippet?.audioUrl || '';
+}
+
+async function decodeAudioSnippet(snippet) {
+  const source = audioSource(snippet);
+  if (!source) return null;
+  try {
+    const response = await fetch(source);
+    const arrayBuffer = await response.arrayBuffer();
+    const Ctx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    const ctx = new Ctx(1, 1, SAMPLE_RATE);
+    return await ctx.decodeAudioData(arrayBuffer.slice(0));
+  } catch (err) {
+    console.warn('[WavExporter] Skipping unavailable audio snippet:', snippet?.name || snippet?.id, err);
+    return null;
+  }
 }
 
 function mixAudioBuffer(target, decoded, startSec) {
@@ -164,7 +174,7 @@ export async function snippetToWavBlob(snippet, project = {}) {
   let durationSec = Math.max(1, (snippet?.durationTicks || ticksPerBar(snippet)) * secondsPerTick(bpm)) + 0.75;
   let decoded = null;
   if (snippet?.type === 'audio') {
-    decoded = await decodeAudioUrl(snippet.audioUrl);
+    decoded = await decodeAudioSnippet(snippet);
     durationSec = Math.max(durationSec, decoded?.duration || 0);
   }
   const samples = ensureLength(null, durationSec);
@@ -194,7 +204,7 @@ export async function projectToWavBlob(project) {
       if (!snippet) continue;
       const startSec = (clip.startBar || 0) * barTicks * secPerTick;
       if (snippet.type === 'audio') {
-        audioMixes.push(decodeAudioUrl(snippet.audioUrl).then(decoded => mixAudioBuffer(samples, decoded, startSec)));
+        audioMixes.push(decodeAudioSnippet(snippet).then(decoded => mixAudioBuffer(samples, decoded, startSec)));
       } else {
         renderSnippetEvents(samples, snippet, startSec, bpm);
       }

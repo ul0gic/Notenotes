@@ -84,7 +84,9 @@ export class CanvasMode {
     toolbar.className = 'canvas-toolbar';
     toolbar.innerHTML = `
       <div class="canvas-toolbar__group">
-        <button class="btn btn--ghost" id="canvas-add-track-btn" style="font-size:0.75rem;min-height:28px;padding:2px 10px;">+ Track</button>
+        <button class="btn btn--ghost" data-add-track-type="midi" style="font-size:0.75rem;min-height:28px;padding:2px 10px;">+ MIDI Track</button>
+        <button class="btn btn--ghost" data-add-track-type="drum" style="font-size:0.75rem;min-height:28px;padding:2px 10px;">+ Drum Track</button>
+        <button class="btn btn--ghost" data-add-track-type="audio" style="font-size:0.75rem;min-height:28px;padding:2px 10px;">+ Audio Track</button>
         <div style="width: 1px; height: 16px; background: var(--surface-3); margin: 0 4px;"></div>
         <button class="btn btn--ghost" id="canvas-zoom-out-btn" style="font-size:0.75rem;min-height:28px;padding:2px 8px;" title="Zoom Out (1/2x)">🔍-</button>
         <button class="btn btn--ghost" id="canvas-zoom-in-btn" style="font-size:0.75rem;min-height:28px;padding:2px 8px;" title="Zoom In (2x)">🔍+</button>
@@ -152,9 +154,27 @@ export class CanvasMode {
     if (!this.project.tracks || this.project.tracks.length === 0) {
       this.project.tracks = [
         { id: crypto.randomUUID(), name: 'Melody', type: 'midi', instrumentId: 'chip_lead', clips: [], muted: false, solo: false, volume: 0.8 },
-        { id: crypto.randomUUID(), name: 'Drums', type: 'midi', instrumentId: 'kit', clips: [], muted: false, solo: false, volume: 0.8 },
+        { id: crypto.randomUUID(), name: 'Drums', type: 'drum', instrumentId: 'kit', clips: [], muted: false, solo: false, volume: 0.8 },
       ];
     }
+    this.project.tracks.forEach(track => this._normalizeTrackType(track));
+  }
+
+  _normalizeTrackType(track) {
+    const clips = track.clips || [];
+    if (clips.some(c => c.snippet?.type === 'audio')) track.type = 'audio';
+    else if (track.instrumentId === 'kit' && !clips.some(c => c.snippet?.type === 'midi')) track.type = 'drum';
+    else if (!track.type) {
+      if (clips.some(c => c.snippet?.type === 'drum')) track.type = 'drum';
+      else track.type = 'midi';
+    }
+    if (track.type === 'drum') track.instrumentId = 'kit';
+    if (track.type === 'audio') track.instrumentId = 'audio';
+    if (track.type === 'midi' && (!track.instrumentId || track.instrumentId === 'kit' || track.instrumentId === 'audio')) {
+      track.instrumentId = 'chip_lead';
+    }
+    if (!Array.isArray(track.clips)) track.clips = [];
+    return track;
   }
 
   /** Render the time ruler (bar numbers) */
@@ -197,18 +217,20 @@ export class CanvasMode {
       header.style.borderLeft = `3px solid ${color.replace('0.35', '0.8')}`;
 
       // Build instrument options
-      const hasAudio = (track.clips || []).some(c => c.snippet?.type === 'audio');
-      const instOptions = hasAudio ? '' : Object.values(TRACK_INSTRUMENTS).map(inst => {
+      this._normalizeTrackType(track);
+      const trackTypeLabel = this._trackTypeLabel(track.type);
+      const instOptions = track.type === 'midi' ? Object.values(TRACK_INSTRUMENTS).filter(inst => inst.type === 'synth').map(inst => {
         const selected = (track.instrumentId === inst.id) ? 'selected' : '';
         return `<option value="${inst.id}" ${selected}>${inst.name}</option>`;
-      }).join('');
-      const instSelect = hasAudio
+      }).join('') : '';
+      const instSelect = track.type === 'drum' ? '<span class="canvas-lane__inst-label">Drum Kit</span>' : track.type !== 'midi'
         ? `<span class="canvas-lane__inst-label">🎤 Audio</span>`
         : `<select class="canvas-lane__instrument" data-track-inst="${track.id}" aria-label="Track instrument">${instOptions}</select>`;
 
       header.innerHTML = `
         <div class="canvas-lane__name-row">
           <span class="canvas-lane__name" data-track-id="${track.id}" title="Double-click to rename">${track.name}</span>
+          <span class="canvas-lane__type">${trackTypeLabel}</span>
           <button class="canvas-lane__remove-btn" data-remove-track="${track.id}" title="Remove track" aria-label="Remove track">✕</button>
         </div>
         ${instSelect}
@@ -402,6 +424,10 @@ export class CanvasMode {
 
       const snippet = this.project.snippets.find(s => s.id === snippetId);
       if (!snippet) return;
+      if (!this._trackAcceptsSnippet(track, snippet)) {
+        showToast(`${this._snippetTypeLabel(snippet)} snippets need a ${this._trackTypeLabel(this._snippetTrackType(snippet))} track`);
+        return;
+      }
 
       // Calculate bar position from drop point
       const rect = contentEl.getBoundingClientRect();
@@ -440,6 +466,24 @@ export class CanvasMode {
       this._autoSetLoopFromClips();
       showToast(`Clip added to ${track.name}`);
     });
+  }
+
+  _snippetTrackType(snippet) {
+    if (snippet?.type === 'audio') return 'audio';
+    if (snippet?.type === 'drum') return 'drum';
+    return 'midi';
+  }
+
+  _trackAcceptsSnippet(track, snippet) {
+    return (track?.type || 'midi') === this._snippetTrackType(snippet);
+  }
+
+  _trackTypeLabel(type) {
+    return type === 'audio' ? 'Audio' : type === 'drum' ? 'Drum' : 'MIDI';
+  }
+
+  _snippetTypeLabel(snippet) {
+    return this._trackTypeLabel(this._snippetTrackType(snippet));
   }
 
   /** Handle clip selection */
@@ -604,6 +648,11 @@ export class CanvasMode {
             const track = this.project?.tracks?.find(tr => tr.id === trackId);
             const snippet = this.project?.snippets?.find(s => s.id === this._touchDrag.snippetId);
             if (track && snippet) {
+              if (!this._trackAcceptsSnippet(track, snippet)) {
+                showToast(`${this._snippetTypeLabel(snippet)} snippets need a ${this._trackTypeLabel(this._snippetTrackType(snippet))} track`);
+                this._touchDrag = null;
+                return;
+              }
               const rect = lane.getBoundingClientRect();
               const scrollLeft = lane.parentElement?.closest('.canvas-tracks')?.scrollLeft || 0;
               const offsetX = t.clientX - rect.left + scrollLeft;
@@ -630,14 +679,15 @@ export class CanvasMode {
   }
 
   /** Add a new track */
-  _addTrack() {
+  _addTrack(type = 'midi') {
     if (!this.project) return;
     const trackNum = this.project.tracks.length + 1;
+    const typeLabel = this._trackTypeLabel(type);
     const track = {
       id: crypto.randomUUID(),
-      name: `Track ${trackNum}`,
-      type: 'midi',
-      instrumentId: 'chip_lead',
+      name: `${typeLabel} ${trackNum}`,
+      type,
+      instrumentId: type === 'drum' ? 'kit' : type === 'audio' ? 'audio' : 'chip_lead',
       clips: [],
       muted: false,
       solo: false,
@@ -646,7 +696,7 @@ export class CanvasMode {
     this.project.tracks.push(track);
     this.store?.scheduleAutoSave(this.project);
     this._renderTracks();
-    showToast(`Added Track ${trackNum}`);
+    showToast(`Added ${typeLabel} track`);
   }
 
   /** Remove a track by ID */
@@ -673,9 +723,11 @@ export class CanvasMode {
   }
 
   _bindEvents() {
-    // Add track
-    this.el.querySelector('#canvas-add-track-btn')?.addEventListener('click', () => {
-      this._addTrack();
+    // Add typed tracks
+    this.el.querySelectorAll('[data-add-track-type]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this._addTrack(btn.dataset.addTrackType || 'midi');
+      });
     });
 
     // Zoom In

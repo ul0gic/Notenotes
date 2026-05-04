@@ -8,6 +8,7 @@ import { QuantizeGrid } from '../engine/Quantizer.js';
 import { SheetMusicView } from '../export/SheetMusicView.js';
 import { downloadBlob, projectToMidiBlob, safeFilename, snippetToMidiBlob } from '../export/MidiExporter.js';
 import { projectToWavBlob, snippetToWavBlob } from '../export/WavExporter.js';
+import { backupFilename, readJsonFile, saveJsonFile, snippetsBackup, snippetsWithFreshIds, validateBackup, workspaceBackup } from '../export/BackupExporter.js';
 import { CHORD_TYPES, ARP_PATTERNS, ARP_RATES } from '../engine/ArpeggioManager.js';
 import { showToast } from './Toast.js';
 
@@ -276,6 +277,23 @@ export class SettingsPanel {
   _renderHistorySection() {
     return `
       <div class="settings-section" id="section-history">
+        <div class="settings-group">
+          <h3 class="settings-group__title">Backups</h3>
+          <p class="settings-desc">Save portable JSON files outside browser storage. Workspace backups restore the whole project; snippet backups restore just the snippet library.</p>
+          <div class="settings-row">
+            <label class="settings-label">Workspace</label>
+            <button class="btn btn--ghost" id="backup-workspace-save" style="font-size:0.75rem;min-height:30px;padding:2px 10px;">Save Backup</button>
+          </div>
+          <div class="settings-row">
+            <label class="settings-label">Snippets</label>
+            <button class="btn btn--ghost" id="backup-snippets-save" style="font-size:0.75rem;min-height:30px;padding:2px 10px;">Save Backup</button>
+          </div>
+          <div class="settings-row">
+            <label class="settings-label">Restore</label>
+            <button class="btn btn--ghost" id="backup-import-btn" style="font-size:0.75rem;min-height:30px;padding:2px 10px;">Import Backup</button>
+            <input id="backup-import-file" type="file" accept="application/json,.json" hidden />
+          </div>
+        </div>
         <div class="settings-group">
           <h3 class="settings-group__title">Milestones</h3>
           <p class="settings-desc">Save named project checkpoints when you reach an important idea. Milestones are kept until browser data is cleared.</p>
@@ -589,6 +607,7 @@ export class SettingsPanel {
 
       case 'history':
         body.innerHTML = this._renderHistorySection();
+        this._bindBackupEvents();
         this._bindMilestoneEvents();
         this._loadMilestones();
         this._loadVersionHistory();
@@ -695,6 +714,76 @@ export class SettingsPanel {
         showToast('Snippet WAV export failed');
       } finally {
         btn.disabled = false;
+      }
+    });
+  }
+
+  _bindBackupEvents() {
+    const body = this.el.querySelector('#settings-body');
+
+    body.querySelector('#backup-workspace-save')?.addEventListener('pointerdown', async (e) => {
+      e.preventDefault();
+      if (!this.project) return;
+      await this.store?.save(this.project);
+      try {
+        await saveJsonFile(workspaceBackup(this.project), backupFilename(this.project, 'workspace'));
+        showToast('Workspace backup saved');
+      } catch (err) {
+        if (err?.name !== 'AbortError') {
+          console.error('[Settings] Workspace backup failed:', err);
+          showToast('Workspace backup failed');
+        }
+      }
+    });
+
+    body.querySelector('#backup-snippets-save')?.addEventListener('pointerdown', async (e) => {
+      e.preventDefault();
+      if (!this.project) return;
+      await this.store?.save(this.project);
+      try {
+        await saveJsonFile(snippetsBackup(this.project), backupFilename(this.project, 'snippets'));
+        showToast('Snippet backup saved');
+      } catch (err) {
+        if (err?.name !== 'AbortError') {
+          console.error('[Settings] Snippet backup failed:', err);
+          showToast('Snippet backup failed');
+        }
+      }
+    });
+
+    const importInput = body.querySelector('#backup-import-file');
+    body.querySelector('#backup-import-btn')?.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      importInput?.click();
+    });
+
+    importInput?.addEventListener('change', async () => {
+      const file = importInput.files?.[0];
+      importInput.value = '';
+      if (!file || !this.store) return;
+
+      try {
+        const backup = await readJsonFile(file);
+        const type = validateBackup(backup);
+
+        if (type === 'workspace') {
+          await this.store.save(backup.project);
+          showToast('Workspace restored. Reloading...');
+          setTimeout(() => window.location.reload(), 500);
+          return;
+        }
+
+        if (!this.project) return;
+        this.project.snippets = [
+          ...(this.project.snippets || []),
+          ...snippetsWithFreshIds(backup.snippets),
+        ];
+        await this.store.save(this.project);
+        showToast(`Imported ${backup.snippets.length} snippets. Reloading...`);
+        setTimeout(() => window.location.reload(), 500);
+      } catch (err) {
+        console.error('[Settings] Backup import failed:', err);
+        showToast(err?.message || 'Backup import failed');
       }
     });
   }

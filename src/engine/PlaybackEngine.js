@@ -131,14 +131,18 @@ export class PlaybackEngine {
       if (track.muted) continue;
       if (hasSolo && !track.solo) continue;
 
-      const instId = track.instrumentId || 'chip_lead';
+      const trackType = track.type || (track.instrumentId === 'kit' ? 'drum' : 'midi');
+      const instId = trackType === 'drum' ? 'kit' : (track.instrumentId || 'chip_lead');
       const instDef = TRACK_INSTRUMENTS[instId];
-      if (!instDef) continue;
+      if (trackType !== 'audio' && !instDef) continue;
 
       // Check each clip on this track
       for (const clip of (track.clips || [])) {
         const snippet = clip.snippet;
         if (!snippet) continue;
+        if (trackType === 'audio' && snippet.type !== 'audio') continue;
+        if (trackType === 'drum' && snippet.type !== 'drum') continue;
+        if (trackType === 'midi' && snippet.type !== 'midi') continue;
 
         const clipStartTick = (clip.startBar || 0) * ticksPerBar;
         const clipEndTick = clipStartTick + (snippet.durationTicks || ticksPerBar);
@@ -177,7 +181,7 @@ export class PlaybackEngine {
         }
 
         // Play audio snippets
-        if (snippet.type === 'audio' && snippet.audioUrl && localTick === 0) {
+        if (snippet.type === 'audio' && this._audioSource(snippet) && localTick === 0) {
           this._playAudioClip(snippet);
         }
 
@@ -232,12 +236,13 @@ export class PlaybackEngine {
 
   async _playAudioClip(snippet) {
     const ctx = this._engine.ctx;
-    if (!ctx || !snippet.audioUrl) return;
+    const audioSource = this._audioSource(snippet);
+    if (!ctx || !audioSource) return;
 
     try {
       let buffer = this._audioBuffers.get(snippet.id);
       if (!buffer) {
-        const response = await fetch(snippet.audioUrl);
+        const response = await fetch(audioSource);
         const arrayBuffer = await response.arrayBuffer();
         buffer = await ctx.decodeAudioData(arrayBuffer);
         this._audioBuffers.set(snippet.id, buffer);
@@ -253,6 +258,10 @@ export class PlaybackEngine {
     } catch (err) {
       console.warn('[PlaybackEngine] Audio playback failed:', err);
     }
+  }
+
+  _audioSource(snippet) {
+    return snippet?.audioDataUrl || snippet?.audioUrl || '';
   }
 
   _applyModulation(snippet, synth, localTick, clipKey, audioTime = null) {
