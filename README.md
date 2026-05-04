@@ -14,7 +14,7 @@
 
 ## What is it and why does it exist?
 
-Notenotes is a tiny, browser-based musical 'post it note' for capturing the *idea* of music. A hummed phrase, a beat in your head, a chord you stumbled into — before it disappears. No accounts, no cost.
+Notenotes is a tiny, browser-based musical 'post it note' for capturing the idea of music with unconventional instruments and visual aids.
 
 I built this app primarily to experiment with music myself, and to understand ways to think about music outside of the constraints of what I've learned in music theory. I am a long time musician who has trouble putting ideas into a DAW, so I needed a noodling board of sorts. This is not ever meant to replace a DAW, and as such I don't want to focus on production and effects. In my head you come up with a hook on Notenotes and then you build it into a song elsewhere. 
 
