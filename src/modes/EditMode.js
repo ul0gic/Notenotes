@@ -522,9 +522,10 @@ export class EditMode {
     if (this._selectedNoteIdx === null || !this._snippet?.hits) return;
     const hits = this._snippet.hits;
     if (this._selectedNoteIdx >= hits.length) return;
+    const beforeState = this._snapshotSnippetState();
     hits.splice(this._selectedNoteIdx, 1);
     this._selectedNoteIdx = null;
-    this._onEdit('Delete hit');
+    this._onEdit('Delete hit', beforeState);
     showToast('Hit deleted');
   }
 
@@ -532,6 +533,7 @@ export class EditMode {
     const startX = e.clientX;
     const startY = e.clientY;
     const origTick = hit.startTick;
+    const beforeState = this._snapshotSnippetState();
     const isDrum = this._snippet?.type === 'drum';
     const origTypeIdx = isDrum ? DRUM_TYPES.findIndex(d => d.id === hit.type) : 0;
     const rowH = isDrum ? (el.closest('.piano-roll__grid-container')?.clientHeight || 400) / DRUM_TYPES.length : this._noteHeight;
@@ -557,17 +559,18 @@ export class EditMode {
       const newTick = Math.round(finalLeft / TICK_WIDTH / this._gridSize) * this._gridSize;
 
       if (isDrum) {
-        if (newTick !== origTick) hit.startTick = Math.max(0, newTick);
         const finalTop = parseFloat(el.style.top);
         const finalPct = finalTop / (100 / DRUM_TYPES.length);
         const newTypeIdx = DRUM_TYPES.length - 1 - Math.round(finalPct);
         const newType = DRUM_TYPES[Math.max(0, Math.min(DRUM_TYPES.length - 1, newTypeIdx))];
+        const changed = newTick !== origTick || (newType && newType.id !== hit.type);
+        if (newTick !== origTick) hit.startTick = Math.max(0, newTick);
         if (newType && newType.id !== hit.type) {
           hit.type = newType.id;
           el.title = newType.id;
         }
-        if (newTick !== origTick || newType?.id !== hit.type) {
-          this._onEdit('Move hit');
+        if (changed) {
+          this._onEdit('Move hit', beforeState);
         }
       }
     };
@@ -588,6 +591,7 @@ export class EditMode {
     const startY = e.clientY;
     const origTick = note.startTick;
     const origPitch = note.pitch;
+    const beforeState = this._snapshotSnippetState();
 
     const onMove = (me) => {
       const dx = me.clientX - startX;
@@ -615,7 +619,7 @@ export class EditMode {
       if (newTick !== origTick || newPitch !== origPitch) {
         note.startTick = Math.max(0, newTick);
         note.pitch = Math.max(this._pitchMin, Math.min(this._pitchMax - 1, newPitch));
-        this._onEdit('Move note');
+        this._onEdit('Move note', beforeState);
       }
     };
 
@@ -626,6 +630,7 @@ export class EditMode {
   _startNoteResize(e, note, idx, el) {
     const startX = e.clientX;
     const origDuration = note.durationTick;
+    const beforeState = this._snapshotSnippetState();
 
     const onMove = (me) => {
       const dx = me.clientX - startX;
@@ -643,7 +648,7 @@ export class EditMode {
 
       if (newDuration !== origDuration) {
         note.durationTick = newDuration;
-        this._onEdit('Resize note');
+        this._onEdit('Resize note', beforeState);
       }
     };
 
@@ -785,6 +790,7 @@ export class EditMode {
   _addNote(startTick, pitch) {
     if (!this._snippet) return;
     if (!this._snippet.notes) this._snippet.notes = [];
+    const beforeState = this._snapshotSnippetState();
 
     const note = {
       pitch,
@@ -795,13 +801,14 @@ export class EditMode {
 
     this._snippet.notes.push(note);
     this._selectedNoteIdx = this._snippet.notes.length - 1;
-    this._onEdit('Add note');
+    this._onEdit('Add note', beforeState);
     showToast(`Added ${midiToNoteName(pitch).display}`);
   }
 
   _addHit(startTick, drumType) {
     if (!this._snippet) return;
     if (!this._snippet.hits) this._snippet.hits = [];
+    const beforeState = this._snapshotSnippetState();
 
     const hit = {
       type: drumType,
@@ -811,7 +818,7 @@ export class EditMode {
 
     this._snippet.hits.push(hit);
     this._selectedNoteIdx = this._snippet.hits.length - 1;
-    this._onEdit('Add hit');
+    this._onEdit('Add hit', beforeState);
     showToast(`Added ${drumType}`);
   }
 
@@ -824,9 +831,10 @@ export class EditMode {
     if (!this._snippet.notes) return;
     if (this._selectedNoteIdx >= this._snippet.notes.length) return;
 
+    const beforeState = this._snapshotSnippetState();
     this._snippet.notes.splice(this._selectedNoteIdx, 1);
     this._selectedNoteIdx = null;
-    this._onEdit('Delete note');
+    this._onEdit('Delete note', beforeState);
     showToast('Note deleted');
   }
 
@@ -837,6 +845,7 @@ export class EditMode {
       return;
     }
 
+    const beforeState = this._snapshotSnippetState();
     let changed = 0;
     for (const note of notes) {
       if (note.durationTick !== this._gridSize) {
@@ -850,7 +859,7 @@ export class EditMode {
       return;
     }
 
-    this._onEdit('Quantize all note durations');
+    this._onEdit('Quantize all note durations', beforeState);
     showToast(`Quantized ${notes.length} notes to ${this._gridLabel()}`);
   }
 
@@ -864,8 +873,47 @@ export class EditMode {
     return labels.get(this._gridSize) || `${this._gridSize} ticks`;
   }
 
-  _onEdit(description) {
+  _cloneForUndo(value) {
+    return value === undefined ? undefined : JSON.parse(JSON.stringify(value));
+  }
+
+  _snapshotSnippetState() {
+    if (!this._snippet) return null;
+    return {
+      name: this._snippet.name,
+      notes: this._cloneForUndo(this._snippet.notes || []),
+      hits: this._cloneForUndo(this._snippet.hits || []),
+      modulation: this._cloneForUndo(this._snippet.modulation || []),
+      durationTicks: this._snippet.durationTicks,
+    };
+  }
+
+  _restoreSnippetState(state) {
+    if (!this._snippet || !state) return;
+    this._snippet.name = state.name;
+    this._snippet.notes = this._cloneForUndo(state.notes || []);
+    this._snippet.hits = this._cloneForUndo(state.hits || []);
+    this._snippet.modulation = this._cloneForUndo(state.modulation || []);
+    this._snippet.durationTicks = state.durationTicks;
+    this._selectedNoteIdx = null;
+    this._rebuildAll();
+    this.store?.scheduleAutoSave(this.project);
+    if (this.onSnippetRenamed) this.onSnippetRenamed(this._snippet);
+  }
+
+  _onEdit(description, beforeState = null) {
     this._updateSnippetDuration();
+    const afterState = this._snapshotSnippetState();
+
+    if (beforeState && afterState && JSON.stringify(beforeState) !== JSON.stringify(afterState)) {
+      this.undoManager?.push({
+        type: 'editSnippet',
+        description,
+        undo: () => this._restoreSnippetState(beforeState),
+        redo: () => this._restoreSnippetState(afterState),
+      });
+    }
+
     this._rebuildGrids();
 
     const count = (this._snippet.notes?.length || 0) + (this._snippet.hits?.length || 0);
@@ -901,6 +949,7 @@ export class EditMode {
 
   _setDuration(newDuration) {
     if (!this._snippet) return;
+    const beforeState = this._snapshotSnippetState();
     const beats = this.transport?.ticksPerBeat || 480;
     const durationTicks = Math.max(480, Math.ceil(newDuration / beats) * beats);
     this._snippet.durationTicks = durationTicks;
@@ -920,6 +969,16 @@ export class EditMode {
     }
     if (this._selectedNoteIdx !== null && this._selectedNoteIdx >= (this._snippet.notes?.length || 0) + (this._snippet.hits?.length || 0)) {
       this._selectedNoteIdx = null;
+    }
+
+    const afterState = this._snapshotSnippetState();
+    if (beforeState && afterState && JSON.stringify(beforeState) !== JSON.stringify(afterState)) {
+      this.undoManager?.push({
+        type: 'setSnippetDuration',
+        description: 'Set snippet duration',
+        undo: () => this._restoreSnippetState(beforeState),
+        redo: () => this._restoreSnippetState(afterState),
+      });
     }
 
     this._rebuildAll();
