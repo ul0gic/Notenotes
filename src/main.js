@@ -46,6 +46,7 @@ class App {
     // UI components
 
     this._initialized = false;
+    this._lastCtrlWheelAt = 0;
   }
 
   /**
@@ -61,6 +62,7 @@ class App {
 
     // Bind keyboard shortcuts
     this._bindKeyboard();
+    this._bindWheelShortcuts();
 
     // Load or create project
     await this._loadOrCreateProject();
@@ -158,6 +160,10 @@ class App {
       if (this.editMode?._snippet) {
         this.editMode.loadSnippet(this.editMode._snippet, this.editMode._clipId);
       }
+    });
+
+    window.addEventListener('project-sound-traits-changed', () => {
+      this.canvasMode?.refresh();
     });
 
     // First user interaction will init audio
@@ -460,6 +466,31 @@ class App {
     });
   }
 
+  _bindWheelShortcuts() {
+    window.addEventListener('wheel', (e) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+
+      const target = e.target;
+      if (target && (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable)) return;
+
+      const mode = this.modeTabs.activeMode;
+      if (mode !== Modes.CANVAS && mode !== Modes.PIANOROLL) return;
+
+      e.preventDefault();
+
+      const now = performance.now();
+      if (now - this._lastCtrlWheelAt < 100) return;
+      this._lastCtrlWheelAt = now;
+
+      const direction = e.deltaY < 0 ? 1 : -1;
+      if (mode === Modes.CANVAS) {
+        this.canvasMode?.zoomBy(direction > 0 ? 1.25 : 0.8);
+      } else {
+        this.editMode?.adjustVisibleKeyCount(direction);
+      }
+    }, { passive: false });
+  }
+
   _toggleKeysOverlay() {
     let overlay = document.getElementById('keys-overlay');
     if (overlay) {
@@ -503,6 +534,7 @@ class App {
           <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Ctrl+click</td><td style="padding:4px 8px;color:var(--text-secondary);">Delete note</td></tr>
           <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Click empty space</td><td style="padding:4px 8px;color:var(--text-secondary);">Add new note</td></tr>
           <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Scroll</td><td style="padding:4px 8px;color:var(--text-secondary);">Pan pitch range</td></tr>
+          <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Ctrl+Wheel</td><td style="padding:4px 8px;color:var(--text-secondary);">Show more or fewer keys</td></tr>
           <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Delete</td><td style="padding:4px 8px;color:var(--text-secondary);">Delete selected note or hit</td></tr>
         </table>
         <hr style="border:none;border-top:1px solid var(--surface-3);margin:var(--space-sm) 0;" />
@@ -511,6 +543,7 @@ class App {
           <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Drag clip</td><td style="padding:4px 8px;color:var(--text-secondary);">Move clip on the timeline</td></tr>
           <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Alt+drag edge</td><td style="padding:4px 8px;color:var(--text-secondary);">Shrink clip</td></tr>
           <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Ctrl+click</td><td style="padding:4px 8px;color:var(--text-secondary);">Delete clip</td></tr>
+          <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Ctrl+Wheel</td><td style="padding:4px 8px;color:var(--text-secondary);">Zoom timeline in or out</td></tr>
           <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Delete</td><td style="padding:4px 8px;color:var(--text-secondary);">Delete selected clip</td></tr>
         </table>
       </div>

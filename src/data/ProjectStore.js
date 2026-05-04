@@ -42,7 +42,12 @@ export function createProject(name = 'Untitled Sketch') {
       arpRate: '1/8',
       arpChordType: 'major',
       arpPattern: 'up',
-      holdDuration: 3000
+      holdDuration: 3000,
+      soundTraits: {},
+      controllerToneAssignments: {
+        leftTrigger: 'none',
+        rightTrigger: 'none'
+      }
     }
   };
 }

@@ -52,6 +52,7 @@
   background: var(--surface-1);
   border-bottom: var(--border-subtle);
   flex-shrink: 0;
+  position: relative;
 }
 
 .patch-selector__label {
@@ -70,6 +71,110 @@
   font-size: var(--font-size-sm);
   padding: var(--space-xs) var(--space-sm);
   min-height: 32px;
+}
+
+.tone-button {
+  background: var(--surface-3);
+  border: var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-family: var(--font-family);
+  font-size: var(--font-size-sm);
+  min-height: 32px;
+  padding: var(--space-xs) var(--space-sm);
+}
+
+.tone-button:hover,
+.tone-button[aria-expanded="true"] {
+  border-color: var(--accent-dim);
+  color: var(--accent-light);
+  background: var(--surface-4);
+}
+
+.tone-trigger-indicator {
+  color: #42d782;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  min-width: 34px;
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+
+.tone-trigger-indicator.is-active {
+  opacity: 1;
+}
+
+.tone-popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: var(--space-md);
+  z-index: 20;
+  width: min(360px, calc(100vw - 32px));
+  padding: var(--space-sm);
+  background: var(--surface-1);
+  border: 1px solid var(--surface-4);
+  border-radius: var(--radius-md);
+  box-shadow: 0 12px 28px rgba(0,0,0,0.35);
+}
+
+.tone-popover__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: 0 0 var(--space-xs);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.tone-popover__close {
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-tertiary);
+  min-width: 24px;
+  min-height: 24px;
+  cursor: pointer;
+}
+
+.tone-popover__close:hover {
+  background: var(--surface-3);
+  color: var(--text-primary);
+}
+
+.tone-popover__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.tone-row {
+  display: grid;
+  grid-template-columns: minmax(70px, auto) 1fr 42px;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.tone-row__name {
+  display: flex;
+  align-items: center;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.tone-row__slider {
+  width: 100%;
+}
+
+.tone-row__value {
+  color: var(--text-tertiary);
+  font-size: var(--font-size-xs);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 /* === SCALE BOARD === */
@@ -325,6 +430,7 @@
   gap: var(--space-sm);
   padding: 0 var(--space-xs);
   flex-shrink: 0;
+  position: relative;
 }
 
 .sk-kit-selector__label {
@@ -343,7 +449,13 @@
   font-size: var(--font-size-sm);
   padding: var(--space-xs) var(--space-sm);
   min-height: 32px;
-  flex: 1;
+  width: auto;
+  min-width: 120px;
+  max-width: 180px;
+}
+
+.sk-tone-popover {
+  left: var(--space-xs);
 }
 
 .sketchkit__pads {
@@ -584,6 +696,29 @@
   min-width: 0;
 }
 
+.ctrlmode__trigger-assignments {
+  display: grid;
+  grid-template-columns: minmax(110px, 1fr) minmax(110px, 1fr);
+  gap: var(--space-xl);
+  width: min(100%, 520px);
+  align-items: end;
+}
+
+.ctrlmode__trigger-select {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  color: var(--text-tertiary);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+}
+
+.ctrlmode__trigger-select .ctrlmode__select {
+  width: 100%;
+  max-width: none;
+}
+
 .ctrlmode__art {
   position: relative;
   width: min(100%, 520px);
@@ -635,6 +770,12 @@
   border-radius: 8px;
 }
 
+.ctrlmode__hotspot--trigger {
+  width: 13%;
+  height: 8%;
+  border-radius: 8px;
+}
+
 .ctrlmode__stick {
   width: 10%;
   height: 15%;
@@ -654,6 +795,8 @@
 #ct-btn-b { left: 81.4%; top: 34.8%; }
 #ct-bumper-l { left: 30.6%; top: 2.8%; }
 #ct-bumper-r { left: 69.4%; top: 2.8%; }
+#ct-trigger-l { left: 30.6%; top: 11%; }
+#ct-trigger-r { left: 69.4%; top: 11%; }
 #ct-stick-l { left: 34.7%; top: 64.2%; }
 #ct-stick-r { left: 65.3%; top: 64.2%; }
 

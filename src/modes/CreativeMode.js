@@ -5,7 +5,7 @@
  */
 
 import '../modes/creative.css';
-import { WebAudioSynth, PRESETS } from '../instruments/WebAudioSynth.js';
+import { WebAudioSynth, PRESETS, SOUND_TRAITS, normalizeSoundTraits } from '../instruments/WebAudioSynth.js';
 import { ScaleBoard } from '../instruments/ScaleBoard.js';
 import { MicroPiano } from '../instruments/MicroPiano.js';
 import { SketchKit } from '../instruments/SketchKit.js';
@@ -48,8 +48,14 @@ export class CreativeMode {
     this.scaleBoard = new ScaleBoard(this.synth, this.project);
     this.microPiano = new MicroPiano(this.synth, this.project);
     this.sketchKit = new SketchKit(this.project);
+    this.sketchKit.onSoundTraitsChanged = (traits) => this._applyProjectSoundTraits(traits);
     this.micRecorder = new MicRecorder();
     this.controllerMode = new ControllerMode(this.synth, this.project, modManager);
+    this.controllerMode.onToneAssignmentChanged = () => this.store?.scheduleAutoSave(this.project);
+    this.controllerMode.onToneOverrideChanged = (traits, labels = []) => {
+      this._setLiveSoundTraits(traits);
+      this._updateToneTriggerIndicator(labels);
+    };
 
     // Recording
     this.recordingManager = new RecordingManager(transport, quantizer);
@@ -64,6 +70,8 @@ export class CreativeMode {
     this._initialized = false;
     this._heldScaleKeyPads = new Map();
     this._heldPianoKeyIndexes = new Map();
+    this._tonePopover = null;
+    this._currentToneTraits = this._currentToneTraits || null;
   }
 
   set project(p) {
@@ -74,6 +82,8 @@ export class CreativeMode {
     if (this.controllerMode) this.controllerMode.project = p;
     if (this.arpManager) this.arpManager.project = p;
     if (this.loopProgress) this.loopProgress.project = p;
+    this._currentToneTraits = this._normalizeProjectSoundTraits(p);
+    if (this.synth) this._setLiveSoundTraits(this._currentToneTraits);
   }
 
   get project() {
@@ -88,7 +98,9 @@ export class CreativeMode {
 
     this.synth.init();
     this.synth.loadPatch(PRESETS.chip_lead);
+    this._applyProjectSoundTraits(this._ensureSoundTraits(), { save: false, notify: false });
     this.sketchKit.init();
+    this.sketchKit.setSoundTraits(this._currentToneTraits || this._ensureSoundTraits());
     this.recordingManager.init();
 
     if (this._modManager) {
@@ -97,6 +109,8 @@ export class CreativeMode {
 
     // Wire modulation capture
     this.recordingManager.setModManager(this._modManager);
+    this.recordingManager.setBaseToneProvider(() => this._baseSoundTraitsSnapshot());
+    this.recordingManager.setToneProvider(() => this._currentSoundTraitsSnapshot());
     this.transport.onTick(() => {
       this.recordingManager.captureModulation();
     });
@@ -246,10 +260,19 @@ export class CreativeMode {
           `<option value="${key}">${p.name}</option>`
         ).join('')}
       </select>
+      <button class="tone-button" id="tone-button" type="button" aria-expanded="false" aria-controls="tone-popover">Tone</button>
+      <span class="tone-trigger-indicator" id="tone-trigger-indicator" aria-live="polite"></span>
     `;
     patchSel.querySelector('#patch-select').addEventListener('change', (e) => {
       const patch = PRESETS[e.target.value];
-      if (patch) this.synth.loadPatch(patch);
+      if (patch) {
+        this.synth.loadPatch(patch);
+        this._setLiveSoundTraits(this.controllerMode?.currentSoundTraits(this._currentToneTraits || this._ensureSoundTraits()));
+      }
+    });
+    patchSel.querySelector('#tone-button').addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      this._toggleTonePopover(patchSel);
     });
     this.el.appendChild(patchSel);
 
@@ -397,6 +420,7 @@ export class CreativeMode {
     const patchSel = this.el.querySelector('#patch-selector');
     const isSynth = id === INSTRUMENTS.SCALEBOARD || id === INSTRUMENTS.PIANO || id === INSTRUMENTS.CONTROLLER;
     patchSel.style.display = isSynth ? 'flex' : 'none';
+    if (!isSynth) this._closeTonePopover();
   }
 
   _releaseKeyboardPerformance() {
@@ -408,5 +432,126 @@ export class CreativeMode {
     }
     this._heldScaleKeyPads.clear();
     this._heldPianoKeyIndexes.clear();
+  }
+
+  _ensureSoundTraits() {
+    if (!this.project) return normalizeSoundTraits(this._currentToneTraits);
+    if (!this.project.settings) this.project.settings = {};
+    this.project.settings.soundTraits = this._normalizeProjectSoundTraits(this.project);
+    this._currentToneTraits = this.project.settings.soundTraits;
+    return this.project.settings.soundTraits;
+  }
+
+  _normalizeProjectSoundTraits(project) {
+    return normalizeSoundTraits(project?.settings?.soundTraits || this._currentToneTraits || {});
+  }
+
+  _applyProjectSoundTraits(traits, { save = true, notify = true } = {}) {
+    const normalized = normalizeSoundTraits(traits);
+    this._currentToneTraits = normalized;
+    if (this.project) {
+      if (!this.project.settings) this.project.settings = {};
+      this.project.settings.soundTraits = JSON.parse(JSON.stringify(normalized));
+    }
+    this.sketchKit?.setSoundTraits(normalized);
+    this._setLiveSoundTraits(this.controllerMode?.currentSoundTraits(normalized) || normalized);
+    if (save) this.store?.scheduleAutoSave(this.project);
+    if (notify) {
+      window.dispatchEvent(new CustomEvent('project-sound-traits-changed', { detail: { soundTraits: normalized } }));
+    }
+    return normalized;
+  }
+
+  _setLiveSoundTraits(traits) {
+    this.synth?.setSoundTraits(traits || this._currentToneTraits || {});
+  }
+
+  _currentSoundTraitsSnapshot() {
+    const traits = this.controllerMode?.currentSoundTraits(this._currentToneTraits || this._ensureSoundTraits())
+      || this.synth.soundTraits
+      || this._ensureSoundTraits();
+    return JSON.parse(JSON.stringify(normalizeSoundTraits(traits)));
+  }
+
+  _baseSoundTraitsSnapshot() {
+    return JSON.parse(JSON.stringify(normalizeSoundTraits(this._currentToneTraits || this._ensureSoundTraits())));
+  }
+
+  _updateToneTriggerIndicator(labels = []) {
+    const indicator = this.el?.querySelector('#tone-trigger-indicator');
+    if (!indicator) return;
+    indicator.textContent = labels.join('/');
+    indicator.classList.toggle('is-active', labels.length > 0);
+  }
+
+  _toggleTonePopover(anchor) {
+    if (this._tonePopover) {
+      this._closeTonePopover();
+      return;
+    }
+
+    const traits = this._ensureSoundTraits();
+    const popover = document.createElement('div');
+    popover.className = 'tone-popover';
+    popover.id = 'tone-popover';
+    popover.innerHTML = `
+      <div class="tone-popover__header">
+        <span>Tone Traits</span>
+        <button class="tone-popover__close" type="button" aria-label="Close tone traits">x</button>
+      </div>
+      <div class="tone-popover__list">
+        ${Object.values(SOUND_TRAITS).map(trait => {
+          const state = traits[trait.id] || { amount: 0 };
+          const amount = Math.round((state.amount ?? 0) * 100);
+          return `
+            <div class="tone-row" title="${trait.hint}">
+              <label class="tone-row__name" for="tone-${trait.id}">${trait.name}</label>
+              <input class="tone-row__slider" type="range" min="0" max="100" value="${amount}" data-tone-amount="${trait.id}" aria-label="${trait.name} intensity">
+              <span class="tone-row__value">${amount}%</span>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+
+    anchor.appendChild(popover);
+    anchor.querySelector('#tone-button')?.setAttribute('aria-expanded', 'true');
+    this._tonePopover = popover;
+
+    popover.querySelector('.tone-popover__close')?.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      this._closeTonePopover();
+    });
+
+    popover.querySelectorAll('[data-tone-amount]').forEach(slider => {
+      const update = () => this._setToneTraitAmount(slider.dataset.toneAmount, Number(slider.value) / 100, slider);
+      slider.addEventListener('input', update);
+      slider.addEventListener('change', update);
+    });
+  }
+
+  _handleToneInput(e) {
+    const slider = e.target.closest('[data-tone-amount]');
+    if (!slider) return;
+    this._setToneTraitAmount(slider.dataset.toneAmount, Number(slider.value) / 100, slider);
+  }
+
+  _setToneTraitAmount(id, amount, slider = null) {
+    if (!id || !SOUND_TRAITS[id]) return;
+    const traits = normalizeSoundTraits(this._ensureSoundTraits());
+    traits[id] = { amount: Math.max(0, Math.min(1, Number(amount) || 0)) };
+    const rounded = Math.round(traits[id].amount * 100);
+    if (slider) {
+      slider.value = String(rounded);
+      const value = slider.closest('.tone-row')?.querySelector('.tone-row__value');
+      if (value) value.textContent = `${rounded}%`;
+    }
+    this._applyProjectSoundTraits(traits);
+  }
+
+  _closeTonePopover() {
+    this._tonePopover?.remove();
+    this._tonePopover = null;
+    this.el?.querySelector('#tone-button')?.setAttribute('aria-expanded', 'false');
   }
 }

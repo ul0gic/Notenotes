@@ -13,6 +13,8 @@ const TICK_WIDTH = 0.15;
 const DEFAULT_NOTE_HEIGHT = 16;
 const MIN_NOTE_HEIGHT = 8;
 const MAX_NOTE_HEIGHT = 24;
+const MIN_PIANO_OCTAVE = 1;
+const MAX_PIANO_OCTAVE = 6;
 
 const DRUM_TYPES = [
   { id: 'kick',   label: 'KICK' },
@@ -47,6 +49,7 @@ export class EditMode {
     this._noteHeight = DEFAULT_NOTE_HEIGHT;
     this._pitchMin = 36;
     this._pitchMax = 84;
+    this._pitchRangeInitialized = false;
 
     this._splitMode = false;
 
@@ -68,9 +71,11 @@ export class EditMode {
   }
 
   loadSnippet(snippet, clipId = null) {
+    const snippetChanged = this._snippet?.id !== snippet?.id;
     this._snippet = snippet;
     this._clipId = clipId;
     this._selectedNoteIdx = null;
+    if (snippetChanged) this._pitchRangeInitialized = false;
 
     this.el.innerHTML = '';
     if (this._snippet) {
@@ -140,8 +145,11 @@ export class EditMode {
       this._pitchMax = DRUM_TYPES.length;
       this._noteHeight = DEFAULT_NOTE_HEIGHT;
     } else {
-      this._pitchMin = 36;
-      this._pitchMax = 84;
+      if (!this._pitchRangeInitialized) {
+        this._pitchMin = 36;
+        this._pitchMax = 84;
+        this._pitchRangeInitialized = true;
+      }
       this.el.style.setProperty('--note-height', `${this._noteHeight}px`);
     }
 
@@ -871,6 +879,37 @@ export class EditMode {
       [120, '1/16'],
     ]);
     return labels.get(this._gridSize) || `${this._gridSize} ticks`;
+  }
+
+  adjustVisibleKeyCount(direction) {
+    if (!this._snippet || this._snippet.type === 'drum' || this._snippet.type === 'audio') return false;
+
+    let lowOct = Math.floor(this._pitchMin / 12) - 1;
+    let highOct = Math.floor(this._pitchMax / 12) - 1;
+    const currentSpan = highOct - lowOct;
+
+    if (direction > 0) {
+      if (highOct < MAX_PIANO_OCTAVE) {
+        highOct += 1;
+      } else if (lowOct > MIN_PIANO_OCTAVE) {
+        lowOct -= 1;
+      } else {
+        showToast('Piano range maxed');
+        return false;
+      }
+    } else if (currentSpan > 1) {
+      highOct -= 1;
+    } else {
+      showToast('Piano range minimum');
+      return false;
+    }
+
+    this._pitchMin = (lowOct + 1) * 12;
+    this._pitchMax = (highOct + 1) * 12;
+    this._pitchRangeInitialized = true;
+    this._rebuildAll();
+    showToast(`Piano range C${lowOct} to C${highOct}`);
+    return true;
   }
 
   _cloneForUndo(value) {

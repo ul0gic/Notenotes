@@ -58,6 +58,20 @@ export class CanvasMode {
     }
   }
 
+  _barPositionFromPixels(px, snap = 'floor') {
+    const beat = px / this.beatWidth;
+    const snappedBeat = snap === 'round' ? Math.round(beat) : Math.floor(beat);
+    return Math.max(0, snappedBeat / this._beatsPerBar());
+  }
+
+  _formatPosition(tick = this.transport?.currentTick || 0) {
+    const ticksPerBar = this.transport.ticksPerBar;
+    const ticksPerBeat = this.transport.ticksPerBeat;
+    const bar = Math.floor(tick / ticksPerBar) + 1;
+    const beat = Math.floor((tick % ticksPerBar) / ticksPerBeat) + 1;
+    return `Bar ${bar}.${beat}`;
+  }
+
   _autoSetLoopFromClips() {
     if (!this.project?.tracks) return;
     let maxEndBar = 4;
@@ -95,7 +109,7 @@ export class CanvasMode {
       </div>
       <div class="canvas-toolbar__spacer"></div>
       <div class="canvas-toolbar__group">
-        <span class="canvas-toolbar__label" id="canvas-bar-display">Bar 1</span>
+        <span class="canvas-toolbar__label" id="canvas-bar-display">Bar 1.1</span>
       </div>
     `;
     this.el.appendChild(toolbar);
@@ -257,16 +271,16 @@ export class CanvasMode {
       inner.appendChild(lane);
     });
 
-    // Add track button
-    const addBtn = document.createElement('button');
-    addBtn.className = 'canvas-add-track';
-    addBtn.id = 'canvas-add-track';
-    addBtn.textContent = '+ Add Track';
-    addBtn.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      this._addTrack();
-    });
-    inner.appendChild(addBtn);
+    // Add typed track row
+    const addRow = document.createElement('div');
+    addRow.className = 'canvas-add-track';
+    addRow.id = 'canvas-add-track';
+    addRow.innerHTML = `
+      <button class="canvas-add-track__btn" data-add-track-type="midi">+ Add MIDI</button>
+      <button class="canvas-add-track__btn" data-add-track-type="drum">+ Add Drum</button>
+      <button class="canvas-add-track__btn" data-add-track-type="audio">+ Add Audio</button>
+    `;
+    inner.appendChild(addRow);
   }
 
   /** Render clips within a track's content area */
@@ -293,7 +307,10 @@ export class CanvasMode {
     const noteCount = (clip.snippet?.notes?.length || 0) + (clip.snippet?.hits?.length || 0);
     const snippetName = clip.snippet?.name || `${noteCount} notes`;
     el.innerHTML = `
-      <span class="canvas-clip__label">${snippetName}</span>
+      <div class="canvas-clip__label-row">
+        <span class="canvas-clip__label">${snippetName}</span>
+        ${this._renderToneBadges(clip)}
+      </div>
       <div class="canvas-clip__preview">${this._renderClipPreview(clip, w)}</div>
       ${this._renderModOverlay(clip, w)}
     `;
@@ -379,6 +396,27 @@ export class CanvasMode {
     return `<svg width="${svgWidth}" height="${height}" class="canvas-clip__audio-preview" style="display:block;">${svgContent}</svg>`;
   }
 
+  _renderToneBadges(clip) {
+    if (clip.snippet?.type !== 'midi') return '';
+    const labels = {
+      crush: 'CR',
+      echo: 'EC',
+      space: 'SP',
+      wobble: 'WB',
+      drive: 'DR',
+      noise: 'NO',
+    };
+    const sources = [
+      clip.snippet?.soundTraits || this.project?.settings?.soundTraits || {},
+      ...(clip.snippet?.notes || []).map(note => note.soundTraits || {}),
+    ];
+    const active = Object.entries(labels)
+      .filter(([id]) => sources.some(traits => traits[id]?.enabled !== false && (traits[id]?.amount || 0) > 0))
+      .slice(0, 3);
+    if (active.length === 0) return '';
+    return `<span class="canvas-clip__tone-badges">${active.map(([id, label]) => `<span title="${id}">${label}</span>`).join('')}</span>`;
+  }
+
   _renderModOverlay(clip, clipWidth) {
     const mod = clip.snippet?.modulation;
     if (!mod || mod.length < 2) return '';
@@ -433,7 +471,7 @@ export class CanvasMode {
       const rect = contentEl.getBoundingClientRect();
       const scrollLeft = contentEl.parentElement?.closest('.canvas-tracks')?.scrollLeft || 0;
       const offsetX = e.clientX - rect.left + scrollLeft;
-      const startBar = Math.max(0, Math.floor(offsetX / this.barWidth));
+      const startBar = this._barPositionFromPixels(offsetX, 'floor');
       const durationBars = snippet.durationTicks / this.transport.ticksPerBar || 1;
 
       const clip = {
@@ -513,7 +551,7 @@ export class CanvasMode {
       document.removeEventListener('pointermove', onMove);
       document.removeEventListener('pointerup', onUp);
 
-      const newBar = Math.max(0, Math.round(parseInt(el.style.left, 10) / this.barWidth));
+      const newBar = this._barPositionFromPixels(parseInt(el.style.left, 10), 'round');
       if (newBar !== originalBar) {
         clip.startBar = newBar;
         el.style.left = `${newBar * this.barWidth}px`;
@@ -656,7 +694,7 @@ export class CanvasMode {
               const rect = lane.getBoundingClientRect();
               const scrollLeft = lane.parentElement?.closest('.canvas-tracks')?.scrollLeft || 0;
               const offsetX = t.clientX - rect.left + scrollLeft;
-              const startBar = Math.max(0, Math.floor(offsetX / this.barWidth));
+              const startBar = this._barPositionFromPixels(offsetX, 'floor');
               const durationBars = snippet.durationTicks / this.transport.ticksPerBar || 1;
               const clip = {
                 id: crypto.randomUUID(),
@@ -723,13 +761,6 @@ export class CanvasMode {
   }
 
   _bindEvents() {
-    // Add typed tracks
-    this.el.querySelectorAll('[data-add-track-type]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        this._addTrack(btn.dataset.addTrackType || 'midi');
-      });
-    });
-
     // Zoom In
     this.el.querySelector('#canvas-zoom-in-btn')?.addEventListener('click', () => {
       this._setZoom(this._zoomLevel * 2);
@@ -748,6 +779,13 @@ export class CanvasMode {
     // Delegated events on the canvas element
     this.el.addEventListener('pointerdown', (e) => {
       // Mute/Solo buttons
+      const addTrackBtn = e.target.closest('[data-add-track-type]');
+      if (addTrackBtn) {
+        e.preventDefault();
+        this._addTrack(addTrackBtn.dataset.addTrackType || 'midi');
+        return;
+      }
+
       const btn = e.target.closest('[data-action]');
       if (btn) {
         const action = btn.dataset.action;
@@ -916,6 +954,8 @@ export class CanvasMode {
 
       if (this.transport.state === TransportState.STOPPED) {
         this._playheadEl.style.display = 'none';
+        const barDisplay = this.el.querySelector('#canvas-bar-display');
+        if (barDisplay) barDisplay.textContent = this._formatPosition(this.transport.currentTick);
         return;
       }
 
@@ -926,10 +966,10 @@ export class CanvasMode {
       const x = 140 + barPosition * this.barWidth; // 140px offset for track headers
       this._playheadEl.style.left = `${x}px`;
 
-      // Update bar display
+      // Update position display
       const barDisplay = this.el.querySelector('#canvas-bar-display');
       if (barDisplay) {
-        barDisplay.textContent = `Bar ${Math.floor(barPosition) + 1}`;
+        barDisplay.textContent = this._formatPosition(tick);
       }
     };
     animate();
@@ -1014,6 +1054,11 @@ export class CanvasMode {
          this._tracksContainer.scrollLeft = scrollRatio * this._tracksContainer.scrollWidth;
       }
     }
+  }
+
+  zoomBy(factor) {
+    this._setZoom(this._zoomLevel * factor);
+    showToast(`Canvas zoom ${Math.round(this._zoomLevel * 100)}%`);
   }
 
   destroy() {

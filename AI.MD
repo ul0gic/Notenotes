@@ -117,11 +117,19 @@ setInterval (25ms) → checks if events need scheduling in next 100ms → schedu
       bpm: 120,
       timeSignature: { beats: 4, subdivision: 4 },
       durationTicks: 7680,     // Total length in ticks
+      soundTraits: {
+        crush: { amount: 0 },
+        echo: { amount: 0 },
+        space: { amount: 0 },
+        wobble: { amount: 0 },
+        drive: { amount: 0 },
+        noise: { amount: 0 },
+      },
       notes: [
-        { pitch: 60, startTick: 0, durationTick: 480, velocity: 0.8 }
+        { pitch: 60, startTick: 0, durationTick: 480, velocity: 0.8, soundTraits: { ...optionalPerNoteTone } }
       ],
       hits: [
-        { type: "kick", startTick: 0, velocity: 1.0 }
+        { type: "kick", startTick: 0, velocity: 1.0, soundTraits: { ...optionalPerHitTone } }
       ],
     }
   ],
@@ -131,6 +139,18 @@ setInterval (25ms) → checks if events need scheduling in next 100ms → schedu
     metronomeVolume: 0.5,
     loopBars: 4,
     masterVolume: 0.8,
+    soundTraits: {
+      crush: { amount: 0 },
+      echo: { amount: 0 },
+      space: { amount: 0 },
+      wobble: { amount: 0 },
+      drive: { amount: 0 },
+      noise: { amount: 0 },
+    },
+    controllerToneAssignments: {
+      leftTrigger: "none",
+      rightTrigger: "none"
+    },
   }
 }
 ```
@@ -259,7 +279,7 @@ This also creates a version history snapshot. Max 5 versions kept per project.
 - **MIDI input** — No Web MIDI API integration yet. Could map MIDI keyboard input to the synth.
 - **Overdubbing** — Record additional notes on top of an existing snippet.
 - **Mobile touch optimization** — Touch events work but multi-touch (e.g., piano chords) needs testing.
-- **Export to MIDI file** — ABC export works, but .mid file export is not implemented.
+- **MP3 export** — MIDI and WAV export exist. MP3 still needs a reliable browser encoder path.
 
 ### Polish Items
 - Loading spinner during project load
@@ -717,3 +737,112 @@ This means the music sounds at the same tick positions, while the bar lines and 
 - Inspect's `Quantize all` button appears to the right of `Split` for MIDI-note snippets only.
 - It sets every note's `durationTick` to the current Inspect grid size (`1/2`, `1/4`, `1/8`, or `1/16`) without changing `startTick` or pitch.
 - It affects only the currently loaded snippet/clip in Inspect. Drum snippets are excluded because drum hits do not have note durations.
+
+<!-- --- NEW CONTEXT ADDED 2026-05-04 (TONE TRAITS / FRIENDLY SOUND EFFECTS) --- -->
+
+## Tone Traits / Friendly Sound Effects
+
+Tone Traits are the current lightweight sound-shaping layer. They are intentionally simple sliders, not a full DAW effects rack.
+
+### Supported Traits
+
+The shared trait ids live in `src/instruments/WebAudioSynth.js`:
+
+```js
+crush, echo, space, wobble, drive, noise
+```
+
+Canonical shape:
+
+```js
+soundTraits: {
+  crush: { amount: 0 },
+  echo: { amount: 0 },
+  space: { amount: 0 },
+  wobble: { amount: 0 },
+  drive: { amount: 0 },
+  noise: { amount: 0 },
+}
+```
+
+Rules:
+
+- `amount` is normalized from `0` to `1`.
+- `0` means off. There is no separate enabled checkbox.
+- Use `normalizeSoundTraits()` before storing, comparing, or applying Tone state.
+- Older `{ enabled: false }` shapes are still tolerated by normalizers and WAV export helpers.
+
+### Current Tone vs Recorded Tone
+
+`project.settings.soundTraits` is the current/default Tone state used by Create mode.
+
+MIDI and drum snippets can store a base snapshot:
+
+```js
+snippet.soundTraits
+```
+
+Individual MIDI notes and drum hits can also store per-event Tone:
+
+```js
+note.soundTraits
+hit.soundTraits
+```
+
+This matters for controller triggers. LT/RT are hotswitches, so a trigger effect should apply to the note/hit played while the trigger is active, not the whole clip.
+
+### Controller Trigger Assignments
+
+Controller trigger assignments are project settings:
+
+```js
+project.settings.controllerToneAssignments = {
+  leftTrigger: "none",
+  rightTrigger: "none",
+}
+```
+
+`ControllerMode.currentSoundTraits(baseTraits)` overlays active trigger pressure on top of the base Tone. It must not write trigger pressure back into `project.settings.soundTraits`.
+
+The UI shows green `LT`, `RT`, or `LT/RT` beside the main `Tone` button while a trigger override is active.
+
+### Live Audio Routing
+
+`WebAudioSynth` owns the synth Tone chain:
+
+- voices connect into `_toneInput`
+- `_rebuildEffects()` builds Crush, Drive, Wobble, Echo, Space, and Noise behavior
+- `setSoundTraits()` rebuilds the chain
+
+`SketchKit` owns a parallel drum Tone chain:
+
+- drum voices connect into `_toneInput`
+- the Kit screen has its own `Tone` button next to the kit dropdown
+- Kit Tone writes through the same project `soundTraits` path for consistency
+
+`CreativeMode._applyProjectSoundTraits()` is the main bridge that writes project state and applies it to both synth and kit.
+
+### Recording
+
+`RecordingManager` has two Tone providers:
+
+- `setBaseToneProvider()` captures the base snippet Tone
+- `setToneProvider()` captures the current live Tone, including temporary trigger overrides
+
+On MIDI note-on, the current live Tone is copied to `note.soundTraits`.
+On drum hit, the current live Tone is copied to `hit.soundTraits`.
+On snippet finalize, the base Tone is copied to `snippet.soundTraits`.
+
+Do not change this back to "one snapshot at the end of recording" because that makes one trigger press smear across the entire clip.
+
+### Playback And Export
+
+Playback priority:
+
+```js
+note.soundTraits || hit.soundTraits || snippet.soundTraits || project.settings.soundTraits
+```
+
+WAV export mirrors this logic in `src/export/WavExporter.js`.
+
+MIDI export cannot carry Notenotes Tone Traits in a reliable standard way. MIDI export should preserve notes, hits, and timing only. If Tone data matters, the project/snippet JSON backup is the canonical format.

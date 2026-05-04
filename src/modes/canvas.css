@@ -313,14 +313,39 @@
   z-index: 10;
 }
 
+.canvas-clip__label-row {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 4px;
+  min-width: 0;
+}
+
 .canvas-clip__label {
+  flex: 1;
+  min-width: 0;
   font-size: 9px;
   font-weight: var(--font-weight-semibold);
-  padding: 2px 4px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   color: rgba(255,255,255,0.8);
+}
+
+.canvas-clip__tone-badges {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 2px;
+}
+
+.canvas-clip__tone-badges span {
+  border-radius: 2px;
+  background: rgba(255,255,255,0.14);
+  color: rgba(255,255,255,0.72);
+  font-size: 7px;
+  line-height: 1;
+  padding: 2px 3px;
+  letter-spacing: 0;
 }
 
 .canvas-clip__preview {
@@ -358,16 +383,13 @@
   background-color: var(--accent-glow);
 }
 
-/* --- Add Track Button --- */
+/* --- Add Track Row --- */
 .canvas-add-track {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--space-sm);
-  padding: var(--space-md);
-  color: var(--text-tertiary);
-  font-size: var(--font-size-sm);
-  cursor: pointer;
+  gap: 1px;
+  padding: var(--space-xs);
   border: 1px dashed var(--surface-4);
   margin: var(--space-sm);
   border-radius: var(--radius-sm);
@@ -378,8 +400,35 @@
 
 .canvas-add-track:hover {
   border-color: var(--accent-dim);
+  background: rgba(255,255,255,0.015);
+}
+
+.canvas-add-track__btn {
+  flex: 1;
+  min-height: 34px;
+  color: var(--text-tertiary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  font-family: var(--font-family);
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.canvas-add-track__btn:hover {
   color: var(--text-secondary);
   background: var(--accent-glow);
+}
+
+@media (max-width: 560px) {
+  .canvas-add-track {
+    flex-wrap: wrap;
+  }
+
+  .canvas-add-track__btn {
+    flex-basis: 100%;
+  }
 }
 
 /* --- Snippet Drop Zone (from Creative Mode) --- */

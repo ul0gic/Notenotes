@@ -95,7 +95,7 @@ export class SettingsPanel {
 
         <div class="settings-group">
           <h3 class="settings-group__title">Install App</h3>
-          <p class="settings-desc">Install Notenotes from your browser for an app-window experience. Chrome and Edge can show an install prompt here; Safari uses Share, then Add to Home Screen.</p>
+          <p class="settings-desc">Install Notenotes from your browser for an app-window experience. In Chrome, open the three-dot menu, then Cast, save, and share, then Install page as app. Edge uses Apps, then Install this site as an app. Safari uses Share, then Add to Home Screen.</p>
           <div class="settings-row">
             <label class="settings-label">PWA</label>
             <button class="btn btn--ghost" id="setting-install-app" style="font-size:0.75rem;min-height:30px;padding:2px 10px;">Install / Help</button>
@@ -251,7 +251,7 @@ export class SettingsPanel {
         </div>
         <div class="settings-group">
           <h3 class="settings-group__title">Audio Export</h3>
-          <p class="settings-desc">Export browser-rendered WAV files for a snippet or the whole Canvas. MP3 will need an optional encoder dependency later.</p>
+          <p class="settings-desc">Export browser-rendered WAV files for a snippet or the whole Canvas. MIDI Tone Traits are rendered into WAV. MP3 will need an optional encoder dependency later.</p>
           <div class="settings-row">
             <label class="settings-label">Canvas</label>
             <button class="btn btn--ghost" id="export-canvas-wav" style="font-size:0.75rem;min-height:30px;padding:2px 10px;">Export WAV</button>
@@ -379,7 +379,7 @@ export class SettingsPanel {
         showToast('Install prompt closed');
         return;
       }
-      showToast('Install from browser menu: Chrome/Edge Install app, Safari Share > Add to Home Screen', 6000);
+      showToast('Chrome: three-dot menu > Cast, save, and share > Install page as app', 7000);
     });
 
     // Quantize

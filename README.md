@@ -38,7 +38,7 @@ I built this app primarily to experiment with music myself, and to understand wa
 
 No install. Click a pad. You're making music.
 
-It's a Progressive Web App — install it from your browser and it works offline forever.
+It's a Progressive Web App. In Chrome, use the three-dot menu, then Cast, save, and share, then Install page as app. In Edge, use Apps, then Install this site as an app. In Safari, use Share, then Add to Home Screen.
 
 ---
 
@@ -62,7 +62,7 @@ Plug in any USB or Bluetooth controller. D-pad and face buttons map to the scale
 
 ![Canvas mode — dragging snippets onto a multi-track timeline](canvas.gif)
 
-Drag your captured snippets onto a timeline. Stretch them, mute them, layer them. Hit play and listen to the song you didn't know you were writing.
+Drag your captured snippets onto typed tracks. MIDI goes on MIDI tracks, drums go on drum tracks, and audio goes on audio tracks. Stretch them, mute them, layer them. Hit play and listen to the song you didn't know you were writing.
 
 ### Inspect — when you're ready for detail
 
@@ -81,25 +81,27 @@ Open any snippet in a piano roll for fine edits. Click to add notes, drag to mov
 | **Scale Board** | Up to 16 pads locked to any scale (Major, Minor, Pentatonic, Blues, Dorian, Mixolydian, Chromatic). Pad count follows scale degrees, or go fully custom. |
 | **Controller** | Gamepad-as-instrument via the Web Gamepad API. D-pad + face buttons play notes; analog sticks bend pitch and modulation. Live on-screen overlay shows what you're pressing. |
 | **Micro Piano** | Configurable chromatic keyboard (1 or 2 stacked, 10–32 keys each) with octave shifting. |
-| **Sketch Kit** | 10-pad synthesized drum kit. Four kit presets (Classic, 808, Electronic, Acoustic). |
-| **Audio In** | Record from any input device with a live waveform. Audio snippets become draggable clips just like MIDI. |
+| **Sketch Kit** | 10-pad synthesized drum kit. Four kit presets (Classic, 808, Electronic, Acoustic), with the same Tone controls as the synth side. |
+| **Audio In** | Record from any input device with a live waveform. New audio snippets are saved with durable audio data so backups can actually bring them back. |
 
-Plus: **8 synth presets** (Chip Lead, Warm Pad, Glass Pluck, Sub Bass, Bright Lead, Tape Keys, Dusty Organ, Vinyl Strings) — and the entire instrument layer is [pluggable](#-build-your-own-instrument).
+Plus: **12 synth presets** (Chip Lead, Chip Bass, Cyber Secks, Heartbound, Triforce, Bliff, Soft Pad, Shimmer Lead, Lo-fi Keys, Warm Bass, Pluck, Organ), **Tone Traits** for shaping sound without becoming a full DAW, and the entire instrument layer is [pluggable](#-build-your-own-instrument).
 
 ### For someone who wants a different perspective into the world of music.
 
 - **Scale-locked pads** — every press is in key. You can't pick a wrong note.
 - **Beat colors** — set a different color for each beat. The background pulses in time so you can *see* the meter.
 - **Hold & arpeggio modes** — latch notes, auto-arpeggiate chords across **10 chord types**, **4 patterns**, and **4 rates**. Or sustain a drone while you explore.
+- **Tone Traits** - simple sliders for Crush, Echo, Space, Wobble, Drive, and Noise. They work on synths and the drum kit, and they are meant to be fast and playful rather than a wall of studio knobs.
+- **Controller triggers as sound switches** - assign LT and RT to Tone Traits, then press them while playing to punch an effect in for just those notes.
 - **Keyboard shortcuts as instrument** — number row triggers pads, letter row triggers piano keys, `ArrowUp`/`ArrowDown` shift octave.
 - **Pitch & mod via QWERTY** — Korg K25-style mod (1/4/7) and pitch (3/6/9) when keys aren't in use.
 - **Mobile and desktop focus, including iOS Safari** — touch drag-and-drop everywhere, transport collapses on narrow screens, audio-gesture quirks worked out.
 
 ### Three modes
 
-- **Create — playing and capturing.** 8 synth presets, 4 drum kits, scale-locked or chromatic, hold and arpeggio modes.
-- **Canvas — arranging.** Multi-track timeline with drag-and-drop, per-track mute / solo, a one-click **Trim** to clean empty space, and an auto-calculated loop region. Recorded **pitch-bend** and **modulation** ride on each clip as orange and pink overlays.
-- **Inspect — refining.** Click-to-add piano roll. Vertical zoom, configurable octave range (C1–C6), **split view** for two-handed work, **2×** / **½** snippet length buttons, and a **Quantize all** button to snap an entire snippet to the grid.
+- **Create: playing and capturing.** 12 synth presets, 4 drum kits, scale-locked or chromatic, hold and arpeggio modes.
+- **Canvas: arranging.** Typed MIDI, drum, and audio tracks with drag-and-drop, per-track mute / solo, a one-click **Trim** to clean empty space, and an auto-calculated loop region. Recorded **pitch-bend**, **modulation**, and Tone badges ride on clips so you can see what has movement or effects.
+- **Inspect: refining.** Click-to-add piano roll. Vertical zoom, configurable octave range (C1–C6), **split view** for two-handed work, **2×** / **½** snippet length buttons, and a **Quantize all** button to snap an entire snippet to the grid.
 
 You never have to leave Create to make a song. The other modes are there when you want them.
 
@@ -107,10 +109,11 @@ You never have to leave Create to make a song. The other modes are there when yo
 
 - **Local-first.** IndexedDB storage. No accounts, no cloud sync, no telemetry.
 - **PWA.** Installable, works offline, lives on your home screen.
-- **Auto-saves up to 5 versions** — restore any one from history. (More robust backups and saving system is coming)
+- **Auto-saves up to 5 versions** — restore any one from history.
+- **Milestones and backups.** Save named checkpoints in the app, export a full workspace JSON backup, or export just your snippet library so browser storage is not the only copy.
 - **Customizable everywhere.** 2/4, 3/4, 4/4, and 5/4 time signatures. Custom beat colors for the background visualizer. Configurable pad, piano-key, and drum counts.
 - **Snippets are nameable** — and auto-named ones update themselves as you edit.
-- **Exports.** Sheet music as **SVG** or **ABC**, with a **percussion clef** for drum snippets. MIDI, WAV, and MP3 are on the [roadmap](#-where-its-going).
+- **Exports.** Sheet music as **SVG** or **ABC**, with a **percussion clef** for drum snippets. Export the whole Canvas or individual snippets as **MIDI** or **WAV**. WAV export renders Tone Traits; MIDI export keeps the notes and timing but not the Notenotes-specific sound shaping. MP3 is still on the [roadmap](#-where-its-going).
 
 ---
 
@@ -167,7 +170,8 @@ These are the ideas that drive the project. Some are coded, some are sketches, s
 
 ### Sharing
 - [ ] **Song-as-link** — share a complete song via URL. Receivers open it in their browser, instantly.
-- [ ] **MIDI / WAV / MP3 export** alongside ABC and sheet music.
+- [x] **MIDI and WAV export** alongside ABC and sheet music.
+- [ ] **MP3 export** once there is a reliable browser encoder path.
 - [ ] **Embeddable player** for blogs, social posts, and personal sites.
 - [ ] **Collaborative jam mode** — two people, two browsers, one loop.
 

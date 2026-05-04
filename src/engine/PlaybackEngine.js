@@ -15,6 +15,10 @@ import { TransportState } from './Transport.js';
 export const TRACK_INSTRUMENTS = {
   chip_lead:    { id: 'chip_lead',    name: 'Chip Lead',    type: 'synth', preset: 'chip_lead' },
   chip_bass:    { id: 'chip_bass',    name: 'Chip Bass',    type: 'synth', preset: 'chip_bass' },
+  cyber_secks:  { id: 'cyber_secks',  name: 'Cyber Secks',  type: 'synth', preset: 'cyber_secks' },
+  heartbound:   { id: 'heartbound',   name: 'Heartbound',   type: 'synth', preset: 'heartbound' },
+  triforce:     { id: 'triforce',     name: 'Triforce',     type: 'synth', preset: 'triforce' },
+  bliff:        { id: 'bliff',        name: 'Bliff',        type: 'synth', preset: 'bliff' },
   soft_pad:     { id: 'soft_pad',     name: 'Soft Pad',     type: 'synth', preset: 'soft_pad' },
   shimmer_lead: { id: 'shimmer_lead', name: 'Shimmer Lead', type: 'synth', preset: 'shimmer_lead' },
   lofi_keys:    { id: 'lofi_keys',    name: 'Lo-fi Keys',   type: 'synth', preset: 'lofi_keys' },
@@ -46,6 +50,7 @@ export class PlaybackEngine {
     this._engine = AudioEngine.getInstance();
     this._lastModIdx = new Map();   // snippetId → last modulation index processed
     this._lastClipLocalTick = new Map();
+    this._toneTraitsHandler = null;
   }
 
   /**
@@ -57,6 +62,7 @@ export class PlaybackEngine {
     // Create shared drum kit
     this._kit = new SketchKit();
     this._kit.init();
+    this._kit.setSoundTraits(this.project?.settings?.soundTraits);
 
     // Subscribe to transport tick events
     this.transport.onTick((tick, nextTickTime) => {
@@ -78,6 +84,9 @@ export class PlaybackEngine {
       this._lastModIdx.clear();
       this._lastClipLocalTick.clear();
     });
+
+    this._toneTraitsHandler = () => this._applySoundTraitsToTrackSynths();
+    window.addEventListener('project-sound-traits-changed', this._toneTraitsHandler);
 
     this._initialized = true;
   }
@@ -107,9 +116,17 @@ export class PlaybackEngine {
     // Load the appropriate preset
     const preset = PRESETS[instDef.preset];
     if (preset) synth.loadPatch(preset);
+    synth.setSoundTraits(this.project?.settings?.soundTraits);
 
     this._trackSynths.set(track.id, { synth, instrumentId: instId });
     return synth;
+  }
+
+  _applySoundTraitsToTrackSynths() {
+    for (const [, entry] of this._trackSynths) {
+      entry.synth.setSoundTraits(this.project?.settings?.soundTraits);
+    }
+    this._kit?.setSoundTraits(this.project?.settings?.soundTraits);
   }
 
   /**
@@ -163,6 +180,7 @@ export class PlaybackEngine {
         if (instDef.type === 'synth' && synth && snippet.notes) {
           for (const note of snippet.notes) {
             if (note.startTick === localTick) {
+              synth.setSoundTraits(note.soundTraits || snippet.soundTraits || this.project?.settings?.soundTraits);
               synth.noteOn(note.pitch, note.velocity || 0.8, nextTickTime);
               const noteOffTick = tick + (note.durationTick || 240);
               const key = `${track.id}-${note.pitch}`;
@@ -175,6 +193,7 @@ export class PlaybackEngine {
         if (instDef.type === 'kit' && snippet.hits && this._kit) {
           for (const hit of snippet.hits) {
             if (hit.startTick === localTick) {
+              this._kit.setSoundTraits(hit.soundTraits || snippet.soundTraits || this.project?.settings?.soundTraits);
               this._kit._triggerSound(hit.type || 'kick', nextTickTime);
             }
           }

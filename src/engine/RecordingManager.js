@@ -33,6 +33,9 @@ export class RecordingManager {
 
     /** Callback when a snippet is created */
     this._onSnippetCreated = null;
+    this._toneProvider = null;
+    this._baseToneProvider = null;
+    this._capturedToneSnapshot = null;
 
     /** Loop subscription cleanup */
     this._unsubLoop = null;
@@ -47,12 +50,13 @@ export class RecordingManager {
       if (state === 'stopped' && this.armed) {
         const endTick = this._getRelativeTick(meta.rawTick);
         for (const [midi, noteData] of this._heldNotes.entries()) {
-          this._capturedNotes.push({
-            pitch: midi,
-            startTick: noteData.startTick,
-            durationTick: Math.max(1, endTick - noteData.startTick),
-            velocity: noteData.velocity,
-          });
+        this._capturedNotes.push({
+          pitch: midi,
+          startTick: noteData.startTick,
+          durationTick: Math.max(1, endTick - noteData.startTick),
+          velocity: noteData.velocity,
+          soundTraits: noteData.soundTraits,
+        });
         }
         this._heldNotes.clear();
         if (this._capturedNotes.length + this._capturedHits.length > 0) {
@@ -69,6 +73,24 @@ export class RecordingManager {
 
   setModManager(mm) {
     this._modManager = mm;
+  }
+
+  setToneProvider(fn) {
+    this._toneProvider = fn;
+  }
+
+  setBaseToneProvider(fn) {
+    this._baseToneProvider = fn;
+  }
+
+  _captureBaseToneSnapshot() {
+    const provider = this._baseToneProvider || this._toneProvider;
+    if (!provider) return;
+    this._capturedToneSnapshot = provider();
+  }
+
+  _currentToneSnapshot() {
+    return this._toneProvider ? this._toneProvider() : this._capturedToneSnapshot;
   }
 
   captureModulation() {
@@ -88,6 +110,9 @@ export class RecordingManager {
    */
   setArmed(armed) {
     this.armed = armed;
+    if (armed) {
+      this._captureBaseToneSnapshot();
+    }
     if (!armed) {
       const endTick = this._getRelativeTick();
       for (const [midi, noteData] of this._heldNotes.entries()) {
@@ -96,6 +121,7 @@ export class RecordingManager {
           startTick: noteData.startTick,
           durationTick: Math.max(1, endTick - noteData.startTick),
           velocity: noteData.velocity,
+          soundTraits: noteData.soundTraits,
         });
       }
       this._heldNotes.clear();
@@ -113,6 +139,7 @@ export class RecordingManager {
     this._heldNotes.set(midi, {
       startTick: tick,
       velocity,
+      soundTraits: this._currentToneSnapshot(),
     });
   }
 
@@ -131,6 +158,7 @@ export class RecordingManager {
       startTick: noteData.startTick,
       durationTick: Math.max(1, endTick - noteData.startTick),
       velocity: noteData.velocity,
+      soundTraits: noteData.soundTraits,
     };
 
     // Apply quantization if enabled
@@ -153,6 +181,7 @@ export class RecordingManager {
       type: drumName,
       startTick: tick,
       velocity: 0.8,
+      soundTraits: this._currentToneSnapshot(),
     });
   }
 
@@ -195,10 +224,17 @@ export class RecordingManager {
       bpm: this.transport.bpm,
       timeSignature: { ...this.transport.timeSignature },
     };
+    if (snippet.type === 'midi' && this._toneProvider) {
+      snippet.soundTraits = this._capturedToneSnapshot || this._currentToneSnapshot();
+    }
+    if (snippet.type === 'drum' && this._toneProvider) {
+      snippet.soundTraits = this._capturedToneSnapshot || this._currentToneSnapshot();
+    }
 
     this._capturedNotes = [];
     this._capturedHits = [];
     this._capturedMod = [];
+    this._capturedToneSnapshot = null;
 
     console.log('[RecordingManager] Snippet created:', snippet.id,
       `${snippet.notes.length} notes, ${snippet.hits.length} hits`);

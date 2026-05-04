@@ -5,6 +5,7 @@
  */
 
 import { getScaleNotes, midiToNoteName, SCALES, NOTE_NAMES } from '../engine/MusicTheory.js';
+import { SOUND_TRAITS, normalizeSoundTraits } from './WebAudioSynth.js';
 
 const POLL_INTERVAL = 30;
 
@@ -19,6 +20,8 @@ export class ControllerMode {
     this._activeChords = new Map();
     this._onNoteOn = null;
     this._onNoteOff = null;
+    this.onToneAssignmentChanged = null;
+    this.onToneOverrideChanged = null;
 
     this.scaleName = 'major';
     this.rootNote = 'C';
@@ -33,6 +36,8 @@ export class ControllerMode {
 
     this._pitchBend = 0;
     this._modulation = 0;
+    this._activeToneOverrides = new Map();
+    this._triggerToneValues = { leftTrigger: 0, rightTrigger: 0 };
   }
 
   set project(p) { this._project = p; }
@@ -101,6 +106,20 @@ export class ControllerMode {
           ${this._renderPads()}
         </div>
         <div class="ctrlmode__controller" id="ct-controller">
+          <div class="ctrlmode__trigger-assignments" aria-label="Trigger effect assignments">
+            <label class="ctrlmode__trigger-select ctrlmode__trigger-select--left">
+              <span>Left trigger</span>
+              <select class="ctrlmode__select" id="ct-tone-left">
+                ${this._renderToneAssignmentOptions('leftTrigger')}
+              </select>
+            </label>
+            <label class="ctrlmode__trigger-select ctrlmode__trigger-select--right">
+              <span>Right trigger</span>
+              <select class="ctrlmode__select" id="ct-tone-right">
+                ${this._renderToneAssignmentOptions('rightTrigger')}
+              </select>
+            </label>
+          </div>
           <div class="ctrlmode__art" aria-label="Game controller">
             <img class="ctrlmode__img" src="${import.meta.env.BASE_URL}controller.png" alt="" aria-hidden="true">
             <span class="ctrlmode__hotspot ctrlmode__hotspot--dpad" id="ct-dpad-u"></span>
@@ -113,6 +132,8 @@ export class ControllerMode {
             <span class="ctrlmode__hotspot ctrlmode__hotspot--button" id="ct-btn-b"></span>
             <span class="ctrlmode__hotspot ctrlmode__hotspot--bumper" id="ct-bumper-l"></span>
             <span class="ctrlmode__hotspot ctrlmode__hotspot--bumper" id="ct-bumper-r"></span>
+            <span class="ctrlmode__hotspot ctrlmode__hotspot--trigger" id="ct-trigger-l"></span>
+            <span class="ctrlmode__hotspot ctrlmode__hotspot--trigger" id="ct-trigger-r"></span>
             <span class="ctrlmode__stick" id="ct-stick-l"></span>
             <span class="ctrlmode__stick" id="ct-stick-r"></span>
           </div>
@@ -143,6 +164,15 @@ export class ControllerMode {
     }).join('');
   }
 
+  _renderToneAssignmentOptions(key) {
+    const value = this._controllerToneAssignments()[key] || 'none';
+    const options = [
+      ['none', 'None'],
+      ...Object.values(SOUND_TRAITS).map(trait => [trait.id, trait.name]),
+    ];
+    return options.map(([id, label]) => `<option value="${id}" ${value === id ? 'selected' : ''}>${label}</option>`).join('');
+  }
+
   _bindEvents() {
     this.el.querySelector('#ct-p-root')?.addEventListener('change', (e) => {
       this.rootNote = e.target.value;
@@ -164,6 +194,12 @@ export class ControllerMode {
     this.el.querySelector('#ct-oct-up')?.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       this.shiftOctave(1);
+    });
+    this.el.querySelector('#ct-tone-left')?.addEventListener('change', (e) => {
+      this._setToneAssignment('leftTrigger', e.target.value);
+    });
+    this.el.querySelector('#ct-tone-right')?.addEventListener('change', (e) => {
+      this._setToneAssignment('rightTrigger', e.target.value);
     });
   }
 
@@ -241,17 +277,20 @@ export class ControllerMode {
     const newlyReleased = new Set([...this._prevButtons].filter(b => !currentButtons.has(b)));
 
     this._mapButtons(newlyPressed, newlyReleased);
+    this._mapAnalogTriggers(pad.buttons, pad.axes);
     this._mapAxes(pad.axes);
     this._prevButtons = currentButtons;
   }
 
   _mapButtons(pressed, released) {
-    const map = { 12: 0, 13: 1, 14: 2, 15: 3, 0: 4, 1: 5, 2: 6, 3: 0, 4: -1, 5: -2 };
+    const map = { 12: 0, 13: 1, 14: 2, 15: 3, 0: 4, 1: 5, 2: 6, 3: 0, 4: -1, 5: -2, 6: -3, 7: -4 };
 
     for (const idx of pressed) {
       const deg = map[idx];
       if (deg === -1) this.shiftOctave(-1);
       else if (deg === -2) this.shiftOctave(1);
+      else if (deg === -3) this._setTriggerTone('leftTrigger', 1);
+      else if (deg === -4) this._setTriggerTone('rightTrigger', 1);
       else if (deg !== undefined && deg >= 0 && deg < this._notes.length) this._triggerPad(deg);
       this._highlightButton(idx, true);
     }
@@ -259,8 +298,82 @@ export class ControllerMode {
     for (const idx of released) {
       const deg = map[idx];
       if (deg !== undefined && deg >= 0 && deg < this._notes.length) this._releasePad(deg);
+      else if (deg === -3) this._setTriggerTone('leftTrigger', 0);
+      else if (deg === -4) this._setTriggerTone('rightTrigger', 0);
       this._highlightButton(idx, false);
     }
+  }
+
+  _controllerToneAssignments() {
+    if (!this.project?.settings) return { leftTrigger: 'none', rightTrigger: 'none' };
+    if (!this.project.settings.controllerToneAssignments) {
+      this.project.settings.controllerToneAssignments = { leftTrigger: 'none', rightTrigger: 'none' };
+    }
+    return this.project.settings.controllerToneAssignments;
+  }
+
+  _setToneAssignment(key, value) {
+    const assignments = this._controllerToneAssignments();
+    assignments[key] = value || 'none';
+    this._activeToneOverrides.clear();
+    this._triggerToneValues = { leftTrigger: 0, rightTrigger: 0 };
+    this._applyToneOverrides();
+    if (this.onToneAssignmentChanged) this.onToneAssignmentChanged(assignments);
+    window.dispatchEvent(new CustomEvent('project-controller-tone-assignments-changed', { detail: { assignments } }));
+  }
+
+  _setTriggerTone(key, value) {
+    const traitId = this._controllerToneAssignments()[key];
+    if (!traitId || traitId === 'none') return;
+    const amount = Math.max(0, Math.min(1, value));
+    if (amount > 0) this._activeToneOverrides.set(traitId, amount);
+    else this._activeToneOverrides.delete(traitId);
+    this._applyToneOverrides();
+  }
+
+  currentSoundTraits(baseTraits = null) {
+    const merged = normalizeSoundTraits(baseTraits || this.project?.settings?.soundTraits || {});
+    for (const [traitId, value] of this._activeToneOverrides) {
+      merged[traitId] = { amount: Math.max(0, Math.min(1, value)) };
+    }
+    return merged;
+  }
+
+  activeTriggerLabels() {
+    const assignments = this._controllerToneAssignments();
+    const labels = [];
+    if (assignments.leftTrigger !== 'none' && this._triggerToneValues.leftTrigger > 0.02) labels.push('LT');
+    if (assignments.rightTrigger !== 'none' && this._triggerToneValues.rightTrigger > 0.02) labels.push('RT');
+    return labels;
+  }
+
+  _mapAnalogTriggers(buttons, axes = []) {
+    const left = this._triggerValue(buttons[6], axes[4]);
+    const right = this._triggerValue(buttons[7], axes[5]);
+    if (Math.abs(left - this._triggerToneValues.leftTrigger) > 0.02) {
+      this._triggerToneValues.leftTrigger = left;
+      this._setTriggerTone('leftTrigger', left);
+    }
+    if (Math.abs(right - this._triggerToneValues.rightTrigger) > 0.02) {
+      this._triggerToneValues.rightTrigger = right;
+      this._setTriggerTone('rightTrigger', right);
+    }
+  }
+
+  _triggerValue(button, axisValue) {
+    if (button?.pressed) return 1;
+    if (typeof button?.value === 'number' && button.value > 0.02) return Math.max(0, Math.min(1, button.value));
+    if (typeof axisValue === 'number') {
+      const normalized = axisValue < 0 ? (axisValue + 1) / 2 : axisValue;
+      return Math.max(0, Math.min(1, normalized));
+    }
+    return 0;
+  }
+
+  _applyToneOverrides() {
+    const merged = this.currentSoundTraits();
+    if (this.onToneOverrideChanged) this.onToneOverrideChanged(merged, this.activeTriggerLabels());
+    else this.synth.setSoundTraits(merged);
   }
 
   _triggerPad(deg) {
@@ -336,7 +449,7 @@ export class ControllerMode {
     const ids = {
       12: '#ct-dpad-u', 13: '#ct-dpad-d', 14: '#ct-dpad-l', 15: '#ct-dpad-r',
       0: '#ct-btn-a', 1: '#ct-btn-b', 2: '#ct-btn-x', 3: '#ct-btn-y',
-      4: '#ct-bumper-l', 5: '#ct-bumper-r',
+      4: '#ct-bumper-l', 5: '#ct-bumper-r', 6: '#ct-trigger-l', 7: '#ct-trigger-r',
     };
     const el = this.el?.querySelector(ids[idx]);
     if (el) el.classList.toggle('is-active', on);
