@@ -984,7 +984,7 @@ On import/migration, embedded `audioDataUrl` should always be converted into a f
 
 ## App Versioning
 
-Current App Version: `0.0.10`
+Current App Version: `0.0.12`
 
 The visible app version is displayed in Settings. Bump it for meaningful user-facing changes or architecture/storage changes, especially when AI.MD is updated for completed work.
 
@@ -1048,3 +1048,54 @@ Rules:
 - Tapping `...` while Settings is open closes Settings and opens the dropdown.
 - `project.settings.debugLogging` controls the Settings debug log switch. When enabled, Settings prints a structured `[Notenotes Debug]` snapshot to the browser console on enable and each Settings open.
 - Keep debug output console-only unless the user asks for an in-app diagnostics surface.
+
+---
+
+## Custom Instrument Foundations
+
+Custom instruments are beginning as project-scoped saved instruments built from one audio source.
+
+Current data shape:
+
+```js
+project.settings.customInstruments = [
+  {
+    id,
+    name,
+    type: "patch" | "kit",
+    audioAssetId,
+    audioMimeType,
+    audioSize,
+    rootMidi,
+    playbackMode: "gated" | "oneShot",
+    brightness,
+    gain,
+    createdAt,
+    updatedAt,
+  }
+]
+```
+
+Current behavior:
+
+- Create mode has a `Create Instrument` flow near the Patch selector.
+- Users can name an instrument, choose Patch or Kit, choose an Audio In snippet or audio file, adjust basic controls, save it, and delete custom melodic patches.
+- When a custom Patch is selected, the flow changes to `Edit Instrument` and updates the saved instrument instead of creating a duplicate.
+- Root note is required for melodic sample patches because it defines the unshifted pitch of the original sample; other keys calculate playback-rate shift relative to that MIDI note.
+- Custom melodic Patch instruments are immediately playable live from Scale, Piano, and Controller through `WebAudioSynth` sample playback.
+- `WebAudioSynth` supports sample patches by decoding the stored audio asset into an `AudioBuffer` and using `playbackRate = 2 ** ((targetMidi - rootMidi) / 12)`.
+- Kit-type custom instruments can be saved as metadata, but live Kit playback generation from one sample source still needs its own wiring.
+
+Storage and backup:
+
+- Custom instrument source audio uses the same IndexedDB audio asset store as Audio In recordings.
+- `ProjectStore._collectAudioAssetIdsFromValue()` must include custom instrument `audioAssetId`s so garbage collection does not delete sample sources.
+- `embedAudioForBackup()` embeds custom instrument audio as `audioDataUrl` so workspace and snippet backups can carry instrument samples.
+- `migrateProjectAudioAssets()` migrates custom instrument embedded audio into local audio assets on import.
+
+Known next steps:
+
+- Add custom instrument support to Canvas track instrument selectors and playback engine.
+- Render custom instruments in WAV export.
+- Wire Kit-type custom instruments so one source sample can generate percussive pad variations.
+- Decide deletion behavior when a custom instrument is referenced by snippets, clips, or tracks.

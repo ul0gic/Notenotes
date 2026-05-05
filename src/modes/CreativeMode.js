@@ -71,6 +71,8 @@ export class CreativeMode {
     this._heldScaleKeyPads = new Map();
     this._heldPianoKeyIndexes = new Map();
     this._tonePopover = null;
+    this._instrumentPopover = null;
+    this._activePatchId = 'chip_lead';
     this._currentToneTraits = this._currentToneTraits || null;
   }
 
@@ -257,25 +259,31 @@ export class CreativeMode {
     patchSel.innerHTML = `
       <span class="patch-selector__label">Patch</span>
       <select id="patch-select" aria-label="Synth patch">
-        ${Object.entries(PRESETS).map(([key, p]) =>
-          `<option value="${key}">${p.name}</option>`
-        ).join('')}
+        ${this._renderPatchOptions()}
       </select>
+      <button class="tone-button" id="create-instrument-button" type="button">${this._activePatchId.startsWith('custom:') ? 'Edit Instrument' : 'Create Instrument'}</button>
+      <button class="tone-button" id="delete-instrument-button" type="button">Delete</button>
       <button class="tone-button" id="tone-button" type="button" aria-expanded="false" aria-controls="tone-popover">Tone</button>
       <span class="tone-trigger-indicator" id="tone-trigger-indicator" aria-live="polite"></span>
     `;
-    patchSel.querySelector('#patch-select').addEventListener('change', (e) => {
-      const patch = PRESETS[e.target.value];
-      if (patch) {
-        this.synth.loadPatch(patch);
-        this._setLiveSoundTraits(this.controllerMode?.currentSoundTraits(this._currentToneTraits || this._ensureSoundTraits()));
-      }
+    patchSel.querySelector('#patch-select').addEventListener('change', async (e) => {
+      await this._selectPatch(e.target.value);
+      this._syncInstrumentButtons();
+    });
+    patchSel.querySelector('#create-instrument-button').addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      this._toggleCreateInstrumentPopover(patchSel);
+    });
+    patchSel.querySelector('#delete-instrument-button').addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      this._deleteSelectedCustomInstrument();
     });
     patchSel.querySelector('#tone-button').addEventListener('pointerdown', (e) => {
       e.preventDefault();
       this._toggleTonePopover(patchSel);
     });
     this.el.appendChild(patchSel);
+    this._syncInstrumentButtons();
 
     // Instrument views container
     const container = document.createElement('div');
@@ -304,6 +312,313 @@ export class CreativeMode {
     this._bindKeyboardPerformance();
 
     return this.el;
+  }
+
+  _renderPatchOptions() {
+    const custom = this._customInstruments().filter(instrument => instrument.type === 'patch');
+    return `
+      <optgroup label="Synth presets">
+        ${Object.entries(PRESETS).map(([key, p]) =>
+          `<option value="${key}" ${key === this._activePatchId ? 'selected' : ''}>${p.name}</option>`
+        ).join('')}
+      </optgroup>
+      ${custom.length ? `
+        <optgroup label="Custom instruments">
+          ${custom.map(instrument =>
+            `<option value="custom:${instrument.id}" ${`custom:${instrument.id}` === this._activePatchId ? 'selected' : ''}>${instrument.name}</option>`
+          ).join('')}
+        </optgroup>
+      ` : ''}
+    `;
+  }
+
+  _refreshPatchSelector() {
+    const select = this.el?.querySelector('#patch-select');
+    if (!select) return;
+    select.innerHTML = this._renderPatchOptions();
+    if ([...select.options].some(option => option.value === this._activePatchId)) {
+      select.value = this._activePatchId;
+    }
+    this._syncInstrumentButtons();
+  }
+
+  _syncInstrumentButtons() {
+    const isCustom = this._activePatchId?.startsWith('custom:');
+    const createBtn = this.el?.querySelector('#create-instrument-button');
+    const deleteBtn = this.el?.querySelector('#delete-instrument-button');
+    if (createBtn) createBtn.textContent = isCustom ? 'Edit Instrument' : 'Create Instrument';
+    if (deleteBtn) deleteBtn.hidden = !isCustom;
+  }
+
+  _customInstruments() {
+    if (!this.project?.settings) return [];
+    if (!Array.isArray(this.project.settings.customInstruments)) {
+      this.project.settings.customInstruments = [];
+    }
+    return this.project.settings.customInstruments;
+  }
+
+  async _selectPatch(id = 'chip_lead') {
+    this._activePatchId = id;
+    if (id.startsWith('custom:')) {
+      const instrument = this._customInstruments().find(item => item.id === id.slice(7));
+      if (!instrument) {
+        showToast('Custom instrument is missing');
+        return;
+      }
+      await this._loadSamplePatch(instrument);
+    } else {
+      const patch = PRESETS[id];
+      if (patch) this.synth.loadPatch(patch);
+    }
+    this._setLiveSoundTraits(this.controllerMode?.currentSoundTraits(this._currentToneTraits || this._ensureSoundTraits()));
+  }
+
+  async _loadSamplePatch(instrument) {
+    if (!instrument?.audioAssetId || !this.store?.getAudioAssetBlob) {
+      showToast('Sample audio is missing');
+      return;
+    }
+    try {
+      const blob = await this.store.getAudioAssetBlob(instrument.audioAssetId);
+      if (!blob) throw new Error('Sample audio is unavailable');
+      const arrayBuffer = await blob.arrayBuffer();
+      const buffer = await this.engine.ctx.decodeAudioData(arrayBuffer.slice(0));
+      this.synth.loadPatch({
+        type: 'sample',
+        name: instrument.name,
+        sampleBuffer: buffer,
+        rootMidi: instrument.rootMidi ?? 60,
+        playbackMode: instrument.playbackMode || 'gated',
+        envelope: {
+          attack: instrument.attack ?? 0.005,
+          decay: instrument.decay ?? 0.08,
+          sustain: instrument.sustain ?? 0.8,
+          release: instrument.release ?? 0.18,
+        },
+        filter: {
+          type: 'lowpass',
+          frequency: instrument.brightness ? 1200 + instrument.brightness * 10800 : 9000,
+          Q: 0.8,
+        },
+        gain: instrument.gain ?? 0.55,
+      });
+      showToast(`Instrument loaded: ${instrument.name}`);
+    } catch (err) {
+      console.warn('[CreativeMode] Custom instrument load failed:', err);
+      showToast(err?.message || 'Custom instrument failed to load');
+    }
+  }
+
+  _toggleCreateInstrumentPopover(anchor) {
+    if (this._instrumentPopover) {
+      this._closeCreateInstrumentPopover();
+      return;
+    }
+
+    const editingInstrument = this._selectedCustomInstrument();
+    const audioSnippets = (this.project?.snippets || []).filter(snippet => snippet.type === 'audio' && snippet.audioAssetId);
+    const popover = document.createElement('div');
+    popover.className = 'tone-popover custom-instrument-popover';
+    popover.id = 'custom-instrument-popover';
+    popover.innerHTML = `
+      <div class="tone-popover__header">
+        <span>${editingInstrument ? 'Edit Instrument' : 'Create Instrument'}</span>
+        <button class="tone-popover__close" type="button" aria-label="Close create instrument">x</button>
+      </div>
+      <div class="custom-instrument-form">
+        <label class="custom-instrument-field">
+          <span>Name</span>
+          <input id="ci-name" type="text" placeholder="My sample patch" value="${this._escapeAttr(editingInstrument?.name || '')}" aria-label="Instrument name">
+        </label>
+        <label class="custom-instrument-field">
+          <span>Type</span>
+          <select id="ci-type" aria-label="Instrument type">
+            <option value="patch" ${editingInstrument?.type !== 'kit' ? 'selected' : ''}>Patch</option>
+            <option value="kit" ${editingInstrument?.type === 'kit' ? 'selected' : ''}>Kit</option>
+          </select>
+        </label>
+        <label class="custom-instrument-field">
+          <span>Audio snippet</span>
+          <select id="ci-snippet" aria-label="Audio snippet source">
+            <option value="">Use imported file...</option>
+            ${audioSnippets.map(snippet => `<option value="${snippet.id}">${snippet.name || 'Audio in recording'}</option>`).join('')}
+          </select>
+        </label>
+        <label class="custom-instrument-field">
+          <span>Audio file</span>
+          <input id="ci-file" type="file" accept="audio/*" aria-label="Audio file source">
+        </label>
+        <label class="custom-instrument-field ci-patch-only">
+          <span>Root note</span>
+          <select id="ci-root" aria-label="Root note">
+            ${this._rootNoteOptions(editingInstrument?.rootMidi ?? 60)}
+          </select>
+          <small>The note your original sample already sounds like. That note plays unshifted; other notes pitch it up or down.</small>
+        </label>
+        <label class="custom-instrument-field ci-patch-only">
+          <span>Playback</span>
+          <select id="ci-playback" aria-label="Playback mode">
+            <option value="gated" ${editingInstrument?.playbackMode !== 'oneShot' ? 'selected' : ''}>Gated</option>
+            <option value="oneShot" ${editingInstrument?.playbackMode === 'oneShot' ? 'selected' : ''}>One-shot</option>
+          </select>
+        </label>
+        <label class="custom-instrument-field">
+          <span>Brightness <b id="ci-brightness-value">${Math.round((editingInstrument?.brightness ?? 0.7) * 100)}%</b></span>
+          <input id="ci-brightness" type="range" min="0" max="100" value="${Math.round((editingInstrument?.brightness ?? 0.7) * 100)}" aria-label="Brightness">
+        </label>
+        <label class="custom-instrument-field">
+          <span>Gain <b id="ci-gain-value">${Math.round((editingInstrument?.gain ?? 0.55) * 100)}%</b></span>
+          <input id="ci-gain" type="range" min="10" max="100" value="${Math.round((editingInstrument?.gain ?? 0.55) * 100)}" aria-label="Gain">
+        </label>
+        <p class="custom-instrument-note" id="ci-kit-note" hidden>Kit instruments are saved now; live Kit playback is the next wiring step.</p>
+        <div class="tone-preset__row">
+          <button class="btn btn--ghost" id="ci-save" type="button">${editingInstrument ? 'Update Instrument' : 'Save Instrument'}</button>
+        </div>
+      </div>
+    `;
+
+    anchor.appendChild(popover);
+    this._instrumentPopover = popover;
+
+    const syncType = () => {
+      const isKit = popover.querySelector('#ci-type')?.value === 'kit';
+      popover.querySelectorAll('.ci-patch-only').forEach(el => { el.hidden = isKit; });
+      const note = popover.querySelector('#ci-kit-note');
+      if (note) note.hidden = !isKit;
+    };
+    const syncSlider = (id) => {
+      const slider = popover.querySelector(`#ci-${id}`);
+      const label = popover.querySelector(`#ci-${id}-value`);
+      if (slider && label) label.textContent = `${slider.value}%`;
+    };
+
+    popover.querySelector('.tone-popover__close')?.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      this._closeCreateInstrumentPopover();
+    });
+    popover.querySelector('#ci-type')?.addEventListener('change', syncType);
+    popover.querySelector('#ci-brightness')?.addEventListener('input', () => syncSlider('brightness'));
+    popover.querySelector('#ci-gain')?.addEventListener('input', () => syncSlider('gain'));
+    popover.querySelector('#ci-save')?.addEventListener('pointerdown', async (e) => {
+      e.preventDefault();
+      await this._saveCustomInstrument(popover);
+    });
+    syncType();
+  }
+
+  _rootNoteOptions(selectedMidi = 60) {
+    const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const options = [];
+    for (let octave = 1; octave <= 6; octave++) {
+      for (let i = 0; i < notes.length; i++) {
+        const midi = (octave + 1) * 12 + i;
+        options.push(`<option value="${midi}" ${midi === selectedMidi ? 'selected' : ''}>${notes[i]}${octave}</option>`);
+      }
+    }
+    return options.join('');
+  }
+
+  async _saveCustomInstrument(root) {
+    if (!this.project || !this.store) return;
+    const name = root.querySelector('#ci-name')?.value?.trim();
+    if (!name) return showToast('Name the instrument first');
+
+    const type = root.querySelector('#ci-type')?.value || 'patch';
+    const snippetId = root.querySelector('#ci-snippet')?.value;
+    const file = root.querySelector('#ci-file')?.files?.[0];
+    let audioAssetId = null;
+    let audioMimeType = '';
+    let audioSize = 0;
+
+    const editingInstrument = this._selectedCustomInstrument();
+
+    if (file) {
+      const record = await this.store.saveAudioAsset(file, {
+        mimeType: file.type || 'audio/*',
+        size: file.size,
+        createdAt: Date.now(),
+      });
+      audioAssetId = record.audioAssetId;
+      audioMimeType = record.mimeType;
+      audioSize = record.size;
+    } else if (snippetId) {
+      const snippet = (this.project.snippets || []).find(item => item.id === snippetId);
+      if (!snippet?.audioAssetId) return showToast('Choose an audio source first');
+      audioAssetId = snippet.audioAssetId;
+      audioMimeType = snippet.audioMimeType || '';
+      audioSize = snippet.audioSize || 0;
+    } else if (editingInstrument?.audioAssetId) {
+      audioAssetId = editingInstrument.audioAssetId;
+      audioMimeType = editingInstrument.audioMimeType || '';
+      audioSize = editingInstrument.audioSize || 0;
+    } else {
+      return showToast('Choose an audio source first');
+    }
+
+    const instrument = {
+      id: editingInstrument?.id || crypto.randomUUID(),
+      name,
+      type,
+      audioAssetId,
+      audioMimeType,
+      audioSize,
+      rootMidi: parseInt(root.querySelector('#ci-root')?.value, 10) || 60,
+      playbackMode: root.querySelector('#ci-playback')?.value || 'gated',
+      brightness: (parseInt(root.querySelector('#ci-brightness')?.value, 10) || 70) / 100,
+      gain: (parseInt(root.querySelector('#ci-gain')?.value, 10) || 55) / 100,
+      createdAt: editingInstrument?.createdAt || Date.now(),
+      updatedAt: Date.now(),
+    };
+
+    if (editingInstrument) Object.assign(editingInstrument, instrument);
+    else this._customInstruments().push(instrument);
+    this._customInstruments().sort((a, b) => a.name.localeCompare(b.name));
+    this.store.scheduleAutoSave(this.project);
+    this._refreshPatchSelector();
+    if (type === 'patch') {
+      await this._selectPatch(`custom:${instrument.id}`);
+      this._refreshPatchSelector();
+    }
+    this._closeCreateInstrumentPopover();
+    showToast(`${editingInstrument ? 'Instrument updated' : 'Instrument saved'}: ${name}`);
+  }
+
+  _selectedCustomInstrument() {
+    const selected = this._activePatchId || this.el?.querySelector('#patch-select')?.value || '';
+    if (!selected.startsWith('custom:')) return null;
+    return this._customInstruments().find(item => item.id === selected.slice(7)) || null;
+  }
+
+  _escapeAttr(value = '') {
+    return String(value)
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  _deleteSelectedCustomInstrument() {
+    const selected = this.el?.querySelector('#patch-select')?.value || '';
+    if (!selected.startsWith('custom:')) {
+      showToast('Choose a custom instrument to delete');
+      return;
+    }
+    const id = selected.slice(7);
+    const instrument = this._customInstruments().find(item => item.id === id);
+    if (!instrument) return;
+    if (!confirm(`Delete custom instrument "${instrument.name}"?`)) return;
+    this.project.settings.customInstruments = this._customInstruments().filter(item => item.id !== id);
+    this._activePatchId = 'chip_lead';
+    this.synth.loadPatch(PRESETS.chip_lead);
+    this.store?.scheduleAutoSave(this.project);
+    this._refreshPatchSelector();
+    showToast(`Instrument deleted: ${instrument.name}`);
+  }
+
+  _closeCreateInstrumentPopover() {
+    this._instrumentPopover?.remove();
+    this._instrumentPopover = null;
   }
 
   _bindKeyboardPerformance() {

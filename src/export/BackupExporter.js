@@ -57,6 +57,7 @@ export function snippetsBackup(project) {
       timeSignature: project?.timeSignature,
     },
     snippets: clone(project?.snippets || []),
+    customInstruments: clone(project?.settings?.customInstruments || []),
   };
 }
 
@@ -116,5 +117,14 @@ export function snippetsWithFreshIds(snippets = []) {
     ...clone(snippet),
     id: crypto.randomUUID(),
     createdAt: Date.now(),
+  }));
+}
+
+export function customInstrumentsWithFreshIds(instruments = []) {
+  return instruments.map(instrument => ({
+    ...clone(instrument),
+    id: crypto.randomUUID(),
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
   }));
 }

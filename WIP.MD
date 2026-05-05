@@ -192,6 +192,94 @@ Expected scope:
 
 Small to medium.
 
+## 9. Custom Instrument Patches / Sample Instruments
+
+Goal:
+
+Let users turn one audio snippet or imported audio file into a playable custom instrument patch. A user should be able to record or import a sound, choose how that sound is interpreted, save it as an instrument patch, and play it from Scale, Piano, Controller, or Kit.
+
+Why it fits:
+
+- It keeps the app focused on playful idea capture, not studio production.
+- It lets people make instruments out of their own voice, room sounds, toys, or found sounds.
+- It builds on the durable audio asset storage work already done for Audio In.
+- It keeps Kit included in the same sound-making philosophy as the melodic instruments.
+
+Important boundary:
+
+This is not an Ableton-style custom drum rack where every pad gets a separate sample. The intended first version is one source sound becoming one playable patch.
+
+For melodic instruments:
+
+- One source sample is pitch-shifted across notes and octaves.
+- The user chooses a root note, probably defaulting to C4.
+
+For Kit:
+
+- The same one source sample is shaped into percussive hits across the Kit pads.
+- Pads can use transformations like pitch, envelope, filter, drive, noise mix, or attack/decay changes to create a related family of drum/percussion sounds from one source.
+- The model should feel closer to "turn this sound into a kit instrument" than "assign a different file to every pad."
+
+First version:
+
+- Add a `Create Instrument` flow.
+- User names the instrument.
+- User chooses instrument type: `Patch` or `Kit`.
+- User chooses source: existing audio snippet or imported browser-decodable audio file.
+- User adjusts controls appropriate to the selected type.
+- User saves, applies, and deletes custom instruments.
+- Deleting a custom instrument should ask for confirmation.
+- If a custom instrument is currently used by snippets or Canvas clips, deletion should either be blocked or clearly explain what will happen before proceeding.
+- Show custom melodic patches in the synth patch dropdown under a Samples or Custom heading.
+- Show custom percussive patches in the Kit dropdown under a Samples or Custom heading.
+
+Shared Create Instrument controls:
+
+- Name.
+- Type: Patch or Kit.
+- Source: audio snippet or file import.
+- Start/end trim.
+- Normalize.
+- Preview.
+
+Patch-specific controls:
+
+- Root note, probably defaulting to C4.
+- Playback mode: one-shot or gated.
+- Simple playback-rate pitch shifting: higher notes play faster/brighter, lower notes play slower/darker.
+- Optional tone-shaping sliders if they map cleanly to the existing Tone system.
+
+Kit-specific controls:
+
+- Generate percussive pad variations from the single source using synthesis-style shaping.
+- Likely sliders: attack, decay, pitch spread, filter brightness, drive, noise mix, and body/low-end.
+- Preview individual pad variations before saving.
+- Keep it as one source sound transformed into a kit-like instrument, not separate samples per pad.
+
+Not first version:
+
+- Time-stretching without pitch changes.
+- Multi-sample instruments.
+- Per-pad sample assignment / custom drum rack behavior.
+- Velocity layers.
+- Loop points with crossfades.
+- Automatic pitch detection.
+- Full sampler workstation UI.
+
+Storage and backup requirements:
+
+- Custom patches should store metadata in the project, with audio bytes stored through the existing audio asset system.
+- Workspace backups must include custom instruments and the sample audio assets needed by those instruments.
+- Workspace + milestones backups must include custom instruments and instrument audio assets referenced by the current workspace and milestones.
+- Full archive backups must include custom instruments and instrument audio assets referenced by current workspace, milestones, and version history.
+- Snippet backups need to include any custom instruments and audio assets required for the exported snippets to sound correct.
+- If a backup/export path cannot include a required custom instrument, it should warn clearly instead of producing a misleading portable file.
+- WAV export must render custom patches. MIDI export can preserve notes/timing only and cannot preserve the sample instrument sound.
+
+Expected scope:
+
+Medium. Basic playable sample patch is not hard; durable persistence, backup/restore, and WAV export make it a real feature.
+
 ## Release Deploy Strategy
 
 Deferred until closer to `1.0.0`, unless accidental public deploys become a real problem.

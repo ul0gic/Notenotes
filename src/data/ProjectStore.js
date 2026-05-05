@@ -51,6 +51,7 @@ export function createProject(name = 'Untitled Sketch') {
       holdDuration: 3000,
       soundTraits: {},
       tonePresets: [],
+      customInstruments: [],
       controllerToneAssignments: {
         leftTrigger: 'none',
         rightTrigger: 'none'
@@ -132,6 +133,11 @@ function walkSnippets(projectOrSnippets) {
     }
   }
   return snippets;
+}
+
+function walkCustomInstruments(projectOrSettings) {
+  if (Array.isArray(projectOrSettings)) return projectOrSettings;
+  return projectOrSettings?.settings?.customInstruments || projectOrSettings?.customInstruments || [];
 }
 
 export class ProjectStore {
@@ -218,6 +224,19 @@ export class ProjectStore {
       snippet.audioMimeType = record.mimeType || snippet.audioMimeType;
       snippet.audioSize = record.size || snippet.audioSize;
     }
+    for (const instrument of walkCustomInstruments(backup)) {
+      if (!instrument?.audioAssetId || instrument.audioDataUrl) continue;
+      const record = await this.getAudioAsset(instrument.audioAssetId);
+      const blob = await this.getAudioAssetBlob(instrument.audioAssetId);
+      if (!record || !blob) {
+        instrument.audioUnavailable = true;
+        instrument.audioUnavailableReason = 'Instrument sample asset missing from browser storage';
+        continue;
+      }
+      instrument.audioDataUrl = await blobToDataUrl(blob);
+      instrument.audioMimeType = record.mimeType || instrument.audioMimeType;
+      instrument.audioSize = record.size || instrument.audioSize;
+    }
     return backup;
   }
 
@@ -227,6 +246,9 @@ export class ProjectStore {
       if (snippet.type !== 'audio') continue;
       delete snippet.audioDataUrl;
       if (isBlobUrl(snippet.audioUrl)) delete snippet.audioUrl;
+    }
+    for (const instrument of walkCustomInstruments(safe)) {
+      delete instrument.audioDataUrl;
     }
     return safe;
   }
@@ -264,9 +286,35 @@ export class ProjectStore {
     return changed;
   }
 
+  async migrateCustomInstrumentAudioAssets(instruments = []) {
+    let changed = false;
+    for (const instrument of instruments) {
+      if (!instrument) continue;
+      if (isDataUrl(instrument.audioDataUrl)) {
+        const blob = await dataUrlToBlob(instrument.audioDataUrl);
+        const record = await this.saveAudioAsset(blob, {
+          mimeType: instrument.audioMimeType || blob.type,
+          size: instrument.audioSize || blob.size,
+          createdAt: instrument.createdAt,
+        });
+        instrument.audioAssetId = record.audioAssetId;
+        instrument.audioMimeType = record.mimeType;
+        instrument.audioSize = record.size;
+        changed = true;
+      }
+      if (instrument.audioDataUrl) {
+        delete instrument.audioDataUrl;
+        changed = true;
+      }
+    }
+    return changed;
+  }
+
   async migrateProjectAudioAssets(project) {
     if (!project) return false;
-    return this.migrateSnippetsAudioAssets(walkSnippets(project));
+    const snippetChanged = await this.migrateSnippetsAudioAssets(walkSnippets(project));
+    const instrumentChanged = await this.migrateCustomInstrumentAudioAssets(walkCustomInstruments(project));
+    return snippetChanged || instrumentChanged;
   }
 
   /**
@@ -505,6 +553,9 @@ export class ProjectStore {
   _collectAudioAssetIdsFromValue(value, ids = new Set()) {
     for (const snippet of walkSnippets(value)) {
       if (snippet?.audioAssetId) ids.add(snippet.audioAssetId);
+    }
+    for (const instrument of value?.settings?.customInstruments || []) {
+      if (instrument?.audioAssetId) ids.add(instrument.audioAssetId);
     }
     return ids;
   }

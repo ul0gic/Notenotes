@@ -8,7 +8,7 @@ import { QuantizeGrid } from '../engine/Quantizer.js';
 import { SheetMusicView } from '../export/SheetMusicView.js';
 import { downloadBlob, projectToMidiBlob, safeFilename, snippetToMidiBlob } from '../export/MidiExporter.js';
 import { projectToWavBlob, snippetToWavBlob } from '../export/WavExporter.js';
-import { backupFilename, readJsonFile, saveJsonFile, snippetsBackup, snippetsWithFreshIds, validateBackup, workspaceBackup } from '../export/BackupExporter.js';
+import { backupFilename, customInstrumentsWithFreshIds, readJsonFile, saveJsonFile, snippetsBackup, snippetsWithFreshIds, validateBackup, workspaceBackup } from '../export/BackupExporter.js';
 import { CHORD_TYPES, ARP_PATTERNS, ARP_RATES } from '../engine/ArpeggioManager.js';
 import { DEFAULT_VERSION_HISTORY_LIMIT, VERSION_HISTORY_LIMITS } from '../data/ProjectStore.js';
 import { APP_VERSION } from '../version.js';
@@ -1057,6 +1057,14 @@ export class SettingsPanel {
           ...(this.project.snippets || []),
           ...snippetsWithFreshIds(backup.snippets),
         ];
+        if (Array.isArray(backup.customInstruments) && backup.customInstruments.length) {
+          this.project.settings ||= {};
+          this.project.settings.customInstruments = [
+            ...(this.project.settings.customInstruments || []),
+            ...customInstrumentsWithFreshIds(backup.customInstruments),
+          ];
+          await this.store.migrateCustomInstrumentAudioAssets(this.project.settings.customInstruments);
+        }
         await this.store.migrateSnippetsAudioAssets(this.project.snippets);
         await this.store.save(this.project);
         showToast(`Imported ${backup.snippets.length} snippets. Reloading...`);

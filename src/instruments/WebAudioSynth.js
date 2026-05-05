@@ -203,6 +203,10 @@ export class WebAudioSynth {
   loadPatch(patch) {
     this.patch = {
       name: patch.name || 'Custom',
+      type: patch.type || 'synth',
+      sampleBuffer: patch.sampleBuffer || null,
+      rootMidi: patch.rootMidi ?? 60,
+      playbackMode: patch.playbackMode || 'gated',
       oscillator: { ...DEFAULT_PATCH.oscillator, ...patch.oscillator },
       oscillator2: patch.oscillator2 ? { ...patch.oscillator2 } : null,
       envelope: { ...DEFAULT_PATCH.envelope, ...patch.envelope },
@@ -260,6 +264,45 @@ export class WebAudioSynth {
     const ctx = this.engine.ctx;
     const now = atTime !== undefined ? atTime : ctx.currentTime;
     const p = this.patch;
+
+    if (p.type === 'sample' && p.sampleBuffer) {
+      const source = ctx.createBufferSource();
+      source.buffer = p.sampleBuffer;
+      source.playbackRate.setValueAtTime(Math.pow(2, (midi - (p.rootMidi ?? 60)) / 12), now);
+
+      const filter = ctx.createBiquadFilter();
+      filter.type = p.filter.type;
+      filter.frequency.setValueAtTime(p.filter.frequency, now);
+      filter.Q.setValueAtTime(p.filter.Q, now);
+
+      const env = ctx.createGain();
+      env.gain.setValueAtTime(0, now);
+      env.gain.linearRampToValueAtTime(velocity, now + p.envelope.attack);
+      env.gain.linearRampToValueAtTime(
+        velocity * p.envelope.sustain,
+        now + p.envelope.attack + p.envelope.decay
+      );
+
+      source.connect(filter);
+      filter.connect(env);
+      env.connect(this._toneInput || this._output);
+      source.start(now);
+
+      const voice = { source, filter, env, midi, startTime: now, sample: true };
+      this._voices.set(midi, voice);
+      this._voiceQueue.push(midi);
+
+      if (p.playbackMode === 'oneShot') {
+        const stopAt = now + (p.sampleBuffer.duration / source.playbackRate.value) + 0.05;
+        source.stop(stopAt);
+        source.addEventListener('ended', () => {
+          this._voices.delete(midi);
+          const queueIdx = this._voiceQueue.indexOf(midi);
+          if (queueIdx !== -1) this._voiceQueue.splice(queueIdx, 1);
+        }, { once: true });
+      }
+      return;
+    }
 
     // Oscillator
     const osc = ctx.createOscillator();
@@ -343,9 +386,11 @@ export class WebAudioSynth {
     voice.env.gain.setTargetAtTime(0, now, p.envelope.release / 3);
 
     // Schedule oscillator stop after release
-    voice.osc.stop(now + p.envelope.release + 0.1);
-    if (voice.osc2) voice.osc2.stop(now + p.envelope.release + 0.1);
-    if (voice.noise) voice.noise.source.stop(now + p.envelope.release + 0.1);
+    const stopAt = now + p.envelope.release + 0.1;
+    if (voice.source) { try { voice.source.stop(stopAt); } catch (_) {} }
+    if (voice.osc) { try { voice.osc.stop(stopAt); } catch (_) {} }
+    if (voice.osc2) { try { voice.osc2.stop(stopAt); } catch (_) {} }
+    if (voice.noise) { try { voice.noise.source.stop(stopAt); } catch (_) {} }
 
     // Remove from map
     this._voices.delete(midi);

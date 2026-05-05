@@ -149,3 +149,43 @@
   color: var(--color-error);
   background: rgba(232, 64, 64, 0.1);
 }
+
+.custom-instrument-popover {
+  min-width: min(360px, calc(100vw - 32px));
+}
+
+.custom-instrument-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.custom-instrument-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+}
+
+.custom-instrument-field input,
+.custom-instrument-field select {
+  min-height: 30px;
+  background: var(--surface-2);
+  color: var(--text-primary);
+  border: 1px solid var(--surface-4);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  font: inherit;
+}
+
+.custom-instrument-field input[type="range"] {
+  padding: 0;
+}
+
+.custom-instrument-note {
+  margin: 0;
+  color: var(--text-tertiary);
+  font-size: var(--font-size-xs);
+  line-height: 1.4;
+}
