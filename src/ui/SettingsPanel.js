@@ -339,7 +339,7 @@ export class SettingsPanel {
         </div>
         <div class="settings-group">
           <h3 class="settings-group__title">Backups</h3>
-          <p class="settings-desc">Save portable JSON files outside browser storage. Workspace backups restore the project; snippet backups restore just the snippet library.</p>
+          <p class="settings-desc">Save portable JSON files outside browser storage. Workspace backups restore the project; snippet backups restore just the snippet library. Older backups can import into newer Notenotes builds, but newer backups will not import into older builds.</p>
           <div class="settings-row">
             <label class="settings-label">Contents</label>
             <select class="settings-select" id="backup-contents" aria-label="Workspace backup contents">
