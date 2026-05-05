@@ -152,11 +152,12 @@ export class ProjectStore {
   async saveAudioAsset(blob, meta = {}) {
     if (!blob) return null;
     const audioAssetId = meta.audioAssetId || crypto.randomUUID();
+    const arrayBuffer = await blob.arrayBuffer();
     const record = {
       audioAssetId,
-      blob,
+      arrayBuffer,
       mimeType: meta.mimeType || blob.type || 'audio/webm',
-      size: meta.size || blob.size || 0,
+      size: meta.size || blob.size || arrayBuffer.byteLength || 0,
       createdAt: meta.createdAt || Date.now(),
       updatedAt: Date.now(),
     };
@@ -171,7 +172,11 @@ export class ProjectStore {
 
   async getAudioAssetBlob(audioAssetId) {
     const record = await this.getAudioAsset(audioAssetId);
-    return record?.blob || null;
+    if (record?.blob) return record.blob;
+    if (record?.arrayBuffer) {
+      return new Blob([record.arrayBuffer], { type: record.mimeType || 'audio/webm' });
+    }
+    return null;
   }
 
   async getAudioAssetObjectUrl(audioAssetId) {
@@ -202,12 +207,13 @@ export class ProjectStore {
     for (const snippet of snippets) {
       if (snippet?.type !== 'audio' || snippet.audioDataUrl || !snippet.audioAssetId) continue;
       const record = await this.getAudioAsset(snippet.audioAssetId);
-      if (!record?.blob) {
+      const blob = await this.getAudioAssetBlob(snippet.audioAssetId);
+      if (!record || !blob) {
         snippet.audioUnavailable = true;
         snippet.audioUnavailableReason = 'Audio asset missing from browser storage';
         continue;
       }
-      snippet.audioDataUrl = await blobToDataUrl(record.blob);
+      snippet.audioDataUrl = await blobToDataUrl(blob);
       snippet.audioMimeType = record.mimeType || snippet.audioMimeType;
       snippet.audioSize = record.size || snippet.audioSize;
     }
@@ -514,7 +520,7 @@ export class ProjectStore {
         missing++;
         continue;
       }
-      bytes += record.size || record.blob?.size || 0;
+      bytes += record.size || record.blob?.size || record.arrayBuffer?.byteLength || 0;
     }
 
     for (const snippet of snippets) {

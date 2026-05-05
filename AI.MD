@@ -867,7 +867,7 @@ On import/migration, embedded `audioDataUrl` should always be converted into a f
 
 ## App Versioning
 
-Current App Version: `0.0.8`
+Current App Version: `0.0.9`
 
 The visible app version is displayed in Settings. Bump it for meaningful user-facing changes or architecture/storage changes, especially when AI.MD is updated for completed work.
 
@@ -919,3 +919,5 @@ Rules:
 - On stop, call `requestData()` before `stop()` when possible.
 - Reject zero-byte recording blobs and show a clear failure message instead of creating an unusable audio snippet.
 - Wrap the Audio In snippet creation path in `try/catch`; IndexedDB/audio asset save failures should surface as a toast rather than silently losing the recording.
+- Store audio assets as `ArrayBuffer` bytes plus MIME metadata, not raw `Blob` / `File` objects. iOS WebKit can throw "error preparing Blob/File data to be stored in object store" when IndexedDB is asked to persist recorder blobs directly.
+- `getAudioAssetBlob()` reconstructs a `Blob` for playback/export. Keep the legacy `record.blob` fallback so older desktop-created assets still play.
