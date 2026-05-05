@@ -738,13 +738,13 @@ This means the music sounds at the same tick positions, while the bar lines and 
 - It sets every note's `durationTick` to the current Inspect grid size (`1/2`, `1/4`, `1/8`, or `1/16`) without changing `startTick` or pitch.
 - It affects only the currently loaded snippet/clip in Inspect. Drum snippets are excluded because drum hits do not have note durations.
 
-<!-- --- NEW CONTEXT ADDED 2026-05-04 (TONE TRAITS / FRIENDLY SOUND EFFECTS) --- -->
+<!-- --- NEW CONTEXT ADDED 2026-05-04 (TONE / FRIENDLY SOUND EFFECTS) --- -->
 
-## Tone Traits / Friendly Sound Effects
+## Tone / Friendly Sound Effects
 
-Tone Traits are the current lightweight sound-shaping layer. They are intentionally simple sliders, not a full DAW effects rack.
+Tone is the current lightweight sound-shaping layer. It is intentionally simple sliders, not a full DAW effects rack.
 
-### Supported Traits
+### Supported Tone Options
 
 The shared trait ids live in `src/instruments/WebAudioSynth.js`:
 
@@ -845,4 +845,4 @@ note.soundTraits || hit.soundTraits || snippet.soundTraits || project.settings.s
 
 WAV export mirrors this logic in `src/export/WavExporter.js`.
 
-MIDI export cannot carry Notenotes Tone Traits in a reliable standard way. MIDI export should preserve notes, hits, and timing only. If Tone data matters, the project/snippet JSON backup is the canonical format.
+MIDI export cannot carry Notenotes Tone in a reliable standard way. MIDI export should preserve notes, hits, and timing only. If Tone data matters, the project/snippet JSON backup is the canonical format.

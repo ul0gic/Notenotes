@@ -273,7 +273,7 @@ export class SettingsPanel {
         </div>
         <div class="settings-group">
           <h3 class="settings-group__title">Audio Export</h3>
-          <p class="settings-desc">Export browser-rendered WAV files for a snippet or the whole Canvas. MIDI Tone Traits are rendered into WAV. MP3 will need an optional encoder dependency later.</p>
+          <p class="settings-desc">Export browser-rendered WAV files for a snippet or the whole Canvas. Tone settings are rendered into WAV. MP3 will need an optional encoder dependency later.</p>
           <div class="settings-row">
             <label class="settings-label">Canvas</label>
             <button class="btn btn--ghost" id="export-canvas-wav" style="font-size:0.75rem;min-height:30px;padding:2px 10px;">Export WAV</button>

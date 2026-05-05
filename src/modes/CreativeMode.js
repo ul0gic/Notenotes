@@ -491,8 +491,8 @@ export class CreativeMode {
     popover.id = 'tone-popover';
     popover.innerHTML = `
       <div class="tone-popover__header">
-        <span>Tone Traits</span>
-        <button class="tone-popover__close" type="button" aria-label="Close tone traits">x</button>
+        <span>Tone</span>
+        <button class="tone-popover__close" type="button" aria-label="Close tone">x</button>
       </div>
       <div class="tone-popover__list">
         ${Object.values(SOUND_TRAITS).map(trait => {

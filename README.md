@@ -84,15 +84,15 @@ Open any snippet in a piano roll for fine edits. Click to add notes, drag to mov
 | **Sketch Kit** | 10-pad synthesized drum kit. Four kit presets (Classic, 808, Electronic, Acoustic), with the same Tone controls as the synth side. |
 | **Audio In** | Record from any input device with a live waveform. New audio snippets are saved with durable audio data so backups can actually bring them back. |
 
-Plus: **12 synth presets** (Chip Lead, Chip Bass, Cyber Secks, Heartbound, Triforce, Bliff, Soft Pad, Shimmer Lead, Lo-fi Keys, Warm Bass, Pluck, Organ), **Tone Traits** for shaping sound without becoming a full DAW, and the entire instrument layer is [pluggable](#-build-your-own-instrument).
+Plus: **12 synth presets** (Chip Lead, Chip Bass, Cyber Secks, Heartbound, Triforce, Bliff, Soft Pad, Shimmer Lead, Lo-fi Keys, Warm Bass, Pluck, Organ), **Tone** controls for shaping sound without becoming a full DAW, and the entire instrument layer is [pluggable](#-build-your-own-instrument).
 
 ### For someone who wants a different perspective into the world of music.
 
 - **Scale-locked pads** — every press is in key. You can't pick a wrong note.
 - **Beat colors** — set a different color for each beat. The background pulses in time so you can *see* the meter.
 - **Hold & arpeggio modes** — latch notes, auto-arpeggiate chords across **10 chord types**, **4 patterns**, and **4 rates**. Or sustain a drone while you explore.
-- **Tone Traits** - simple sliders for Crush, Echo, Space, Wobble, Drive, and Noise. They work on synths and the drum kit, and they are meant to be fast and playful rather than a wall of studio knobs.
-- **Controller triggers as sound switches** - assign LT and RT to Tone Traits, then press them while playing to punch an effect in for just those notes.
+- **Tone** - simple sliders for Crush, Echo, Space, Wobble, Drive, and Noise. They work on synths and the drum kit, and they are meant to be fast and playful rather than a wall of studio knobs.
+- **Controller triggers as sound switches** - assign LT and RT to Tone, then press them while playing to punch an effect in for just those notes.
 - **Keyboard shortcuts as instrument** — number row triggers pads, letter row triggers piano keys, `ArrowUp`/`ArrowDown` shift octave.
 - **Pitch & mod via QWERTY** — Korg K25-style mod (1/4/7) and pitch (3/6/9) when keys aren't in use.
 - **Mobile and desktop focus, including iOS Safari** — touch drag-and-drop everywhere, transport collapses on narrow screens, audio-gesture quirks worked out.
@@ -113,7 +113,7 @@ You never have to leave Create to make a song. The other modes are there when yo
 - **Milestones and backups.** Save named checkpoints in the app, export a full workspace JSON backup, or export just your snippet library so browser storage is not the only copy.
 - **Customizable everywhere.** 2/4, 3/4, 4/4, and 5/4 time signatures. Custom beat colors for the background visualizer. Configurable pad, piano-key, and drum counts.
 - **Snippets are nameable** — and auto-named ones update themselves as you edit.
-- **Exports.** Sheet music as **SVG** or **ABC**, with a **percussion clef** for drum snippets. Export the whole Canvas or individual snippets as **MIDI** or **WAV**. WAV export renders Tone Traits; MIDI export keeps the notes and timing but not the Notenotes-specific sound shaping. MP3 is still on the [roadmap](#-where-its-going).
+- **Exports.** Sheet music as **SVG** or **ABC**, with a **percussion clef** for drum snippets. Export the whole Canvas or individual snippets as **MIDI** or **WAV**. WAV export renders Tone; MIDI export keeps the notes and timing but not the Notenotes-specific sound shaping. MP3 is still on the [roadmap](#-where-its-going).
 
 ---
 

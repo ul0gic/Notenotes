@@ -9,12 +9,12 @@ import { SOUND_TRAITS, normalizeSoundTraits } from './WebAudioSynth.js';
 
 const POLL_INTERVAL = 30;
 const TRIGGER_NOTE_MODIFIERS = {
-  seventh: { id: 'seventh', name: '7th note', scaleOffset: 6 },
-  ninth: { id: 'ninth', name: '9th note', scaleOffset: 8 },
-  eleventh: { id: 'eleventh', name: '11th note', scaleOffset: 10 },
-  thirteenth: { id: 'thirteenth', name: '13th note', scaleOffset: 12 },
-  octave: { id: 'octave', name: 'Octave up', semitoneOffset: 12 },
-  fifth: { id: 'fifth', name: 'Fifth up', semitoneOffset: 7 },
+  seventh: { id: 'seventh', name: '7th note', shortName: '7th', scaleOffset: 6 },
+  ninth: { id: 'ninth', name: '9th note', shortName: '9th', scaleOffset: 8 },
+  eleventh: { id: 'eleventh', name: '11th note', shortName: '11th', scaleOffset: 10 },
+  thirteenth: { id: 'thirteenth', name: '13th note', shortName: '13th', scaleOffset: 12 },
+  octave: { id: 'octave', name: 'Octave up', shortName: 'Oct', semitoneOffset: 12 },
+  fifth: { id: 'fifth', name: 'Fifth up', shortName: '5th', semitoneOffset: 7 },
 };
 
 export class ControllerMode {
@@ -49,7 +49,13 @@ export class ControllerMode {
     this._activePadNotes = new Map();
   }
 
-  set project(p) { this._project = p; }
+  set project(p) {
+    this._project = p;
+    this._controllerToneAssignments();
+    this._syncTriggerAssignmentSelects();
+    this._updateTriggerHelp();
+    this._updateTriggerStatus();
+  }
   get project() { return this._project; }
 
   setNoteCallbacks(onNoteOn, onNoteOff) {
@@ -167,13 +173,16 @@ export class ControllerMode {
             <span>Left stick: modulation</span>
             <span>Right stick: pitch bend</span>
             <span>Shoulders: octave down / up</span>
-            <span>Triggers: Tone or note modifiers</span>
+            <span>Triggers: Tone or Trigger Notes</span>
           </div>
+          <div class="ctrlmode__trigger-help" id="ct-trigger-help" aria-live="polite"></div>
+          <div class="ctrlmode__trigger-status" id="ct-trigger-status" aria-live="polite"></div>
         </div>
       </div>
     `;
 
     this._bindEvents();
+    this._updateTriggerHelp();
     this._startPolling();
 
     return this.el;
@@ -182,7 +191,7 @@ export class ControllerMode {
   _renderPads() {
     return this._notes.map((midi, i) => {
       const info = midiToNoteName(midi);
-      const active = this._activeMidis.has(midi);
+      const active = this._activePadNotes.has(i);
       return `<button class="ctrlmode__pad" data-index="${i}" data-midi="${midi}"
                 style="background:${active ? 'var(--accent-dim)' : 'var(--surface-3)'}">
                 <span class="ctrlmode__pad-degree">${i + 1}</span>
@@ -192,12 +201,12 @@ export class ControllerMode {
   }
 
   _renderToneAssignmentOptions(key) {
-    const value = this._controllerToneAssignments()[key] || 'none';
+    const value = this._normalizeTriggerAssignment(this._controllerToneAssignments()[key]);
     const options = [
       ['none', 'None'],
-      ['__tone', 'Tone Traits', true],
+      ['__tone', 'Tone', true],
       ...Object.values(SOUND_TRAITS).map(trait => [trait.id, trait.name]),
-      ['__notes', 'Note Modifiers', true],
+      ['__notes', 'Trigger Notes', true],
       ...Object.values(TRIGGER_NOTE_MODIFIERS).map(mod => [`note:${mod.id}`, mod.name]),
     ];
     return options.map(([id, label, disabled]) => `<option value="${id}" ${value === id ? 'selected' : ''} ${disabled ? 'disabled' : ''}>${label}</option>`).join('');
@@ -231,6 +240,7 @@ export class ControllerMode {
     this.el.querySelector('#ct-tone-right')?.addEventListener('change', (e) => {
       this._setToneAssignment('rightTrigger', e.target.value);
     });
+    this._syncTriggerAssignmentSelects();
   }
 
   shiftOctave(delta) {
@@ -340,15 +350,41 @@ export class ControllerMode {
     if (!this.project.settings.controllerToneAssignments) {
       this.project.settings.controllerToneAssignments = { leftTrigger: 'none', rightTrigger: 'none' };
     }
-    return this.project.settings.controllerToneAssignments;
+    const assignments = this.project.settings.controllerToneAssignments;
+    const left = this._normalizeTriggerAssignment(assignments.leftTrigger);
+    const right = this._normalizeTriggerAssignment(assignments.rightTrigger);
+    if (left !== assignments.leftTrigger) assignments.leftTrigger = left;
+    if (right !== assignments.rightTrigger) assignments.rightTrigger = right;
+    return assignments;
+  }
+
+  _normalizeTriggerAssignment(value) {
+    if (!value || value === 'none') return 'none';
+    if (TRIGGER_NOTE_MODIFIERS[value]) return `note:${value}`;
+    if (value.startsWith?.('note:')) {
+      const noteId = value.replace('note:', '');
+      return TRIGGER_NOTE_MODIFIERS[noteId] ? value : 'none';
+    }
+    if (SOUND_TRAITS[value]) return value;
+    return 'none';
+  }
+
+  _syncTriggerAssignmentSelects() {
+    const assignments = this._controllerToneAssignments();
+    const left = this.el?.querySelector('#ct-tone-left');
+    const right = this.el?.querySelector('#ct-tone-right');
+    if (left) left.value = assignments.leftTrigger || 'none';
+    if (right) right.value = assignments.rightTrigger || 'none';
   }
 
   _setToneAssignment(key, value) {
     const assignments = this._controllerToneAssignments();
-    assignments[key] = value || 'none';
+    assignments[key] = this._normalizeTriggerAssignment(value);
     this._activeToneOverrides.clear();
     this._triggerToneValues = { leftTrigger: 0, rightTrigger: 0 };
     this._applyToneOverrides();
+    this._syncTriggerAssignmentSelects();
+    this._updateTriggerHelp();
     if (this.onToneAssignmentChanged) this.onToneAssignmentChanged(assignments);
     window.dispatchEvent(new CustomEvent('project-controller-tone-assignments-changed', { detail: { assignments } }));
   }
@@ -376,19 +412,34 @@ export class ControllerMode {
   activeTriggerLabels() {
     const assignments = this._controllerToneAssignments();
     const labels = [];
-    if (assignments.leftTrigger !== 'none' && this._triggerToneValues.leftTrigger > 0.02) labels.push('LT');
-    if (assignments.rightTrigger !== 'none' && this._triggerToneValues.rightTrigger > 0.02) labels.push('RT');
+    if (assignments.leftTrigger !== 'none' && this._triggerToneValues.leftTrigger > 0.02) labels.push(this._triggerLabel('leftTrigger', 'LT'));
+    if (assignments.rightTrigger !== 'none' && this._triggerToneValues.rightTrigger > 0.02) labels.push(this._triggerLabel('rightTrigger', 'RT'));
     return labels;
   }
 
-  _activeTriggerNoteModifiers() {
+  _triggerLabel(key, fallback) {
+    const assignment = this._controllerToneAssignments()[key];
+    if (assignment?.startsWith('note:')) {
+      const modifier = TRIGGER_NOTE_MODIFIERS[assignment.replace('note:', '')];
+      return modifier ? `${fallback} ${modifier.shortName || modifier.name}` : fallback;
+    }
+    const trait = SOUND_TRAITS[assignment];
+    if (trait) return `${fallback} ${trait.name}`;
+    return fallback;
+  }
+
+  _activeTriggerEntries() {
     const assignments = this._controllerToneAssignments();
     return [
-      ['leftTrigger', assignments.leftTrigger],
-      ['rightTrigger', assignments.rightTrigger],
-    ]
-      .filter(([key, value]) => this._triggerToneValues[key] > 0.02 && value?.startsWith('note:'))
-      .map(([, value]) => TRIGGER_NOTE_MODIFIERS[value.replace('note:', '')])
+      ['leftTrigger', 'LT', assignments.leftTrigger],
+      ['rightTrigger', 'RT', assignments.rightTrigger],
+    ].filter(([key, , value]) => this._triggerToneValues[key] > 0.02 && value && value !== 'none');
+  }
+
+  _activeTriggerNoteModifiers() {
+    return this._activeTriggerEntries()
+      .filter(([, , value]) => value?.startsWith('note:'))
+      .map(([, , value]) => TRIGGER_NOTE_MODIFIERS[value.replace('note:', '')])
       .filter(Boolean);
   }
 
@@ -403,6 +454,7 @@ export class ControllerMode {
       this._triggerToneValues.rightTrigger = right;
       this._setTriggerTone('rightTrigger', right);
     }
+    this._updateTriggerStatus();
   }
 
   _triggerValue(button, axisValue) {
@@ -419,6 +471,41 @@ export class ControllerMode {
     const merged = this.currentSoundTraits();
     if (this.onToneOverrideChanged) this.onToneOverrideChanged(merged, this.activeTriggerLabels());
     else this.synth.setSoundTraits(merged);
+    this._updateTriggerStatus();
+  }
+
+  _updateTriggerStatus() {
+    const status = this.el?.querySelector('#ct-trigger-status');
+    if (!status) return;
+    const active = this._activeTriggerEntries();
+    const toneLabels = active
+      .filter(([, , value]) => SOUND_TRAITS[value])
+      .map(([key, fallback]) => this._triggerLabel(key, fallback));
+    const noteLabels = active
+      .filter(([, , value]) => value?.startsWith('note:'))
+      .map(([key, fallback]) => this._triggerLabel(key, fallback));
+    const parts = [];
+    if (toneLabels.length) parts.push(`Tone: ${toneLabels.join(' + ')}`);
+    if (noteLabels.length) parts.push(`Trigger Notes: ${noteLabels.join(' + ')}`);
+    status.textContent = parts.join('  ');
+    status.classList.toggle('is-active', parts.length > 0);
+  }
+
+  _updateTriggerHelp() {
+    const help = this.el?.querySelector('#ct-trigger-help');
+    if (!help) return;
+    const assignments = Object.values(this._controllerToneAssignments());
+    const hasTone = assignments.some(value => SOUND_TRAITS[value]);
+    const hasNotes = assignments.some(value => value?.startsWith('note:'));
+    const lines = [];
+    if (hasNotes) {
+      lines.push('<strong>Trigger Notes:</strong> hold the trigger, then strike a pad. Single mode plays the selected note color as the 7th, 9th, 11th, 13th, octave, or fifth. Chord mode keeps the chord and adds that extra note.');
+    }
+    if (hasTone) {
+      lines.push('<strong>Tone triggers:</strong> hold the trigger while striking a pad to bake that Tone into the notes you record. Let go before the next note and the Tone stays off for that note.');
+    }
+    help.innerHTML = lines.join('<br>');
+    help.classList.toggle('is-active', lines.length > 0);
   }
 
   _triggerPad(deg) {

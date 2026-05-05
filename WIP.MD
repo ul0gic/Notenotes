@@ -1,231 +1,64 @@
 # Work In Progress
 
-This file is the current recommendation after auditing the codebase against the previous plan.
+This file is the current short roadmap for Notenotes. Keep it focused on what still needs decisions or implementation. Details about how the current code works belong in `AI.MD` unless they directly affect a planned change.
 
-## Audit Summary
+## Current Recommendation
 
-Some of the previous WIP list was stale. In particular, Canvas track type enforcement already exists.
+Move next to **WAV Export Hardening**.
 
-## Already Exists
+Why:
 
-## Durable Audio Asset Storage
-
-Status: implemented in the current local build.
-
-Audio In recordings save into a dedicated IndexedDB `audioAssets` store. Projects, snippets, version history, milestones, and canvas clips reference recordings by `audioAssetId` instead of repeatedly copying the audio into every saved snapshot.
-
-Current behavior:
-
-- New recordings should survive reloads, browser restarts, project saves, version history, and milestones.
-- Workspace and snippet JSON backups embed audio at export time so backups stay portable.
-- Backup import converts embedded audio back into local audio assets.
-- WAV export resolves asset-backed audio for snippet and canvas rendering.
-- Existing `audioDataUrl` recordings can migrate into audio assets.
-- Dead `blob:`-only recordings are marked unavailable instead of failing silently.
-
-Important note:
-
-The unavailable `blob:` case only applies to older or partial recordings that had no embedded audio data and no audio asset. A `blob:` URL alone is a temporary browser-session pointer and cannot be recovered after that session is gone.
-
-## Canvas Track Type Enforcement
-
-Status: already implemented.
-
-Current behavior:
-
-- Canvas top toolbar has typed add buttons:
-  - `+ MIDI Track`
-  - `+ Drum Track`
-  - `+ Audio Track`
-- Bottom add row has typed add buttons:
-  - `+ Add MIDI`
-  - `+ Add Drum`
-  - `+ Add Audio`
-- Tracks have explicit `type` values.
-- MIDI tracks use synth instruments.
-- Drum tracks use the kit.
-- Audio tracks use audio clips.
-- Desktop drag/drop rejects mismatched snippets.
-- Touch drag/drop rejects mismatched snippets.
-- Playback also skips mismatched clips defensively.
-
-Small possible polish:
-
-- Canvas snippet dock currently uses the music icon for non-drum snippets, so audio snippets may not visually read as audio there.
-- Track type enforcement should still be manually smoke-tested after the audio storage change, but it does not need to be built from scratch.
-
-## Partially Exists
-
-## Tone Traits
-
-Status: first useful version exists.
-
-Current behavior:
-
-- Project stores current Tone settings in `project.settings.soundTraits`.
-- MIDI and drum recording can save Tone snapshots.
-- Controller trigger assignments exist.
-- Playback applies saved Tone snapshots to MIDI notes and drum hits.
-- WAV export renders Tone for MIDI/drum snippets.
-- Canvas shows Tone badges on MIDI clips with active Tone.
-
-Still missing or incomplete:
-
-- No user-saved Tone presets yet.
-- No clean UI to apply a Tone preset to a selected snippet or selected Canvas clip.
-- No explicit edit path for a saved snippet/clip Tone after recording.
-- Tone badges currently appear for MIDI clips, not drum clips.
-- No full Tone automation editor.
-
-Recommendation:
-
-Keep Tone presets as a later beta polish pass. Do not turn the Canvas into a full mixer yet.
-
-## WAV Export
-
-Status: works in important cases, but needs hardening.
-
-Current behavior:
-
-- Snippet WAV export exists.
-- Canvas WAV export exists.
-- Asset-backed audio can be resolved for export.
-- MIDI/drum Tone rendering exists.
-
-Known gaps to check or fix:
-
-- Canvas WAV export does not appear to honor mute/solo yet.
-- Missing audio assets are skipped quietly rather than summarized to the user.
-- Mixed canvas export needs a deliberate smoke test with MIDI, drum, and audio tracks.
-- Time signature and non-bar-one starts should be tested after the storage refactor.
-
-Recommendation:
-
-This is a good near-term task because export trust matters for beta.
-
-## Local Backups
-
-Status: basic portable backups exist.
-
-Current behavior:
-
-- Workspace backup exists.
-- Snippet backup exists.
-- Import exists.
-- Audio is embedded into backup JSON during export.
-- Imported audio is migrated back into local audio assets.
-
-Still missing:
-
-- User-selectable backup contents.
-- Option to include milestones.
-- Option to include version history.
-- Backup size estimate.
-- Clear explanation of what is local browser storage versus an owned backup file.
-
-Recommendation:
-
-Pair this with the storage meter instead of doing it as a separate abstract settings pass.
-
-## Newly Completed: Storage Meter and Backup Clarity
-
-Status: implemented in the current local build.
-
-Goal:
-
-- Add a storage meter in Settings -> Save.
-- Show estimated browser storage usage and quota.
-- Show referenced audio recordings and audio storage size.
-- Estimate current workspace backup size.
-- Clarify that browser/PWA storage is local and a workspace backup is the safer handoff point.
-
-Current behavior:
-
-- Uses `navigator.storage.estimate()` when available.
-- Uses local audio asset stats from the project store.
-- Estimates workspace backup size by combining project JSON and audio backup overhead.
-- Shows stronger guidance when storage is high, recordings exist, or missing audio assets are detected.
-
-Still worth checking manually:
-
-- How the meter reads on iPhone Safari and Chrome.
-- Whether the storage quota shown by mobile browsers is understandable enough for normal users.
-
-## Still Needs Work
+- Export trust matters for beta.
+- Durable audio storage is now in place.
+- Typed Canvas tracks are already in place.
+- Users need confidence that what they arrange can leave the app intact.
 
 ## 1. WAV Export Hardening
 
 Goal:
 
-Make WAV export trustworthy enough for beta users.
+Make snippet and Canvas WAV export feel reliable enough for real users.
 
-Checklist:
+Needs testing or follow-up:
 
-- Honor muted tracks. Implemented locally.
-- Honor soloed tracks. Implemented locally.
-- Report skipped unavailable audio clips. Implemented locally.
-- Test snippet WAV export for MIDI, drum, audio, and Tone.
-- Test canvas WAV export for mixed MIDI, drum, and audio tracks.
-- Test clips starting after bar 1.
+- Smoke test snippet WAV export for MIDI, drum, audio, and Tone.
+- Smoke test Canvas WAV export with mixed MIDI, drum, and audio tracks.
+- Confirm muted tracks stay out of Canvas export.
+- Confirm soloed tracks export correctly.
+- Confirm unavailable audio is summarized clearly instead of failing silently.
+- Test clips that start after bar 1.
 - Test non-4/4 time signatures.
+
+Code note:
+
+WAV export already has paths for MIDI, drum, audio, Tone rendering, and asset-backed audio. This is mainly a trust pass and bug-fix pass, not a new exporter.
 
 Expected scope:
 
 Small to medium.
 
-Recommendation:
-
-Finish manual export testing next. Export trust matters for beta, and the storage/track-type foundation is now in better shape.
-
-## Newly Added: Controller Trigger Note Modifiers
-
-Status: implemented locally.
-
-Controller trigger dropdowns now support both Tone Traits and note modifiers.
-
-Initial note modifiers:
-
-- 7th note
-- 9th note
-- 11th note
-- 13th note
-- Octave up
-- Fifth up
-
-Behavior:
-
-- In single-note mode, holding a trigger with a note modifier changes the note struck into that related note.
-- If both triggers have note modifiers and both are held, both related notes can sound.
-- In chord mode, holding a trigger adds the related note to the chord.
-- Existing Tone Trait trigger behavior still works.
-
-Needs hands-on testing:
-
-- Confirm real controller trigger values feel right on desktop Chrome.
-- Confirm trigger dropdowns fit on mobile.
-- Decide whether any modifiers should be removed if the list feels too theory-heavy.
-
 ## 2. Backup Options and History Limits
 
 Goal:
 
-Make local backup behavior clearer and configurable.
+Give users clearer control over how much history and backup data they keep.
 
 Recommended settings:
 
-- Version history depth:
-  - `5`
-  - `10`
-  - `25`
-  - `50`
-- Workspace backup contents:
-  - current workspace only
-  - workspace plus milestones
-  - full archive: workspace plus milestones plus version history
+- Version history depth: `5`, `10`, `25`, `50`.
+- Workspace backup contents: current workspace only.
+- Expanded backup contents: workspace plus milestones.
+- Full archive backup contents: workspace plus milestones plus version history.
 
-Current code note:
+Needed UX:
 
-Version history is currently hardcoded at 5.
+- Explain that browser/PWA storage is local to that browser/device.
+- Explain that exported backup files are the user's portable copy.
+- Show a rough backup size estimate before export when possible.
+
+Code note:
+
+Version history is currently capped at 5. Backups already exist, but options for milestones/history are not user-facing yet.
 
 Expected scope:
 
@@ -235,36 +68,51 @@ Medium.
 
 Goal:
 
-Give users a clean way to save and reuse Tone Trait combinations without making every Canvas track a full effects mixer.
+Let users save and reuse Tone settings without turning the Canvas into a full mixer.
 
 Recommended model:
 
-- Project has current live Tone.
-- Snippets store Tone snapshots recorded at capture time.
-- Users can save Tone presets.
-- Users can apply a Tone preset to:
-  - live playing
-  - a snippet
-  - a selected Canvas clip
+- Users can save named Tone presets.
+- Users can apply a preset to live playing.
+- Users can apply a preset to a snippet.
+- Users can apply a preset to a selected Canvas clip.
+- Recorded notes and drum hits keep the Tone that was active when they were played.
 
 Canvas visual:
 
 - Keep small Tone badges on clips with active Tone.
-- Add drum clip Tone badges too.
+- Add Tone badges to drum clips too.
 - Keep pitch/modulation lines separate from Tone badges.
-- Do not draw six automation lanes yet.
+- Do not build full automation lanes yet.
 
-Export logic:
+Export and backup logic:
 
-- MIDI export will not preserve Tone Traits because standard MIDI does not reliably carry this sound-design data.
-- Notenotes JSON backup preserves Tone.
 - WAV export should render Tone.
+- Notenotes JSON backups should preserve Tone.
+- MIDI export should not be expected to preserve Tone because standard MIDI does not reliably carry Notenotes sound-design data.
 
 Expected scope:
 
-Medium if kept to presets and badges.
+Medium if kept to presets, clip application, and badges.
 
-## 4. Google Drive Backup
+## 4. Controller Trigger Polish
+
+Goal:
+
+Make trigger behavior obvious and consistent for users who do not already think like musicians.
+
+Possible follow-up:
+
+- Re-check trigger helper text on mobile.
+- Confirm Trigger Notes feel clear in single-note mode and chord mode.
+- Decide whether the Trigger Notes list should stay as-is or be simplified after testing.
+- Confirm real controller trigger pressure maps cleanly on desktop Chrome and mobile browsers where gamepads are supported.
+
+Expected scope:
+
+Small.
+
+## 5. Google Drive Backup
 
 Goal:
 
@@ -272,19 +120,23 @@ Let users back up to a `.notenotes` folder in Google Drive with a retention sett
 
 Expected pieces:
 
-- Google OAuth flow
-- create/find `.notenotes` folder
-- save workspace backup files
-- save snippet backup files
-- retention setting for how many cloud saves to keep
-- restore UI
-- offline/auth/quota error handling
+- Google OAuth flow.
+- Create or find `.notenotes` folder.
+- Save workspace backup files.
+- Save snippet backup files.
+- Retention setting for how many cloud saves to keep.
+- Restore UI.
+- Offline, auth, quota, and permission error handling.
 
 Recommendation:
 
-Do not start this until local backups, storage meter, and export reliability feel solid. This is useful, but it brings account permissions, cloud failures, and support burden.
+Do not start this until local backups, storage clarity, and export reliability feel solid. This is useful, but it adds account permissions, cloud failures, and support burden.
 
-## 5. Optional Later: Audio File Import
+Expected scope:
+
+Large.
+
+## 6. Optional Later: Audio File Import
 
 Goal:
 
@@ -292,22 +144,23 @@ Let users import audio files as audio snippets, not only record from Audio In.
 
 Why it fits:
 
-Audio assets now exist, so imported audio can use the same storage path as recordings.
+Audio assets now exist, so imported files can use the same storage path as recordings.
 
 Questions before building:
 
 - Do we allow any audio file the browser can decode?
 - Do we auto-trim silence?
-- Do we ask for BPM or just treat it as free audio?
+- Do we ask for BPM or treat imported files as free audio?
 
 Expected scope:
 
 Small to medium.
 
-## Current Recommendation
+## Parking Lot
 
-Move next to `WAV Export Hardening`.
+These are worth remembering but should not block beta:
 
-Reason:
-
-Track type enforcement already exists, durable audio storage now exists, and the Save tab now explains local storage better. The next beta risk is export trust: Canvas WAV export should honor mute/solo, clearly report unavailable audio, and be checked against mixed MIDI, drum, and audio arrangements.
+- Snippet dock icon polish for audio snippets.
+- Full Tone automation editor.
+- MP3 export with an optional encoder.
+- Better chunking/code splitting if the Vite bundle warning becomes a practical problem.

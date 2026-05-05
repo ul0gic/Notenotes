@@ -818,6 +818,39 @@
   white-space: nowrap;
 }
 
+.ctrlmode__trigger-help {
+  max-width: min(100%, 640px);
+  min-height: 0;
+  color: #42d782;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.45;
+  opacity: 0;
+  text-align: center;
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+
+.ctrlmode__trigger-help strong {
+  font-weight: var(--font-weight-bold);
+}
+
+.ctrlmode__trigger-help.is-active {
+  opacity: 1;
+}
+
+.ctrlmode__trigger-status {
+  min-height: 18px;
+  color: #42d782;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+
+.ctrlmode__trigger-status.is-active {
+  opacity: 1;
+}
+
 /* --- Instrument Container (active instrument view) --- */
 .instrument-container {
   flex: 1;
