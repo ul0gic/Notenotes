@@ -111,7 +111,7 @@ You never have to leave Create to make a song. The other modes are there when yo
 - **PWA.** Installable, works offline, lives on your home screen.
 - **Auto-save history is adjustable** - keep 5, 10, 25, or 50 versions and restore from history when you need to.
 - **Milestones and backups.** Save named checkpoints in the app, export a full workspace JSON backup, or export just your snippet library so browser storage is not the only copy. Backup files include the app version that created them. Older backups can move forward into newer Notenotes versions, but newer backups are blocked from importing into older builds.
-- **Customizable everywhere.** 2/4, 3/4, 4/4, and 5/4 time signatures. Custom beat colors for the background visualizer. Configurable pad, piano-key, and drum counts.
+- **Customizable everywhere.** 2/4, 3/4, 4/4, and 5/4 time signatures for now. Custom beat colors for the background visualizer. Configurable pad, piano-key, and drum counts.
 - **Snippets are nameable** - and auto-named ones update themselves as you edit.
 - **Exports.** Sheet music as **SVG** or **ABC**, with a **percussion clef** for drum snippets. Export the whole Canvas or individual snippets as **MIDI** or **WAV**. WAV export renders Tone; MIDI export keeps the notes and timing but not the Notenotes-specific sound shaping. Empty or unavailable exports now fail clearly instead of handing you a misleading silent or tempo-only file. MP3 is still on the [roadmap](#future-vision).
 
@@ -168,6 +168,13 @@ These are the ideas that drive the project. Some are coded, some are sketches, s
 - [ ] **Chord lock** - only chords that fit the song's key are reachable.
 - [ ] **Drone mode** - sustain the root of your key in the background as a tonal anchor.
 - [ ] **Suggest-next-chord** - gentle prompts when you want them, invisible when you don't.
+
+### Rhythm and meter
+- [x] **Simple project time signatures** - 2/4, 3/4, 4/4, and 5/4 are supported as project-level timing.
+- [ ] **Compound meter presets** - 6/8, 9/8, and 12/8 are planned, but only once the app can show their grouping honestly instead of pretending they are just longer 4/4.
+- [ ] **Clear pulse labels** - meters like 2/2 and 9/8 need the app to explain what the beat means, because BPM can mean different felt pulses depending on the meter.
+- [ ] **No random time-signature soup** - I do not want a giant custom meter box that technically works but teaches the wrong idea. Fewer choices that feel right beats a dropdown full of confusing math.
+- [ ] **Meter maps later** - one Canvas has one project timing for now. Changing meter mid-song is a real feature, but it needs a proper design instead of a rushed checkbox.
 
 ### Sharing
 - [x] **MIDI and WAV export** alongside ABC and sheet music.
