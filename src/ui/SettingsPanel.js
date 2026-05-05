@@ -11,6 +11,7 @@ import { projectToWavBlob, snippetToWavBlob } from '../export/WavExporter.js';
 import { backupFilename, readJsonFile, saveJsonFile, snippetsBackup, snippetsWithFreshIds, validateBackup, workspaceBackup } from '../export/BackupExporter.js';
 import { CHORD_TYPES, ARP_PATTERNS, ARP_RATES } from '../engine/ArpeggioManager.js';
 import { DEFAULT_VERSION_HISTORY_LIMIT, VERSION_HISTORY_LIMITS } from '../data/ProjectStore.js';
+import { APP_VERSION } from '../version.js';
 import { showToast } from './Toast.js';
 
 const TIME_SIGNATURE_OPTIONS = [
@@ -119,6 +120,10 @@ export class SettingsPanel {
                 return `<option value="${value}" ${timeSigValue === value ? 'selected' : ''}>${ts.label}</option>`;
               }).join('')}
             </select>
+          </div>
+          <div class="settings-row">
+            <label class="settings-label">App Version</label>
+            <span class="settings-value">${APP_VERSION}</span>
           </div>
         </div>
 

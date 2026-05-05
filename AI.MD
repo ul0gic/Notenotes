@@ -862,3 +862,18 @@ Reason:
 Rule:
 
 On import/migration, embedded `audioDataUrl` should always be converted into a fresh local audio asset before storage. Temporary `blob:` URLs are still unrecoverable after reload and should be marked unavailable.
+
+---
+
+## App Versioning
+
+Current App Version: `0.0.1`
+
+The visible app version is displayed in Settings. Bump it for meaningful user-facing changes or architecture/storage changes, especially when AI.MD is updated for completed work.
+
+Keep these in sync:
+
+- `src/version.js`
+- `package.json`
+- `package-lock.json`
+- this section of `AI.MD`
