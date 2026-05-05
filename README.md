@@ -153,6 +153,8 @@ These are the ideas that drive the project. Some are coded, some are sketches, s
 - [ ] **Webcam/Wiimote motion controls** — Movement to modulate, other potential uses.
 - [ ] **Touch + accelerometer** — on mobile, tilt for modulation, tap velocity for dynamics.
 - [ ] **Foot pedals & accessibility switches** — every input becomes an instrument.
+- [ ] **Lyric notepad** — write words next to the notes they fit.
+
 
 ###  Sound and color
 - [x] **Per-beat colors** in the background visualizer.
@@ -166,19 +168,12 @@ These are the ideas that drive the project. Some are coded, some are sketches, s
 - [ ] **Chord lock** — only chords that fit the song's key are reachable.
 - [ ] **Drone mode** — sustain the root of your key in the background as a tonal anchor.
 - [ ] **Suggest-next-chord** — gentle prompts when you want them, invisible when you don't.
-- [ ] **Humanize toggle** on auto-quantize — perfectly imperfect timing.
 
 ### Sharing
-- [ ] **Song-as-link** — share a complete song via URL. Receivers open it in their browser, instantly.
 - [x] **MIDI and WAV export** alongside ABC and sheet music.
 - [ ] **MP3 export** once there is a reliable browser encoder path.
-- [ ] **Embeddable player** for blogs, social posts, and personal sites.
-- [ ] **Collaborative jam mode** — two people, two browsers, one loop.
 
-### For those who need to learn
-- [ ] **First 5 Melodies** — interactive guided onboarding for absolute beginners.
-- [ ] **Practice mode** — paste a melody, the app shows you how to play it on the Scale Board.
-- [ ] **Lyric notepad** — write words next to the notes they fit.
+
 
 ### Expanding sound
 - [ ] **Found-sound recorder** — sample your environment, drop it into the kit.
