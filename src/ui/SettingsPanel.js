@@ -831,8 +831,14 @@ export class SettingsPanel {
     body.querySelector('#export-canvas-midi')?.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       if (!this.project) return;
-      downloadBlob(projectToMidiBlob(this.project), safeFilename(`${this.project.name || 'notenotes'}-canvas`, 'mid'));
-      showToast('Canvas MIDI exported');
+      const stats = { renderedEvents: 0, skippedMismatchedClips: 0 };
+      const blob = projectToMidiBlob(this.project, { stats });
+      if (!stats.renderedEvents) {
+        showToast('No MIDI or drum Canvas clips to export');
+        return;
+      }
+      downloadBlob(blob, safeFilename(`${this.project.name || 'notenotes'}-canvas`, 'mid'));
+      showToast(stats.skippedMismatchedClips ? 'Canvas MIDI exported, skipped mismatched clips' : 'Canvas MIDI exported');
     });
 
     body.querySelector('#export-canvas-wav')?.addEventListener('pointerdown', async (e) => {
@@ -866,7 +872,13 @@ export class SettingsPanel {
       const snippetId = body.querySelector('#export-snippet-select')?.value;
       const snippet = this.project?.snippets?.find(s => s.id === snippetId);
       if (!snippet) return;
-      downloadBlob(snippetToMidiBlob(snippet, this.project), safeFilename(snippet.name || 'snippet', 'mid'));
+      const stats = { renderedEvents: 0 };
+      const blob = snippetToMidiBlob(snippet, this.project, { stats });
+      if (!stats.renderedEvents) {
+        showToast('Selected snippet has no MIDI events');
+        return;
+      }
+      downloadBlob(blob, safeFilename(snippet.name || 'snippet', 'mid'));
       showToast('Snippet MIDI exported');
     });
 

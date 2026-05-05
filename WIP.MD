@@ -27,6 +27,8 @@ Current status:
 - Mismatched clips and unavailable audio are skipped defensively and summarized to the user.
 - Canvas WAV export no longer downloads a silent file when there are no audible/renderable Canvas clips.
 - Snippet WAV export now fails clearly if the selected Audio In recording is unavailable instead of downloading silence.
+- Canvas MIDI export respects typed tracks plus mute/solo state, and no longer downloads a misleading file when there are no MIDI/drum events to export.
+- Snippet MIDI export no longer downloads a tempo-only file when the selected snippet has no MIDI/drum events.
 
 Needs testing or follow-up:
 

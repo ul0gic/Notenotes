@@ -867,7 +867,7 @@ On import/migration, embedded `audioDataUrl` should always be converted into a f
 
 ## App Versioning
 
-Current App Version: `0.0.1`
+Current App Version: `0.0.2`
 
 The visible app version is displayed in Settings. Bump it for meaningful user-facing changes or architecture/storage changes, especially when AI.MD is updated for completed work.
 
@@ -877,3 +877,17 @@ Keep these in sync:
 - `package.json`
 - `package-lock.json`
 - this section of `AI.MD`
+
+---
+
+## MIDI Export Trust Rules
+
+Canvas MIDI export should mirror Canvas playback expectations where standard MIDI allows it:
+
+- respect track mute/solo state
+- skip audio tracks
+- only export MIDI snippets from MIDI tracks
+- only export drum snippets from drum tracks
+- count rendered note/hit events and refuse tempo-only downloads when there is nothing musical to export
+
+Snippet MIDI export should also refuse tempo-only downloads when the selected snippet has no notes or drum hits.

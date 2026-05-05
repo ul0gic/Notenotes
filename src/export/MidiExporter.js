@@ -60,6 +60,23 @@ function noteEvents(tick, pitch, duration, velocity, channel) {
   ];
 }
 
+function stats(options) {
+  options.stats ||= {};
+  options.stats.renderedEvents ||= 0;
+  options.stats.skippedMismatchedClips ||= 0;
+  return options.stats;
+}
+
+function addMidiNoteEvents(events, note, startTick, channel, exportStats) {
+  events.push(...noteEvents(startTick + (note.startTick || 0), note.pitch, note.durationTick, note.velocity, channel));
+  exportStats.renderedEvents += 1;
+}
+
+function addDrumHitEvents(events, hit, startTick, exportStats) {
+  events.push(...noteEvents(startTick + (hit.startTick || 0), DRUM_MIDI[hit.type] || 38, PPQ / 8, hit.velocity, 9));
+  exportStats.renderedEvents += 1;
+}
+
 function tempoEvents(project) {
   const bpm = Math.max(40, Math.min(240, Math.round(project?.bpm || 120)));
   const micros = Math.round(60000000 / bpm);
@@ -71,22 +88,33 @@ function tempoEvents(project) {
   ];
 }
 
-export function projectToMidiBlob(project) {
+export function projectToMidiBlob(project, options = {}) {
+  const exportStats = stats(options);
   const events = [...tempoEvents(project)];
   const ticksPerBar = PPQ * (project?.timeSignature?.beats || 4);
+  const hasSolo = (project?.tracks || []).some(track => track.solo);
+  const audibleTracks = (project?.tracks || []).filter(track => !track.muted && (!hasSolo || track.solo));
 
-  for (const track of (project?.tracks || [])) {
-    const isKit = (track.instrumentId || '') === 'kit';
-    const channel = isKit ? 9 : 0;
+  for (const track of audibleTracks) {
+    const trackType = track.type || (track.instrumentId === 'kit' ? 'drum' : 'midi');
     for (const clip of (track.clips || [])) {
       const snippet = clip.snippet;
       if (!snippet) continue;
-      const start = (clip.startBar || 0) * ticksPerBar;
-      for (const note of (snippet.notes || [])) {
-        events.push(...noteEvents(start + (note.startTick || 0), note.pitch, note.durationTick, note.velocity, channel));
+      if (trackType === 'audio') continue;
+      if (trackType === 'drum' && snippet.type !== 'drum') {
+        exportStats.skippedMismatchedClips += 1;
+        continue;
       }
-      for (const hit of (snippet.hits || [])) {
-        events.push(...noteEvents(start + (hit.startTick || 0), DRUM_MIDI[hit.type] || 38, PPQ / 8, hit.velocity, 9));
+      if (trackType === 'midi' && snippet.type !== 'midi') {
+        exportStats.skippedMismatchedClips += 1;
+        continue;
+      }
+
+      const start = (clip.startBar || 0) * ticksPerBar;
+      if (trackType === 'midi') {
+        for (const note of (snippet.notes || [])) addMidiNoteEvents(events, note, start, 0, exportStats);
+      } else if (trackType === 'drum') {
+        for (const hit of (snippet.hits || [])) addDrumHitEvents(events, hit, start, exportStats);
       }
     }
   }
@@ -94,14 +122,15 @@ export function projectToMidiBlob(project) {
   return midiBlobFromEvents(events);
 }
 
-export function snippetToMidiBlob(snippet, project) {
+export function snippetToMidiBlob(snippet, project, options = {}) {
+  const exportStats = stats(options);
   const channel = snippet?.type === 'drum' ? 9 : 0;
   const events = [...tempoEvents(project)];
   for (const note of (snippet?.notes || [])) {
-    events.push(...noteEvents(note.startTick || 0, note.pitch, note.durationTick, note.velocity, channel));
+    addMidiNoteEvents(events, note, 0, channel, exportStats);
   }
   for (const hit of (snippet?.hits || [])) {
-    events.push(...noteEvents(hit.startTick || 0, DRUM_MIDI[hit.type] || 38, PPQ / 8, hit.velocity, 9));
+    addDrumHitEvents(events, hit, 0, exportStats);
   }
   return midiBlobFromEvents(events);
 }
