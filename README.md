@@ -329,7 +329,7 @@ If you spot anything in this repo that's missing a credit it deserves, please [o
 
 ## 📄 License
 
-[MIT](./LICENSE) — do anything you want with it, just keep the license notice.
+[MIT](./LICENSE) — Do what you wish to do with this, I suggest we improve it for the sake of anyone it might help.
 
 ---
 
