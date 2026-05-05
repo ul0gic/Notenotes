@@ -121,10 +121,15 @@ function applyToneTraits(input, traits = {}) {
   return out;
 }
 
-function mixBuffer(target, source, startSec = 0) {
+function clampGain(value, fallback = 1) {
+  const gain = Number.isFinite(value) ? value : fallback;
+  return Math.max(0, Math.min(1.5, gain));
+}
+
+function mixBuffer(target, source, startSec = 0, gain = 1) {
   const offset = Math.max(0, Math.floor(startSec * SAMPLE_RATE));
   for (let i = 0; i < source.length; i++) {
-    mixSample(target, offset + i, source[i]);
+    mixSample(target, offset + i, source[i] * gain);
   }
 }
 
@@ -182,7 +187,8 @@ function renderHit(buffer, hit, startSec, secPerTick) {
 }
 
 function renderSnippetEvents(buffer, snippet, startSec, bpm, options = {}) {
-  const secPerTick = secondsPerTick(snippet.bpm || bpm);
+  const secPerTick = secondsPerTick(options.useSnippetBpm === false ? bpm : (snippet.bpm || bpm));
+  const gain = clampGain(options.gain);
   if (options.includeMidi !== false) {
     for (const note of snippet.notes || []) {
       renderTone(
@@ -190,26 +196,28 @@ function renderSnippetEvents(buffer, snippet, startSec, bpm, options = {}) {
         startSec + (note.startTick || 0) * secPerTick,
         Math.max(secPerTick, (note.durationTick || TICKS_PER_BEAT) * secPerTick),
         note.pitch || 60,
-        note.velocity || 0.8,
+        (note.velocity || 0.8) * gain,
       );
     }
   }
   if (options.includeDrums !== false) {
     for (const hit of snippet.hits || []) {
+      const hitWithGain = { ...hit, velocity: (hit.velocity || 0.8) * gain };
       const traits = hit.soundTraits || options.toneTraits || snippet.soundTraits;
       if (hasToneTraits(traits)) {
         const hitSamples = ensureLength(null, buffer.length / SAMPLE_RATE);
-        renderHit(hitSamples, hit, startSec, secPerTick);
+        renderHit(hitSamples, hitWithGain, startSec, secPerTick);
         mixBuffer(buffer, applyToneTraits(hitSamples, traits));
       } else {
-        renderHit(buffer, hit, startSec, secPerTick);
+        renderHit(buffer, hitWithGain, startSec, secPerTick);
       }
     }
   }
 }
 
-function renderMidiWithTone(target, snippet, startSec, bpm, baseTraits = {}) {
-  const secPerTick = secondsPerTick(snippet.bpm || bpm);
+function renderMidiWithTone(target, snippet, startSec, bpm, baseTraits = {}, gain = 1, options = {}) {
+  const secPerTick = secondsPerTick(options.useSnippetBpm === false ? bpm : (snippet.bpm || bpm));
+  const renderGain = clampGain(gain);
   for (const note of snippet.notes || []) {
     const noteTraits = note.soundTraits || baseTraits;
     const noteSamples = ensureLength(null, target.length / SAMPLE_RATE);
@@ -218,7 +226,7 @@ function renderMidiWithTone(target, snippet, startSec, bpm, baseTraits = {}) {
       startSec + (note.startTick || 0) * secPerTick,
       Math.max(secPerTick, (note.durationTick || TICKS_PER_BEAT) * secPerTick),
       note.pitch || 60,
-      note.velocity || 0.8,
+      (note.velocity || 0.8) * renderGain,
     );
     mixBuffer(target, applyToneTraits(noteSamples, noteTraits));
   }
@@ -256,15 +264,16 @@ async function decodeAudioSnippet(snippet, options = {}) {
   }
 }
 
-function mixAudioBuffer(target, decoded, startSec) {
+function mixAudioBuffer(target, decoded, startSec, gain = 1) {
   if (!decoded) return;
   const offset = Math.max(0, Math.floor(startSec * SAMPLE_RATE));
   const channels = decoded.numberOfChannels || 1;
+  const renderGain = clampGain(gain);
   for (let ch = 0; ch < channels; ch++) {
     const data = decoded.getChannelData(ch);
-    const gain = 0.7 / channels;
+    const channelGain = (0.7 * renderGain) / channels;
     for (let i = 0; i < data.length; i++) {
-      mixSample(target, offset + i, data[i] * gain);
+      mixSample(target, offset + i, data[i] * channelGain);
     }
   }
 }
@@ -338,40 +347,59 @@ export async function projectToWavBlob(project, options = {}) {
   const barTicks = ticksPerBar(project);
   const hasSolo = (project?.tracks || []).some(track => track.solo);
   const audibleTracks = (project?.tracks || []).filter(track => !track.muted && (!hasSolo || track.solo));
-  let maxTick = barTicks;
+  const jobs = [];
+  let maxSec = barTicks * secPerTick;
+
   for (const track of audibleTracks) {
+    const trackType = track.type || (track.instrumentId === 'kit' ? 'drum' : 'midi');
+    const gain = clampGain(track.volume, 1);
     for (const clip of track.clips || []) {
       const snippet = clip.snippet;
       if (!snippet) continue;
-      maxTick = Math.max(maxTick, (clip.startBar || 0) * barTicks + (snippet.durationTicks || barTicks));
+      if (trackType === 'audio' && snippet.type !== 'audio') {
+        if (options.stats) options.stats.skippedMismatchedClips = (options.stats.skippedMismatchedClips || 0) + 1;
+        continue;
+      }
+      if (trackType === 'drum' && snippet.type !== 'drum') {
+        if (options.stats) options.stats.skippedMismatchedClips = (options.stats.skippedMismatchedClips || 0) + 1;
+        continue;
+      }
+      if (trackType === 'midi' && snippet.type !== 'midi') {
+        if (options.stats) options.stats.skippedMismatchedClips = (options.stats.skippedMismatchedClips || 0) + 1;
+        continue;
+      }
+
+      const startSec = (clip.startBar || 0) * barTicks * secPerTick;
+      const durationSec = (snippet.durationTicks || barTicks) * secPerTick;
+      const job = { trackType, snippet, startSec, durationSec, gain };
+
+      if (snippet.type === 'audio') {
+        job.decoded = await decodeAudioSnippet(snippet, options);
+        if (!job.decoded) continue;
+        job.durationSec = Math.max(durationSec, job.decoded.duration || 0);
+      }
+
+      jobs.push(job);
+      maxSec = Math.max(maxSec, startSec + job.durationSec);
     }
   }
 
-  const hasAnyClipTone = audibleTracks.some(track =>
-    (track.clips || []).some(clip => hasSnippetTone(clip.snippet, project?.settings?.soundTraits || {}))
-  );
-  const samples = ensureLength(null, maxTick * secPerTick + (hasAnyClipTone ? 3 : 1));
-  const audioMixes = [];
-  for (const track of audibleTracks) {
-    const trackType = track.type || (track.instrumentId === 'kit' ? 'drum' : 'midi');
-    for (const clip of track.clips || []) {
-      const snippet = clip.snippet;
-      if (!snippet) continue;
-      if (trackType === 'audio' && snippet.type !== 'audio') continue;
-      if (trackType === 'drum' && snippet.type !== 'drum') continue;
-      if (trackType === 'midi' && snippet.type !== 'midi') continue;
-      const startSec = (clip.startBar || 0) * barTicks * secPerTick;
-      if (snippet.type === 'audio') {
-        audioMixes.push(decodeAudioSnippet(snippet, options).then(decoded => mixAudioBuffer(samples, decoded, startSec)));
-      } else if (trackType === 'midi' && snippet.type === 'midi') {
-        const traits = snippet.soundTraits || project?.settings?.soundTraits || {};
-        renderMidiWithTone(samples, snippet, startSec, bpm, traits);
-      } else {
-        const traits = snippet.soundTraits || project?.settings?.soundTraits || {};
-        renderSnippetEvents(samples, snippet, startSec, bpm, { includeMidi: false, toneTraits: traits });
-      }
+  const hasAnyClipTone = jobs.some(job => hasSnippetTone(job.snippet, project?.settings?.soundTraits || {}));
+  const samples = ensureLength(null, maxSec + (hasAnyClipTone ? 3 : 1));
+  if (options.stats) options.stats.renderedClips = jobs.length;
+
+  for (const job of jobs) {
+    const { trackType, snippet, startSec, gain } = job;
+    if (snippet.type === 'audio') {
+      mixAudioBuffer(samples, job.decoded, startSec, gain);
+    } else if (trackType === 'midi' && snippet.type === 'midi') {
+      const traits = snippet.soundTraits || project?.settings?.soundTraits || {};
+      renderMidiWithTone(samples, snippet, startSec, bpm, traits, gain, { useSnippetBpm: false });
+    } else {
+      const traits = snippet.soundTraits || project?.settings?.soundTraits || {};
+      renderSnippetEvents(samples, snippet, startSec, bpm, { includeMidi: false, toneTraits: traits, gain, useSnippetBpm: false });
     }
   }
-  await Promise.all(audioMixes);
+
   return encodeWav(samples);
 }

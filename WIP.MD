@@ -19,15 +19,20 @@ Goal:
 
 Make snippet and Canvas WAV export feel reliable enough for real users.
 
+Current status:
+
+- Canvas WAV export sizes the render after audio clips are decoded, so long recordings are not cut off by stale tick durations.
+- Canvas WAV export uses the project tempo for Canvas timing, matching playback.
+- Track mute/solo and track volume are honored in Canvas WAV export.
+- Mismatched clips and unavailable audio are skipped defensively and summarized to the user.
+
 Needs testing or follow-up:
 
 - Smoke test snippet WAV export for MIDI, drum, audio, and Tone.
 - Smoke test Canvas WAV export with mixed MIDI, drum, and audio tracks.
-- Confirm muted tracks stay out of Canvas export.
-- Confirm soloed tracks export correctly.
-- Confirm unavailable audio is summarized clearly instead of failing silently.
 - Test clips that start after bar 1.
 - Test non-4/4 time signatures.
+- Test real Audio In recordings whose stored snippet duration differs from decoded audio duration.
 
 Code note:
 

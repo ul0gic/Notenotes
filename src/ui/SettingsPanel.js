@@ -785,10 +785,13 @@ export class SettingsPanel {
       btn.disabled = true;
       showToast('Rendering Canvas WAV...');
       try {
-        const stats = { skippedAudio: 0 };
+        const stats = { skippedAudio: 0, skippedMismatchedClips: 0, renderedClips: 0 };
         const blob = await projectToWavBlob(this.project, { store: this.store, stats });
         downloadBlob(blob, safeFilename(`${this.project.name || 'notenotes'}-canvas`, 'wav'));
-        showToast(stats.skippedAudio ? `Canvas WAV exported, skipped ${stats.skippedAudio} unavailable audio clip${stats.skippedAudio === 1 ? '' : 's'}` : 'Canvas WAV exported');
+        const skipped = [];
+        if (stats.skippedAudio) skipped.push(`${stats.skippedAudio} unavailable audio clip${stats.skippedAudio === 1 ? '' : 's'}`);
+        if (stats.skippedMismatchedClips) skipped.push(`${stats.skippedMismatchedClips} mismatched clip${stats.skippedMismatchedClips === 1 ? '' : 's'}`);
+        showToast(skipped.length ? `Canvas WAV exported, skipped ${skipped.join(' and ')}` : 'Canvas WAV exported');
       } catch (err) {
         console.error('[Settings] Canvas WAV export failed:', err);
         showToast('Canvas WAV export failed');
