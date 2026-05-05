@@ -57,6 +57,7 @@ export function createProject(name = 'Untitled Sketch') {
       },
       versionHistoryLimit: DEFAULT_VERSION_HISTORY_LIMIT,
       backupContents: 'current',
+      debugLogging: false,
     }
   };
 }

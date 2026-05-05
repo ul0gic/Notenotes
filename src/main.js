@@ -134,6 +134,7 @@ class App {
 
     // Wire metronome button to also show settings on long-press
     this.transportBar.onSettingsClick = () => this.settingsPanel.toggle();
+    this.transportBar.onMoreOpen = () => this.settingsPanel.close();
 
     // Wire modulation manager to creative mode synth (after synth init)
     this.modManager._synth = this.creativeMode.synth;

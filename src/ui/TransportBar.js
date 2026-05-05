@@ -20,6 +20,7 @@ export class TransportBar {
     this.onArpClick = null;
     this.onKeysClick = null;
     this.onModResetClick = null;
+    this.onMoreOpen = null;
     this._lastMoreToggle = 0;
   }
 
@@ -151,6 +152,7 @@ export class TransportBar {
     // Settings button
     this.el.querySelector('#btn-settings')?.addEventListener('pointerdown', (e) => {
       e.preventDefault();
+      this.closeMore();
       if (this.onSettingsClick) this.onSettingsClick();
     });
 
@@ -181,7 +183,10 @@ export class TransportBar {
       if (now - this._lastMoreToggle < 250) return;
       this._lastMoreToggle = now;
       const more = this.el.querySelector('#tb-more');
-      if (more) more.classList.toggle('is-open');
+      if (!more) return;
+      const shouldOpen = !more.classList.contains('is-open');
+      if (shouldOpen && this.onMoreOpen) this.onMoreOpen();
+      more.classList.toggle('is-open', shouldOpen);
     };
     this.el.querySelector('#tb-more-btn')?.addEventListener('pointerdown', toggleMore);
     this.el.querySelector('#tb-more-btn')?.addEventListener('touchend', toggleMore);
@@ -200,6 +205,10 @@ export class TransportBar {
     } else {
       btn.textContent = 'OFF';
     }
+  }
+
+  closeMore() {
+    this.el?.querySelector('#tb-more')?.classList.remove('is-open');
   }
 
   setModDisplay(pitch, mod) {

@@ -699,6 +699,123 @@ This means the music sounds at the same tick positions, while the bar lines and 
 
 **Known Boundary**: Avoid 6/8, 7/8, 12/8, and mid-song meter changes until the app has explicit UX and engine support for denominator/pulse semantics. The current transport treats `timeSignature.beats` as the beat count and keeps one beat equal to 480 ticks.
 
+### Future Non-x/4 Time Signatures
+
+Supporting denominators other than `4` is feasible, but it is not just adding more dropdown rows.
+
+Current behavior:
+
+- `Transport.ticksPerBeat` is always `480`.
+- `Transport.secondsPerBeat` is always `60 / bpm`.
+- `Transport.ticksPerBar` is currently `ticksPerBeat * timeSignature.beats`.
+- Canvas and Inspect rulers use `timeSignature.beats` as "visible beats per bar."
+- Quantizer names such as `1/4`, `1/8`, and `1/16` are relative to the quarter-note beat model.
+- `timeSignature.subdivision` is stored but mostly not used for timing math.
+
+This means a stored `{ beats: 6, subdivision: 8 }` would not crash, but it would be musically wrong: the app would treat it like six quarter-note pulses per bar, not six eighth-note pulses per bar.
+
+Use these definitions before expanding support:
+
+```js
+const QUARTER_TICKS = 480;
+const beatUnitTicks = QUARTER_TICKS * (4 / timeSignature.subdivision);
+const ticksPerBar = beatUnitTicks * timeSignature.beats;
+```
+
+Examples:
+
+- `4/4`: beat unit = quarter note = `480` ticks, bar = `1920` ticks.
+- `3/4`: beat unit = quarter note = `480` ticks, bar = `1440` ticks.
+- `6/8`: beat unit = eighth note = `240` ticks, bar = `1440` ticks.
+- `12/8`: beat unit = eighth note = `240` ticks, bar = `2880` ticks.
+
+The hard UX/music question is BPM meaning:
+
+- For simple meters like `3/4` and `4/4`, BPM usually means quarter notes per minute.
+- For `6/8`, users often feel two big dotted-quarter pulses per bar, even though the notation has six eighth notes.
+- If Notenotes shows `120 BPM` in `6/8`, we must decide whether that means 120 eighth-note pulses, 120 quarter-note pulses, or 120 dotted-quarter felt beats. Each choice changes playback speed or user expectations.
+
+Recommendation:
+
+- Keep current public support limited to `x/4` for beta.
+- When adding `x/8`, add an explicit internal concept of `beatUnitTicks` and do not reuse `ticksPerBeat` ambiguously.
+- In UI, consider labeling these as meter presets with plain names, for example `6/8 - rolling two-feel`, rather than exposing arbitrary numerator/denominator inputs.
+- Do not add free-form custom denominators until the app has a tested meter helper module and export behavior.
+
+Clip conversion rule should stay based on absolute ticks:
+
+- Notes, hits, and audio snippets keep their `startTick`, `durationTick`, and `durationTicks`.
+- When changing project meter, convert Canvas placement through absolute ticks:
+  - `startTick = clip.startBar * oldTicksPerBar`
+  - `newStartBar = startTick / newTicksPerBar`
+  - `durationBars = snippet.durationTicks / newTicksPerBar`
+- This preserves how the music sounds in time. Only bar lines and labels move.
+
+What not to do:
+
+- Do not "stretch" notes when switching from `4/4` to `6/8` unless the user explicitly asks for a separate rhythmic reinterpretation feature.
+- Do not make old clips conform to whole bars automatically. Fractional bars are acceptable and honest.
+- Do not support meter changes inside one Canvas arrangement without a meter map. A single `project.timeSignature` cannot represent "intro in 4/4, bridge in 6/8."
+
+Safer staged plan:
+
+1. Extract meter math into a small helper module, e.g. `Meter.js`.
+2. Add tests for `ticksPerBar`, ruler labels, clip placement conversion, and duration conversion across `2/4`, `3/4`, `4/4`, `5/4`, `6/8`, and `12/8`.
+3. Update Transport, Canvas, Inspect, RecordingManager, Quantizer labels, MIDI export, WAV export, and sheet music export to use the helper.
+4. Add only a few curated `x/8` meters first, probably `6/8` and `12/8`.
+5. Keep project-level meter only. Revisit per-section meter maps later.
+
+### Time Signature Product Boundary
+
+Use curated meter presets, not arbitrary custom time signature inputs.
+
+Supported for beta:
+
+- `2/4`
+- `3/4`
+- `4/4`
+- `5/4`
+
+Reason:
+
+These are simple quarter-note pulse meters. They fit the current engine model, visual beat dots, Canvas ruler, quantizer labels, recording logic, and export paths without introducing a second concept of "felt beat."
+
+Reasonable next expansion:
+
+- `6/8`
+- `9/8`
+- `12/8`
+- possibly `2/2`, if the UI explains its pulse clearly
+
+Do not treat these as plain numerator/denominator math only. They need musical grouping/felt-pulse metadata.
+
+Examples:
+
+```js
+{
+  beats: 9,
+  subdivision: 8,
+  grouping: [3, 3, 3],
+  feltBeats: 3
+}
+```
+
+For `9/8`, users usually feel three large pulses, each split into three eighth notes. Showing nine identical beat dots or treating BPM as nine equal main beats is likely confusing. The UI should make the grouping visible, or Notenotes should not expose the meter yet.
+
+`2/2` is mathematically easy but musically/UX-sensitive. If BPM is literal, `120 BPM` in `2/2` means 120 half-note pulses per minute, not the same thing as `4/4` at 120. Do not add it unless the app can label the pulse clearly.
+
+Avoid for now:
+
+- free-form custom meters
+- arbitrary denominators such as `/16`
+- advanced odd meters such as `11/16`, `13/8`, or `7/16`
+- mixed meter inside one Canvas
+- automatic rhythmic reinterpretation when changing meter
+
+Policy:
+
+If a meter cannot be represented honestly with the current UI, do not expose it. Notenotes should prefer fewer clearly understood meter choices over a long dropdown that gives users mathematically valid but musically misleading results.
+
 <!-- --- NEW CONTEXT ADDED 2026-05-04 (AUDIO IN + KEYBOARD PERFORMANCE) --- -->
 
 ## 🎹 Hardware Keyboard Performance & Audio In
@@ -867,7 +984,7 @@ On import/migration, embedded `audioDataUrl` should always be converted into a f
 
 ## App Versioning
 
-Current App Version: `0.0.9`
+Current App Version: `0.0.10`
 
 The visible app version is displayed in Settings. Bump it for meaningful user-facing changes or architecture/storage changes, especially when AI.MD is updated for completed work.
 
@@ -921,3 +1038,13 @@ Rules:
 - Wrap the Audio In snippet creation path in `try/catch`; IndexedDB/audio asset save failures should surface as a toast rather than silently losing the recording.
 - Store audio assets as `ArrayBuffer` bytes plus MIME metadata, not raw `Blob` / `File` objects. iOS WebKit can throw "error preparing Blob/File data to be stored in object store" when IndexedDB is asked to persist recorder blobs directly.
 - `getAudioAssetBlob()` reconstructs a `Blob` for playback/export. Keep the legacy `record.blob` fallback so older desktop-created assets still play.
+
+---
+
+## Mobile Menu And Debug Logs
+
+- `TransportBar.closeMore()` is the canonical way to close the mobile `...` dropdown.
+- Tapping Settings from the mobile dropdown closes the dropdown before opening Settings.
+- Tapping `...` while Settings is open closes Settings and opens the dropdown.
+- `project.settings.debugLogging` controls the Settings debug log switch. When enabled, Settings prints a structured `[Notenotes Debug]` snapshot to the browser console on enable and each Settings open.
+- Keep debug output console-only unless the user asks for an in-app diagnostics surface.

@@ -125,6 +125,10 @@ export class SettingsPanel {
             <label class="settings-label">App Version</label>
             <span class="settings-value">${APP_VERSION}</span>
           </div>
+          <div class="settings-row" style="justify-content: flex-start; gap: 10px;">
+            <input type="checkbox" id="setting-debug-logging" ${this.project?.settings?.debugLogging ? 'checked' : ''} />
+            <label class="settings-label" for="setting-debug-logging">Debug logs</label>
+          </div>
         </div>
 
         <div class="settings-group">
@@ -459,6 +463,20 @@ export class SettingsPanel {
         return;
       }
       showToast('Chrome: three-dot menu > Cast, save, and share > Install page as app', 7000);
+    });
+
+    body.querySelector('#setting-debug-logging')?.addEventListener('change', async (e) => {
+      if (!this.project) return;
+      this.project.settings ||= {};
+      this.project.settings.debugLogging = e.target.checked;
+      this.store?.scheduleAutoSave(this.project);
+      if (e.target.checked) {
+        await this._dumpDebugSnapshot('enabled');
+        showToast('Debug logs enabled');
+      } else {
+        console.info('[Notenotes Debug] Debug logs disabled');
+        showToast('Debug logs disabled');
+      }
     });
 
     // Quantize
@@ -806,6 +824,54 @@ export class SettingsPanel {
     return Math.ceil(projectBytes * multiplier + base64AudioBytes);
   }
 
+  async _dumpDebugSnapshot(reason = 'manual') {
+    if (!this.project?.settings?.debugLogging) return;
+    try {
+      const audioStats = await this.store?.getAudioAssetStats?.(this.project);
+      const storage = await navigator.storage?.estimate?.();
+      const snippets = this.project?.snippets || [];
+      const tracks = this.project?.tracks || [];
+      const byType = snippets.reduce((counts, snippet) => {
+        counts[snippet.type || 'unknown'] = (counts[snippet.type || 'unknown'] || 0) + 1;
+        return counts;
+      }, {});
+      console.info('[Notenotes Debug]', {
+        reason,
+        appVersion: APP_VERSION,
+        project: {
+          id: this.project.id,
+          name: this.project.name,
+          bpm: this.project.bpm,
+          timeSignature: this.project.timeSignature,
+          tracks: tracks.length,
+          clips: tracks.reduce((total, track) => total + (track.clips?.length || 0), 0),
+          snippets: snippets.length,
+          snippetsByType: byType,
+        },
+        audio: {
+          snippets: audioStats?.audioSnippetCount || 0,
+          assets: audioStats?.audioAssetCount || 0,
+          bytes: audioStats?.bytes || 0,
+          readableSize: formatBytes(audioStats?.bytes || 0),
+          missing: audioStats?.missing || 0,
+        },
+        browserStorage: storage ? {
+          usage: storage.usage || 0,
+          quota: storage.quota || 0,
+          readableUsage: formatBytes(storage.usage || 0),
+          readableQuota: formatBytes(storage.quota || 0),
+        } : 'unavailable',
+        settings: {
+          backupContents: this.project.settings?.backupContents,
+          versionHistoryLimit: this.project.settings?.versionHistoryLimit,
+          quantize: this.project.settings?.quantize,
+        },
+      });
+    } catch (err) {
+      console.warn('[Notenotes Debug] Snapshot failed:', err);
+    }
+  }
+
   async _workspaceBackupPayload(contents = 'current') {
     const portableProject = await this.store.embedAudioForBackup(this.project);
     const options = { contents };
@@ -1064,6 +1130,7 @@ export class SettingsPanel {
     this._isOpen = true;
     this.el.classList.add('is-open');
     this._switchSection(this._activeSection);
+    this._dumpDebugSnapshot('settings-open');
   }
 
   close() {
