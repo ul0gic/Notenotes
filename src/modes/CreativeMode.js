@@ -68,6 +68,7 @@ export class CreativeMode {
 
     // UI
     this.snippetTray = new SnippetTray();
+    this.snippetTray.setSnippetUsageProvider((snippetId) => this._snippetInstrumentUsage(snippetId));
     this.loopProgress = new LoopProgress(transport, project);
 
     this._initialized = false;
@@ -89,6 +90,7 @@ export class CreativeMode {
     if (this.loopProgress) this.loopProgress.project = p;
     this._currentToneTraits = this._normalizeProjectSoundTraits(p);
     if (this.synth) this._setLiveSoundTraits(this._currentToneTraits);
+    this.refreshProjectBoundUi();
   }
 
   get project() {
@@ -345,6 +347,13 @@ export class CreativeMode {
     this._syncInstrumentButtons();
   }
 
+  refreshProjectBoundUi() {
+    if (!this.el) return;
+    this._refreshPatchSelector();
+    this.sketchKit?.refreshKitSelector?.();
+    this.snippetTray?._renderSnippets?.();
+  }
+
   _syncInstrumentButtons() {
     const isCustom = this._activePatchId?.startsWith('custom:');
     const createBtn = this.el?.querySelector('#create-instrument-button');
@@ -554,12 +563,12 @@ export class CreativeMode {
         audioAssetId = record.audioAssetId;
         audioMimeType = record.mimeType;
         audioSize = record.size;
-      } else if (snippetId) {
-        const snippet = (this.project.snippets || []).find(item => item.id === snippetId);
-        if (!snippet?.audioAssetId) return showToast('Choose an audio source first');
-        audioAssetId = snippet.audioAssetId;
-        audioMimeType = snippet.audioMimeType || '';
-        audioSize = snippet.audioSize || 0;
+    } else if (snippetId) {
+      const snippet = (this.project.snippets || []).find(item => item.id === snippetId);
+      if (!snippet?.audioAssetId) return showToast('Choose an audio source first');
+      audioAssetId = snippet.audioAssetId;
+      audioMimeType = snippet.audioMimeType || '';
+      audioSize = snippet.audioSize || 0;
       } else if (editingInstrument?.audioAssetId) {
         audioAssetId = editingInstrument.audioAssetId;
         audioMimeType = editingInstrument.audioMimeType || '';
@@ -575,6 +584,7 @@ export class CreativeMode {
         audioAssetId,
         audioMimeType,
         audioSize,
+        sourceSnippetId: snippetId || (file ? null : editingInstrument?.sourceSnippetId) || null,
         rootMidi: parseInt(root.querySelector('#ci-root')?.value, 10) || 60,
         playbackMode: root.querySelector('#ci-playback')?.value || 'gated',
         brightness: (parseInt(root.querySelector('#ci-brightness')?.value, 10) || 70) / 100,
@@ -592,6 +602,7 @@ export class CreativeMode {
       }));
       this.sketchKit?.refreshKitSelector?.();
       this._refreshPatchSelector();
+      this.snippetTray?._renderSnippets?.();
       if (type === 'patch') {
         await this._selectPatch(`custom:${instrument.id}`);
         this._refreshPatchSelector();
@@ -656,7 +667,25 @@ export class CreativeMode {
     }));
     this.sketchKit?.refreshKitSelector?.();
     this._refreshPatchSelector();
+    this.snippetTray?._renderSnippets?.();
     showToast(`Instrument deleted: ${instrument.name}`);
+  }
+
+  _snippetInstrumentUsage(snippetId) {
+    const snippet = (this.project?.snippets || []).find(item => item.id === snippetId);
+    const instruments = this._customInstruments().filter(instrument =>
+      instrument.sourceSnippetId === snippetId ||
+      (!!snippet?.audioAssetId && instrument.audioAssetId === snippet.audioAssetId)
+    );
+    if (!instruments.length) return null;
+
+    const names = instruments.map(instrument => instrument.name).join(', ');
+    return {
+      blocked: true,
+      label: instruments.length === 1 ? 'Instrument' : `${instruments.length} instruments`,
+      title: `Used by custom instrument${instruments.length === 1 ? '' : 's'}: ${names}`,
+      onBlocked: () => showToast(`Used by instrument: ${names}`),
+    };
   }
 
   async _saveInstrumentChangeNow() {

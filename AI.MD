@@ -984,7 +984,7 @@ On import/migration, embedded `audioDataUrl` should always be converted into a f
 
 ## App Versioning
 
-Current App Version: `0.0.16`
+Current App Version: `0.0.17`
 
 The visible app version is displayed in Settings. Bump it for meaningful user-facing changes or architecture/storage changes, especially when AI.MD is updated for completed work.
 
@@ -1082,6 +1082,9 @@ Current behavior:
 - Users can name an instrument, choose Patch or Kit, choose an Audio In snippet or audio file, adjust basic controls, save it, and delete custom melodic patches.
 - When a custom Patch is selected, the flow changes to `Edit Instrument` and updates the saved instrument instead of creating a duplicate.
 - The Kit screen also exposes Create/Edit/Delete instrument controls and lists saved custom Kit instruments in the Kit dropdown.
+- Creative Mode refreshes project-bound Patch and Kit selectors after the project is loaded. This matters because Creative Mode renders before IndexedDB load completes, so custom instruments must be refreshed once real project data arrives.
+- When an instrument is created from an audio snippet, `sourceSnippetId` is saved. Older instruments without `sourceSnippetId` are still treated as using a snippet when their `audioAssetId` matches that snippet.
+- Source snippets used by custom instruments get an `Instrument` badge in the snippet tray. Deleting those snippets is blocked so users do not accidentally remove the visible source for an instrument.
 - Root note is required for melodic sample patches because it defines the unshifted pitch of the original sample; other keys calculate playback-rate shift relative to that MIDI note.
 - Custom melodic Patch instruments are immediately playable live from Scale, Piano, and Controller through `WebAudioSynth` sample playback.
 - Canvas MIDI track instrument dropdowns include custom Patch instruments.

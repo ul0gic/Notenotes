@@ -11,6 +11,7 @@ export class SnippetTray {
     /** @type {Array} */
     this.snippets = [];
     this._onSnippetSelected = null;
+    this._snippetUsageProvider = null;
   }
 
   /**
@@ -22,6 +23,11 @@ export class SnippetTray {
    * Set callback for when a snippet is deleted from the tray.
    */
   onSnippetDeleted(fn) { this._onSnippetDeleted = fn; }
+
+  setSnippetUsageProvider(fn) {
+    this._snippetUsageProvider = fn;
+    if (this.el) this._renderSnippets();
+  }
 
   render() {
     this.el = document.createElement('div');
@@ -57,6 +63,11 @@ export class SnippetTray {
    * @param {string} id
    */
   removeSnippet(id) {
+    const usage = this._snippetUsageProvider?.(id);
+    if (usage?.blocked) {
+      usage.onBlocked?.(usage);
+      return;
+    }
     this.snippets = this.snippets.filter(s => s.id !== id);
     this._renderSnippets();
     if (this._onSnippetDeleted) {
@@ -82,6 +93,10 @@ export class SnippetTray {
       const bars = Math.ceil(s.durationTicks / (480 * (s.timeSignature?.beats || 4)));
       const autoMeta = s.type === 'audio' ? 'Audio' : `${noteCount} notes · ${bars} bar${bars > 1 ? 's' : ''}`;
       const displayName = s.name || autoMeta;
+      const usage = this._snippetUsageProvider?.(s.id);
+      const badge = usage?.label
+        ? `<span class="snippet-tray__badge" title="${this._escapeAttr(usage.title || usage.label)}">${this._escapeHtml(usage.label)}</span>`
+        : '';
 
       return `
         <div class="snippet-tray__item" data-id="${s.id}" draggable="true">
@@ -91,6 +106,7 @@ export class SnippetTray {
           <div class="snippet-tray__item-info">
             <span class="snippet-tray__item-icon">${typeIcon}</span>
             <span class="snippet-tray__item-meta">${displayName}</span>
+            ${badge}
           </div>
           <div class="snippet-tray__item-actions">
             <button class="snippet-tray__action-btn snippet-tray__delete-btn" data-delete="${s.id}" aria-label="Delete snippet" title="Delete">✕</button>
@@ -190,5 +206,16 @@ export class SnippetTray {
       <rect width="${width}" height="${height}" fill="var(--surface-3)" rx="3"/>
       ${svgContent}
     </svg>`;
+  }
+
+  _escapeHtml(value = '') {
+    return String(value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  _escapeAttr(value = '') {
+    return this._escapeHtml(value).replace(/"/g, '&quot;');
   }
 }

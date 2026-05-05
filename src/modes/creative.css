@@ -126,6 +126,22 @@
   white-space: nowrap;
 }
 
+.snippet-tray__badge {
+  flex-shrink: 0;
+  max-width: 64px;
+  padding: 1px 5px;
+  border-radius: var(--radius-sm);
+  background: rgba(66, 215, 130, 0.14);
+  border: 1px solid rgba(66, 215, 130, 0.32);
+  color: #42d782;
+  font-size: 9px;
+  font-weight: var(--font-weight-bold);
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .snippet-tray__item-actions {
   display: flex;
   justify-content: flex-end;
