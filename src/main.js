@@ -168,6 +168,11 @@ class App {
       this.canvasMode?.refresh();
     });
 
+    window.addEventListener('project-custom-instruments-changed', (event) => {
+      this.canvasMode?.refresh();
+      this.playbackEngine?.onCustomInstrumentsChanged(event.detail?.instrumentId || null);
+    });
+
     // First user interaction will init audio
     this._setupAudioInit();
 

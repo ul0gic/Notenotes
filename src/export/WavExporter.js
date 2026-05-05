@@ -279,6 +279,78 @@ function mixAudioBuffer(target, decoded, startSec, gain = 1) {
   }
 }
 
+async function decodeCustomInstrument(instrument, options = {}) {
+  if (!instrument?.audioAssetId || !options.store?.getAudioAssetBlob) return null;
+  try {
+    const blob = await options.store.getAudioAssetBlob(instrument.audioAssetId);
+    if (!blob) return null;
+    const arrayBuffer = await blob.arrayBuffer();
+    const Ctx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    const ctx = new Ctx(1, 1, SAMPLE_RATE);
+    return await ctx.decodeAudioData(arrayBuffer.slice(0));
+  } catch (err) {
+    console.warn('[WavExporter] Custom instrument decode failed:', instrument?.name || instrument?.id, err);
+    return null;
+  }
+}
+
+function customInstrumentForTrack(project, track) {
+  const id = track?.instrumentId || '';
+  if (!id.startsWith('custom:')) return null;
+  return (project?.settings?.customInstruments || [])
+    .find(instrument => instrument.id === id.slice(7) && instrument.type === 'patch') || null;
+}
+
+function sampleAt(decoded, sourceIndex) {
+  if (!decoded) return 0;
+  const channels = decoded.numberOfChannels || 1;
+  const i0 = Math.floor(sourceIndex);
+  const i1 = Math.min(decoded.length - 1, i0 + 1);
+  const frac = sourceIndex - i0;
+  let value = 0;
+  for (let ch = 0; ch < channels; ch++) {
+    const data = decoded.getChannelData(ch);
+    value += (data[i0] || 0) * (1 - frac) + (data[i1] || 0) * frac;
+  }
+  return value / channels;
+}
+
+function renderSampleNote(target, decoded, instrument, note, startSec, bpm, gain = 1, options = {}) {
+  if (!decoded) return;
+  const secPerTick = secondsPerTick(options.useSnippetBpm === false ? bpm : bpm);
+  const noteStart = startSec + (note.startTick || 0) * secPerTick;
+  const rate = Math.pow(2, ((note.pitch || 60) - (instrument.rootMidi ?? 60)) / 12);
+  const durationSec = instrument.playbackMode === 'oneShot'
+    ? decoded.duration / Math.max(0.01, rate)
+    : Math.max(secPerTick, (note.durationTick || TICKS_PER_BEAT) * secPerTick) + 0.18;
+  const start = Math.max(0, Math.floor(noteStart * SAMPLE_RATE));
+  const len = Math.max(1, Math.floor(durationSec * SAMPLE_RATE));
+  const attack = Math.max(1, Math.floor((instrument.attack ?? 0.005) * SAMPLE_RATE));
+  const release = Math.max(1, Math.floor((instrument.release ?? 0.18) * SAMPLE_RATE));
+  const renderGain = clampGain((note.velocity || 0.8) * (instrument.gain ?? 0.55) * gain);
+  const brightness = instrument.brightness ?? 0.7;
+  let low = 0;
+
+  for (let i = 0; i < len; i++) {
+    const targetIndex = start + i;
+    if (targetIndex >= target.length) break;
+    const sourceIndex = i * rate * (decoded.sampleRate / SAMPLE_RATE);
+    if (sourceIndex >= decoded.length) break;
+    const a = Math.min(1, i / attack);
+    const r = i < len - release ? 1 : Math.max(0, (len - i) / release);
+    let sample = sampleAt(decoded, sourceIndex);
+    low += (sample - low) * (0.05 + brightness * 0.45);
+    sample = low;
+    mixSample(target, targetIndex, sample * renderGain * a * r);
+  }
+}
+
+function renderMidiWithCustomInstrument(target, snippet, decoded, instrument, startSec, bpm, gain = 1, options = {}) {
+  for (const note of snippet.notes || []) {
+    renderSampleNote(target, decoded, instrument, note, startSec, bpm, gain, options);
+  }
+}
+
 function normalize(buffer) {
   let peak = 0;
   for (let i = 0; i < buffer.length; i++) peak = Math.max(peak, Math.abs(buffer[i]));
@@ -374,12 +446,19 @@ export async function projectToWavBlob(project, options = {}) {
       const startSec = (clip.startBar || 0) * barTicks * secPerTick;
       const durationSec = (snippet.durationTicks || barTicks) * secPerTick;
       const traits = clip.soundTraits || snippet.soundTraits || project?.settings?.soundTraits || {};
-      const job = { trackType, snippet, startSec, durationSec, gain, traits };
+      const customInstrument = trackType === 'midi' ? customInstrumentForTrack(project, track) : null;
+      const job = { trackType, snippet, startSec, durationSec, gain, traits, customInstrument };
 
       if (snippet.type === 'audio') {
         job.decoded = await decodeAudioSnippet(snippet, options);
         if (!job.decoded) continue;
         job.durationSec = Math.max(durationSec, job.decoded.duration || 0);
+      }
+      if (customInstrument) {
+        job.customDecoded = await decodeCustomInstrument(customInstrument, options);
+        if (job.customDecoded) {
+          job.durationSec = Math.max(job.durationSec, durationSec + Math.min(8, job.customDecoded.duration * 2));
+        }
       }
 
       jobs.push(job);
@@ -396,7 +475,17 @@ export async function projectToWavBlob(project, options = {}) {
     if (snippet.type === 'audio') {
       mixAudioBuffer(samples, job.decoded, startSec, gain);
     } else if (trackType === 'midi' && snippet.type === 'midi') {
-      renderMidiWithTone(samples, snippet, startSec, bpm, traits, gain, { useSnippetBpm: false });
+      if (job.customInstrument && job.customDecoded) {
+        if (hasToneTraits(traits)) {
+          const toneLayer = ensureLength(null, samples.length / SAMPLE_RATE);
+          renderMidiWithCustomInstrument(toneLayer, snippet, job.customDecoded, job.customInstrument, startSec, bpm, gain, { useSnippetBpm: false });
+          mixBuffer(samples, applyToneTraits(toneLayer, traits));
+        } else {
+          renderMidiWithCustomInstrument(samples, snippet, job.customDecoded, job.customInstrument, startSec, bpm, gain, { useSnippetBpm: false });
+        }
+      } else {
+        renderMidiWithTone(samples, snippet, startSec, bpm, traits, gain, { useSnippetBpm: false });
+      }
     } else {
       renderSnippetEvents(samples, snippet, startSec, bpm, { includeMidi: false, toneTraits: traits, gain, useSnippetBpm: false });
     }

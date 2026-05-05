@@ -532,6 +532,13 @@ export class CreativeMode {
     let audioSize = 0;
 
     const editingInstrument = this._selectedCustomInstrument();
+    if (editingInstrument && editingInstrument.type !== type) {
+      const usage = this._customInstrumentUsage(editingInstrument.id);
+      if (usage.count > 0) {
+        showToast(`Switch ${usage.summary} before changing this instrument type`);
+        return;
+      }
+    }
 
     if (file) {
       const record = await this.store.saveAudioAsset(file, {
@@ -575,9 +582,15 @@ export class CreativeMode {
     else this._customInstruments().push(instrument);
     this._customInstruments().sort((a, b) => a.name.localeCompare(b.name));
     this.store.scheduleAutoSave(this.project);
+    window.dispatchEvent(new CustomEvent('project-custom-instruments-changed', {
+      detail: { instrumentId: instrument.id, action: editingInstrument ? 'updated' : 'created' },
+    }));
     this._refreshPatchSelector();
     if (type === 'patch') {
       await this._selectPatch(`custom:${instrument.id}`);
+      this._refreshPatchSelector();
+    } else if (this._activePatchId === `custom:${instrument.id}`) {
+      await this._selectPatch('chip_lead');
       this._refreshPatchSelector();
     }
     this._closeCreateInstrumentPopover();
@@ -607,13 +620,55 @@ export class CreativeMode {
     const id = selected.slice(7);
     const instrument = this._customInstruments().find(item => item.id === id);
     if (!instrument) return;
+    const usage = this._customInstrumentUsage(id);
+    if (usage.count > 0) {
+      showToast(`Used by ${usage.summary}; switch those tracks first`);
+      return;
+    }
     if (!confirm(`Delete custom instrument "${instrument.name}"?`)) return;
     this.project.settings.customInstruments = this._customInstruments().filter(item => item.id !== id);
     this._activePatchId = 'chip_lead';
     this.synth.loadPatch(PRESETS.chip_lead);
     this.store?.scheduleAutoSave(this.project);
+    window.dispatchEvent(new CustomEvent('project-custom-instruments-changed', {
+      detail: { instrumentId: id, action: 'deleted' },
+    }));
     this._refreshPatchSelector();
     showToast(`Instrument deleted: ${instrument.name}`);
+  }
+
+  _customInstrumentUsage(id) {
+    const ref = `custom:${id}`;
+    const trackNames = [];
+    let clipCount = 0;
+    let snippetCount = 0;
+
+    for (const track of this.project?.tracks || []) {
+      if (track.instrumentId === ref) trackNames.push(track.name || 'Untitled track');
+      for (const clip of track.clips || []) {
+        if (clip.instrumentId === ref || clip.snippet?.instrumentId === ref || clip.snippet?.patchId === ref) {
+          clipCount++;
+        }
+      }
+    }
+
+    for (const snippet of this.project?.snippets || []) {
+      if (snippet.instrumentId === ref || snippet.patchId === ref) snippetCount++;
+    }
+
+    const parts = [];
+    if (trackNames.length) {
+      const preview = trackNames.slice(0, 2).join(', ');
+      const extra = trackNames.length > 2 ? ` and ${trackNames.length - 2} more` : '';
+      parts.push(`${trackNames.length} track${trackNames.length === 1 ? '' : 's'} (${preview}${extra})`);
+    }
+    if (clipCount) parts.push(`${clipCount} clip${clipCount === 1 ? '' : 's'}`);
+    if (snippetCount) parts.push(`${snippetCount} snippet${snippetCount === 1 ? '' : 's'}`);
+
+    return {
+      count: trackNames.length + clipCount + snippetCount,
+      summary: parts.join(', ') || '0 places',
+    };
   }
 
   _closeCreateInstrumentPopover() {

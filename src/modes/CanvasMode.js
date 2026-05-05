@@ -199,6 +199,34 @@ export class CanvasMode {
     return track;
   }
 
+  _customPatchInstruments() {
+    return (this.project?.settings?.customInstruments || []).filter(instrument => instrument.type === 'patch');
+  }
+
+  _midiInstrumentOptions(selectedId) {
+    const builtIns = Object.values(TRACK_INSTRUMENTS)
+      .filter(inst => inst.type === 'synth')
+      .map(inst => `<option value="${inst.id}" ${selectedId === inst.id ? 'selected' : ''}>${inst.name}</option>`)
+      .join('');
+    const custom = this._customPatchInstruments()
+      .map(instrument => {
+        const id = `custom:${instrument.id}`;
+        return `<option value="${id}" ${selectedId === id ? 'selected' : ''}>${instrument.name}</option>`;
+      })
+      .join('');
+    return `
+      <optgroup label="Synth presets">${builtIns}</optgroup>
+      ${custom ? `<optgroup label="Custom instruments">${custom}</optgroup>` : ''}
+    `;
+  }
+
+  _instrumentName(instrumentId) {
+    if (instrumentId?.startsWith?.('custom:')) {
+      return this._customPatchInstruments().find(instrument => instrument.id === instrumentId.slice(7))?.name || 'Custom instrument';
+    }
+    return TRACK_INSTRUMENTS[instrumentId]?.name || instrumentId;
+  }
+
   /** Render the time ruler (bar numbers) */
   _renderRuler() {
     if (!this._rulerEl) return;
@@ -241,10 +269,7 @@ export class CanvasMode {
       // Build instrument options
       this._normalizeTrackType(track);
       const trackTypeLabel = this._trackTypeLabel(track.type);
-      const instOptions = track.type === 'midi' ? Object.values(TRACK_INSTRUMENTS).filter(inst => inst.type === 'synth').map(inst => {
-        const selected = (track.instrumentId === inst.id) ? 'selected' : '';
-        return `<option value="${inst.id}" ${selected}>${inst.name}</option>`;
-      }).join('') : '';
+      const instOptions = track.type === 'midi' ? this._midiInstrumentOptions(track.instrumentId) : '';
       const instSelect = track.type === 'drum' ? '<span class="canvas-lane__inst-label">Drum Kit</span>' : track.type !== 'midi'
         ? `<span class="canvas-lane__inst-label">🎤 Audio</span>`
         : `<select class="canvas-lane__instrument" data-track-inst="${track.id}" aria-label="Track instrument">${instOptions}</select>`;
@@ -880,7 +905,7 @@ export class CanvasMode {
         this.onTrackInstrumentChanged(trackId);
       }
 
-      const instName = TRACK_INSTRUMENTS[select.value]?.name || select.value;
+      const instName = this._instrumentName(select.value);
       showToast(`${track.name}: ${instName}`);
     });
 
