@@ -76,15 +76,60 @@ export class CanvasMode {
   }
 
   _autoSetLoopFromClips() {
-    if (!this.project?.tracks) return;
-    let maxEndBar = 4;
+    this._syncCanvasLoopRegion();
+  }
+
+  _canvasLoopEnabled() {
+    return !!this.project?.settings?.canvasLoopEnabled;
+  }
+
+  _latestClipEndBar() {
+    if (!this.project?.tracks) return 0;
+    let maxEndBar = 0;
     for (const track of this.project.tracks) {
       for (const clip of (track.clips || [])) {
         const endBar = (clip.startBar || 0) + (clip.durationBars || 1);
         if (endBar > maxEndBar) maxEndBar = endBar;
       }
     }
-    this.transport.setLoop(0, maxEndBar);
+    return maxEndBar;
+  }
+
+  _syncCanvasLoopRegion() {
+    let enabled = this._canvasLoopEnabled();
+    if (enabled && this._latestClipEndBar() <= 0 && this.project?.settings) {
+      this.project.settings.canvasLoopEnabled = false;
+      enabled = false;
+    }
+    this.transport.loopEnabled = enabled;
+    if (enabled) {
+      this.transport.setLoop(0, Math.max(1, this._latestClipEndBar()));
+    }
+    this._syncLoopButton();
+  }
+
+  _setCanvasLoopEnabled(enabled) {
+    if (!this.project?.settings) return;
+    if (enabled && this._latestClipEndBar() <= 0) {
+      showToast('Add a clip before turning on Canvas loop');
+      enabled = false;
+    }
+    this.project.settings.canvasLoopEnabled = !!enabled;
+    this._syncCanvasLoopRegion();
+    this.store?.scheduleAutoSave(this.project);
+    showToast(enabled ? 'Canvas loop on' : 'Canvas loop off');
+  }
+
+  _syncLoopButton() {
+    const btn = this.el?.querySelector('#canvas-loop-toggle');
+    if (!btn) return;
+    const enabled = this._canvasLoopEnabled();
+    const end = this._latestClipEndBar();
+    btn.classList.toggle('is-active', enabled);
+    btn.setAttribute('aria-pressed', String(enabled));
+    btn.title = enabled
+      ? `Looping Canvas from start to bar ${Math.max(1, end).toFixed(end % 1 ? 2 : 0)}`
+      : 'Loop Canvas from the start to the latest clip';
   }
 
   render() {
@@ -109,6 +154,7 @@ export class CanvasMode {
         <button class="btn btn--ghost" id="canvas-zoom-in-btn" style="font-size:0.75rem;min-height:28px;padding:2px 8px;" title="Zoom In (2x)">🔍+</button>
         <div style="width: 1px; height: 16px; background: var(--surface-3); margin: 0 4px;"></div>
         <button class="btn btn--ghost" id="canvas-trim-btn" style="font-size:0.75rem;min-height:28px;padding:2px 8px;" title="Trim empty space from all snippets">✂️ Trim</button>
+        <button class="btn btn--ghost canvas-loop-toggle" id="canvas-loop-toggle" type="button" aria-pressed="${this._canvasLoopEnabled() ? 'true' : 'false'}" title="Loop Canvas from the start to the latest clip">Loop</button>
         <div style="width: 1px; height: 16px; background: var(--surface-3); margin: 0 4px;"></div>
         <select class="canvas-toolbar__select" id="canvas-tone-preset" aria-label="Tone preset for selected clip">
           ${this._renderTonePresetOptions()}
@@ -165,7 +211,7 @@ export class CanvasMode {
     this._renderSnippetDock();
     this._bindEvents();
     this._startPlayheadAnimation();
-    this._autoSetLoopFromClips();
+    this._syncCanvasLoopRegion();
 
     return this.el;
   }
@@ -314,6 +360,7 @@ export class CanvasMode {
       <button class="canvas-add-track__btn" data-add-track-type="audio">+ Add Audio</button>
     `;
     inner.appendChild(addRow);
+    this._syncCanvasLoopRegion();
   }
 
   /** Render clips within a track's content area */
@@ -845,6 +892,10 @@ export class CanvasMode {
     // Trim empty space
     this.el.querySelector('#canvas-trim-btn')?.addEventListener('click', () => {
       this._trimEmptySpace();
+    });
+
+    this.el.querySelector('#canvas-loop-toggle')?.addEventListener('click', () => {
+      this._setCanvasLoopEnabled(!this._canvasLoopEnabled());
     });
 
     this.el.querySelector('#canvas-tone-apply')?.addEventListener('click', () => {

@@ -49,6 +49,18 @@
   font-family: var(--font-family);
 }
 
+.canvas-loop-toggle {
+  min-height: 28px;
+  padding: 2px 10px;
+  font-size: 0.75rem;
+}
+
+.canvas-loop-toggle.is-active {
+  color: var(--accent-light);
+  background: var(--accent-glow);
+  border-color: var(--accent-dim);
+}
+
 .canvas-toolbar__spacer { flex: 1; }
 
 /* --- Timeline Container --- */

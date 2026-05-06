@@ -984,7 +984,7 @@ On import/migration, embedded `audioDataUrl` should always be converted into a f
 
 ## App Versioning
 
-Current App Version: `0.0.17`
+Current App Version: `0.0.18`
 
 The visible app version is displayed in Settings. Bump it for meaningful user-facing changes or architecture/storage changes, especially when AI.MD is updated for completed work.
 
@@ -1048,6 +1048,16 @@ Rules:
 - Tapping `...` while Settings is open closes Settings and opens the dropdown.
 - `project.settings.debugLogging` controls the Settings debug log switch. When enabled, Settings prints a structured `[Notenotes Debug]` snapshot to the browser console on enable and each Settings open.
 - Keep debug output console-only unless the user asks for an in-app diagnostics surface.
+
+---
+
+## Canvas Loop Toggle
+
+- `project.settings.canvasLoopEnabled` controls the Canvas toolbar Loop button.
+- When off, transport looping is disabled for Canvas playback.
+- When on, Canvas sets `transport.loopEnabled = true` and sets the loop range from bar 0 to the latest clip end across all tracks.
+- Moving, resizing, adding, deleting, quantizing, trimming, undoing, or re-rendering tracks should call `_autoSetLoopFromClips()` / `_syncCanvasLoopRegion()` so the loop endpoint follows the arrangement.
+- If there are no clips, Canvas loop is turned off and the user is prompted to add a clip before enabling it.
 
 ---
 
