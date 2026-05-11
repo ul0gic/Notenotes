@@ -100,7 +100,7 @@ Notenotes is BYO-key. The user pays your provider directly. We never see, log, o
 
 ## Security and privacy
 
-- API keys are stored in the user's browser localStorage and sent only to the provider URL the user configured.
+- API keys are held in memory for the current tab session only and sent only to the provider URL the user configured.
 - Notenotes does not telemetrize, does not retain prompt or response data, does not have any backend that sees this traffic.
 - Self-hosted users can point Ollama at a local URL; in that case the request never leaves their machine.
 
