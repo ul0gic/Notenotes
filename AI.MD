@@ -330,6 +330,7 @@ This also creates a version history snapshot. Max 5 versions kept per project.
 - Window `resize` listener recalculates columns on orientation change or window resize.
 
 **Pad Count Logic**
+- `root` pad mode hides the Scale selector, shows the existing Root dropdown as `Root Note`, renders 12 chromatic pads for the current octave, and each pad plays a dyad: the pad note plus the selected root note in the octave nearest to that pad. Example: with root `C`, the `B4` pad plays `B4 + C5`, while the `D4` pad plays `D4 + C4`.
 - In `single`/`chords` pad modes, pad count equals the scale's interval count (`SCALES[name].intervals.length`): Major → 7, Pentatonic → 5, Blues → 6.
 - In `custom` pad mode, pad count comes from Settings → `scalePadsCount` slider (1–16).
 - Changing scale or root recalculates pad count accordingly. `customPadTypes` array is trimmed to match current pad count.
@@ -984,7 +985,7 @@ On import/migration, embedded `audioDataUrl` should always be converted into a f
 
 ## App Versioning
 
-Current App Version: `0.0.30`
+Current App Version: `0.0.31`
 
 The visible app version is displayed in Settings. Bump it for meaningful user-facing changes or architecture/storage changes, especially when AI.MD is updated for completed work.
 

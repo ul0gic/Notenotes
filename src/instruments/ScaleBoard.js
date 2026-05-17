@@ -4,6 +4,8 @@
  * Pad Mode dropdown options:
  *   - "single": each pad plays a single note from the scale.
  *   - "chords": each pad plays a triad rooted on its scale degree.
+ *   - "root": chromatic pads; each pad plays itself plus the selected root
+ *             note in the octave nearest the pad note.
  *   - "voices": each pad sings a syllable from a typed phrase, at the pad's pitch.
  *               Requires a VoiceEngine to be passed in. Phrase is persisted in
  *               project.settings.voicePhrase.
@@ -14,7 +16,7 @@
  * a low and a high voice singing "ah" both sound like "ah."
  */
 
-import { getScaleNotes, midiToNoteName, SCALES, NOTE_NAMES } from '../engine/MusicTheory.js';
+import { getScaleNotes, midiToNoteName, noteNameToMidi, SCALES, NOTE_NAMES } from '../engine/MusicTheory.js';
 import { showToast } from '../ui/Toast.js';
 import { syllabify, extractPlayableSyllables, sanitizePhraseInput } from './voice/syllabify.js';
 
@@ -33,7 +35,7 @@ export class ScaleBoard {
     this.scaleName = 'major';
     this.rootNote = 'C';
     this.octave = 4;
-    this.padMode = 'single'; // 'single', 'chords', 'voices', 'custom'
+    this.padMode = 'single'; // 'single', 'chords', 'root', 'voices', 'custom'
     this.isEditingLayout = false;
     this.customPadTypes = []; // 'single' or 'chord'
 
@@ -51,6 +53,7 @@ export class ScaleBoard {
     this._fullScaleNotes = [];
     this._activePads = new Set();
     this._activeChords = new Map(); // padIndex -> array of midis
+    this._activeRootDyads = new Map(); // padIndex -> [pad midi, nearest root midi]
     this._activePadIndexes = new Set();
 
     // Callbacks for note recording
@@ -141,7 +144,9 @@ export class ScaleBoard {
   _updateNotes(overrideCount) {
     this._fullScaleNotes = getScaleNotes(this.scaleName, this.rootNote, this.octave);
 
-    if (this.padMode === 'custom') {
+    if (this.padMode === 'root') {
+      this._notes = NOTE_NAMES.map(note => noteNameToMidi(note, this.octave));
+    } else if (this.padMode === 'custom') {
       const count = overrideCount || this.project?.settings?.scalePadsCount || 7;
       this._notes = this._fullScaleNotes.slice(0, Math.min(count, this._fullScaleNotes.length));
     } else {
@@ -171,11 +176,12 @@ export class ScaleBoard {
     this.el.innerHTML = `
       <div class="scaleboard__controls">
         <div class="scaleboard__control-group">
-          <label class="scaleboard__label">Root</label>
+          <label class="scaleboard__label">${this.padMode === 'root' ? 'Root Note' : 'Root'}</label>
           <select class="scaleboard__select" id="sb-root" aria-label="Root note">
             ${NOTE_NAMES.map(n => `<option value="${n}" ${n === this.rootNote ? 'selected' : ''}>${n}</option>`).join('')}
           </select>
         </div>
+        ${this.padMode !== 'root' ? `
         <div class="scaleboard__control-group">
           <label class="scaleboard__label">Scale</label>
           <select class="scaleboard__select" id="sb-scale" aria-label="Scale type">
@@ -184,11 +190,13 @@ export class ScaleBoard {
             ).join('')}
           </select>
         </div>
+        ` : ''}
         <div class="scaleboard__control-group">
           <label class="scaleboard__label">Pad Mode</label>
           <select class="scaleboard__select" id="sb-pad-mode" aria-label="Pad mode">
             <option value="single" ${this.padMode === 'single' ? 'selected' : ''}>Single</option>
             <option value="chords" ${this.padMode === 'chords' ? 'selected' : ''}>Chords</option>
+            <option value="root" ${this.padMode === 'root' ? 'selected' : ''}>Root</option>
             ${this.voiceEngine ? `<option value="voices" ${this.padMode === 'voices' ? 'selected' : ''}>Voice Sketch</option>` : ''}
             <option value="custom" ${this.padMode === 'custom' ? 'selected' : ''}>Custom</option>
           </select>
@@ -233,17 +241,20 @@ export class ScaleBoard {
   _renderPads() {
     return this._notes.map((midi, i) => {
       const noteInfo = midiToNoteName(midi);
+      const isRootMode = this.padMode === 'root';
+      const rootMidi = isRootMode ? this._rootMidiNear(midi) : midi;
+      const rootInfo = midiToNoteName(rootMidi);
       let isChord = this.padMode === 'chords' || (this.padMode === 'custom' && this.customPadTypes[i] === 'chord');
-      let typeLabel = isChord ? 'Chord' : 'Note';
+      let typeLabel = isRootMode ? `+ ${rootInfo.display}` : (isChord ? 'Chord' : 'Note');
       const isVoice = this.padMode === 'voices';
       const voiceLabel = isVoice ? this._previewSyllableForPad(i) : null;
       const voiceClass = isVoice ? ' scaleboard__pad--voice' : '';
       return `
         <button class="scaleboard__pad${voiceClass} ${this.isEditingLayout ? 'is-editing' : ''}" data-index="${i}" data-midi="${midi}"
-                aria-label="Scale degree ${i + 1}, ${noteInfo.display}${voiceLabel ? ', sings ' + voiceLabel : ''}">
-          <span class="scaleboard__pad-degree">${i + 1}</span>
+                aria-label="${isRootMode ? `${noteInfo.display} plus nearest ${this.rootNote}, ${rootInfo.display}` : `Scale degree ${i + 1}, ${noteInfo.display}`}${voiceLabel ? ', sings ' + voiceLabel : ''}">
+          <span class="scaleboard__pad-degree">${isRootMode ? noteInfo.name : i + 1}</span>
           <span class="scaleboard__pad-note">${noteInfo.display}</span>
-          ${this.padMode === 'custom' ? `<span class="scaleboard__pad-type">${typeLabel}</span>` : ''}
+          ${(this.padMode === 'custom' || isRootMode) ? `<span class="scaleboard__pad-type">${typeLabel}</span>` : ''}
           ${isVoice && voiceLabel ? `<span class="scaleboard__pad-syllable">${this._escapeHtml(voiceLabel)}</span>` : ''}
         </button>
       `;
@@ -368,7 +379,7 @@ export class ScaleBoard {
     });
 
     // Scale selector
-    this.el.querySelector('#sb-scale').addEventListener('change', (e) => {
+    this.el.querySelector('#sb-scale')?.addEventListener('change', (e) => {
       this.scaleName = e.target.value;
       this._refreshPads();
     });
@@ -386,6 +397,7 @@ export class ScaleBoard {
 
     // Mode selector
     this.el.querySelector('#sb-pad-mode')?.addEventListener('change', (e) => {
+      this.releaseAllPads();
       this.padMode = e.target.value;
       if (this.padMode !== 'custom') this.isEditingLayout = false;
       // When entering voices mode, ensure tokens reflect the latest bank/phrase.
@@ -395,6 +407,8 @@ export class ScaleBoard {
       this._refreshLayout();
       if (this.padMode === 'custom') {
         showToast('Tap "Edit Layout" to set each pad to Note or Chord');
+      } else if (this.padMode === 'root') {
+        showToast('Root Mode: each note also plays the nearest root');
       } else if (this.padMode === 'voices') {
         showToast('Voice Sketch: experimental robot voice tokens');
       }
@@ -477,6 +491,14 @@ export class ScaleBoard {
     return midis;
   }
 
+  _rootMidiNear(referenceMidi) {
+    const rootClass = noteNameToMidi(this.rootNote, 0) % 12;
+    let best = rootClass;
+    while (best < referenceMidi - 6) best += 12;
+    while (best > referenceMidi + 6) best -= 12;
+    return Math.max(0, Math.min(127, best));
+  }
+
   _bindPadEvents() {
     const pads = this.el.querySelectorAll('.scaleboard__pad');
     pads.forEach(pad => {
@@ -527,6 +549,14 @@ export class ScaleBoard {
       return;
     }
 
+    if (this.padMode === 'root') {
+      const rootMidi = this._rootMidiNear(midi);
+      const midis = rootMidi === midi ? [midi] : [midi, rootMidi];
+      this._activeRootDyads.set(index, midis);
+      midis.forEach(m => this._noteOn(m));
+      return;
+    }
+
     const isChord = this.padMode === 'chords' || (this.padMode === 'custom' && this.customPadTypes[index] === 'chord');
     if (isChord) {
       const chordMidis = this._getChordMidis(index);
@@ -545,6 +575,14 @@ export class ScaleBoard {
 
     if (this.padMode === 'voices' && this.voiceEngine) {
       this._releaseVoicePad(index);
+      this._activePadIndexes.delete(index);
+      return;
+    }
+
+    if (this._activeRootDyads.has(index)) {
+      const midis = this._activeRootDyads.get(index) || [];
+      midis.forEach(m => this._noteOff(m));
+      this._activeRootDyads.delete(index);
       this._activePadIndexes.delete(index);
       return;
     }
