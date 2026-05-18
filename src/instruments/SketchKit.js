@@ -103,6 +103,7 @@ export class SketchKit {
     this.onDeleteInstrument = null;
     this.onAISeedClick = null;
     this._activePadTimers = new Map();
+    this._toneClickOutsideHandler = null;
 
     window.addEventListener('settings-pads-changed', () => {
       if (this.el) this._refreshPads();
@@ -474,7 +475,6 @@ export class SketchKit {
     popover.innerHTML = `
       <div class="tone-popover__header">
         <span>Tone</span>
-        <button class="tone-popover__close" type="button" aria-label="Close tone">x</button>
       </div>
       ${this._renderTonePresetControls()}
       <div class="tone-popover__list">
@@ -492,10 +492,15 @@ export class SketchKit {
     `;
     anchor.appendChild(popover);
     this.el.querySelector('#sk-tone-button')?.setAttribute('aria-expanded', 'true');
-    popover.querySelector('.tone-popover__close')?.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
+    const handleOutside = (e) => {
+      const current = this.el?.querySelector('#sk-tone-popover');
+      if (!current) return;
+      if (current.contains(e.target)) return;
+      if (anchor.contains(e.target)) return;
       this._closeTonePopover();
-    });
+    };
+    queueMicrotask(() => document.addEventListener('pointerdown', handleOutside, true));
+    this._toneClickOutsideHandler = handleOutside;
     popover.querySelectorAll('[data-sk-tone-amount]').forEach(slider => {
       const update = () => this._setToneTraitAmount(slider.dataset.skToneAmount, Number(slider.value) / 100, slider);
       slider.addEventListener('input', update);
@@ -601,6 +606,10 @@ export class SketchKit {
   }
 
   _closeTonePopover() {
+    if (this._toneClickOutsideHandler) {
+      document.removeEventListener('pointerdown', this._toneClickOutsideHandler, true);
+      this._toneClickOutsideHandler = null;
+    }
     this.el?.querySelector('#sk-tone-popover')?.remove();
     this.el?.querySelector('#sk-tone-button')?.setAttribute('aria-expanded', 'false');
   }

@@ -38,6 +38,7 @@ export class EditMode {
     this.el = null;
 
     this.onSnippetRenamed = null;
+    this.onSnippetCreated = null;
 
     this._snippet = null;
     this._clipId = null;
@@ -147,7 +148,11 @@ export class EditMode {
       <div class="edit-empty">
         <div class="edit-empty__icon">✏️</div>
         <h2 class="edit-empty__title">Inspect</h2>
-        <p class="edit-empty__desc">Select a snippet to view or edit its notes.</p>
+        <p class="edit-empty__desc">Select a snippet to view or edit its notes, or make a blank one here.</p>
+        <div class="edit-empty__actions">
+          <button class="btn btn--ghost edit-toolbar__btn" id="edit-new-midi" type="button">New MIDI Clip</button>
+          <button class="btn btn--ghost edit-toolbar__btn" id="edit-new-drum" type="button">New Drum Clip</button>
+        </div>
         <select class="edit-empty__select" id="edit-empty-select" aria-label="Select snippet">
           ${options}
         </select>
@@ -160,6 +165,36 @@ export class EditMode {
       const snippet = this.project?.snippets?.find(s => s.id === id);
       if (snippet) this.loadSnippet(snippet);
     });
+    this.el.querySelector('#edit-new-midi')?.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      this._createBlankSnippet('midi');
+    });
+    this.el.querySelector('#edit-new-drum')?.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      this._createBlankSnippet('drum');
+    });
+  }
+
+  _createBlankSnippet(type = 'midi') {
+    if (!this.project) return;
+    if (!Array.isArray(this.project.snippets)) this.project.snippets = [];
+    const isDrum = type === 'drum';
+    const snippet = {
+      id: crypto.randomUUID(),
+      createdAt: Date.now(),
+      type: isDrum ? 'drum' : 'midi',
+      name: isDrum ? 'New Drum Clip' : 'New MIDI Clip',
+      notes: [],
+      hits: [],
+      durationTicks: this.transport?.ticksPerBar || ((this.transport?.ticksPerBeat || 480) * (this.transport?.timeSignature?.beats || 4)),
+      bpm: this.transport?.bpm || this.project.bpm || 120,
+      timeSignature: { ...(this.transport?.timeSignature || this.project.timeSignature || { beats: 4, subdivision: 4 }) },
+    };
+    this.project.snippets.push(snippet);
+    this.store?.scheduleAutoSave(this.project);
+    this.onSnippetCreated?.(snippet);
+    this.loadSnippet(snippet);
+    showToast(`${isDrum ? 'Drum' : 'MIDI'} clip created`);
   }
 
   _renderEditor() {
@@ -236,6 +271,10 @@ export class EditMode {
         <button class="btn btn--ghost" id="edit-double-btn" style="font-size:0.65rem;min-height:22px;padding:0 5px;" title="Double snippet length">2x</button>
         <button class="btn btn--ghost" id="edit-half-btn" style="font-size:0.65rem;min-height:22px;padding:0 5px;" title="Halve snippet length">½</button>
         <span class="edit-toolbar__value">${noteCount} ${isDrum ? 'hits' : 'notes'}</span>
+      </div>
+      <div class="edit-toolbar__group">
+        <button class="btn btn--ghost edit-toolbar__btn" id="edit-new-midi-toolbar" type="button">New MIDI</button>
+        <button class="btn btn--ghost edit-toolbar__btn" id="edit-new-drum-toolbar" type="button">New Drum</button>
       </div>
       <div class="edit-toolbar__group">
         <span class="edit-toolbar__label">Grid</span>
@@ -718,6 +757,16 @@ export class EditMode {
     toolbar.querySelector('#edit-delete-btn')?.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       this._deleteSelectedNote();
+    });
+
+    toolbar.querySelector('#edit-new-midi-toolbar')?.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      this._createBlankSnippet('midi');
+    });
+
+    toolbar.querySelector('#edit-new-drum-toolbar')?.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      this._createBlankSnippet('drum');
     });
 
     toolbar.querySelector('#edit-double-btn')?.addEventListener('pointerdown', (e) => {

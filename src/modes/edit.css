@@ -47,6 +47,15 @@
   background: var(--surface-3);
 }
 
+.edit-toolbar__btn {
+  min-height: 28px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  line-height: 1;
+  white-space: nowrap;
+}
+
 .edit-toolbar__select {
   background: var(--surface-3);
   border: var(--border-subtle);
@@ -98,6 +107,13 @@
   min-height: 32px;
   min-width: 200px;
   margin-top: var(--space-md);
+}
+
+.edit-empty__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-sm);
 }
 
 /* --- Piano Roll Container --- */

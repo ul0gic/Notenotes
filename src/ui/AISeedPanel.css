@@ -60,23 +60,6 @@
   letter-spacing: 0.02em;
 }
 
-.ai-seed-panel__close {
-  background: transparent;
-  border: none;
-  color: var(--text-tertiary);
-  font-size: 14px;
-  font-family: var(--font-family);
-  cursor: pointer;
-  padding: 0 6px;
-  min-height: 24px;
-  border-radius: var(--radius-sm);
-}
-
-.ai-seed-panel__close:hover {
-  color: var(--text-primary);
-  background: var(--surface-3);
-}
-
 .ai-seed-panel__row {
   display: flex;
   flex-wrap: wrap;

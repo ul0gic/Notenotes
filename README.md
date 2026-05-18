@@ -105,6 +105,8 @@ Plus: **12 synth presets** (Chip Lead, Chip Bass, Cyber Secks, Heartbound, Trifo
 
 You never have to leave Create to make a song. The other modes are there when you want them.
 
+Inspect also lets you make a blank MIDI or drum clip directly, so you do not have to record live just to start writing notes.
+
 ### Local, fast, free.
 
 - **Local-first.** IndexedDB storage. No accounts, no cloud sync, no telemetry.

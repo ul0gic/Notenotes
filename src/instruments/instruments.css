@@ -128,21 +128,6 @@
   font-weight: var(--font-weight-semibold);
 }
 
-.tone-popover__close {
-  border: none;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text-tertiary);
-  min-width: 24px;
-  min-height: 24px;
-  cursor: pointer;
-}
-
-.tone-popover__close:hover {
-  background: var(--surface-3);
-  color: var(--text-primary);
-}
-
 .tone-popover__list {
   display: flex;
   flex-direction: column;

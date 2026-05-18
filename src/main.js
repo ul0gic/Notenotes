@@ -97,6 +97,9 @@ class App {
     this.editMode.onSnippetRenamed = () => {
       this.creativeMode.snippetTray._renderSnippets();
     };
+    this.editMode.onSnippetCreated = (snippet) => {
+      this.creativeMode.snippetTray.addSnippet(snippet);
+    };
 
     // Wire snippet selection: SnippetTray → EditMode
     this.creativeMode.snippetTray.onSnippetSelected((snippet) => {

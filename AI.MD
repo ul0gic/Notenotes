@@ -985,7 +985,7 @@ On import/migration, embedded `audioDataUrl` should always be converted into a f
 
 ## App Versioning
 
-Current App Version: `0.0.34`
+Current App Version: `0.0.35`
 
 The visible app version is displayed in Settings. Bump it for meaningful user-facing changes or architecture/storage changes, especially when AI.MD is updated for completed work.
 
@@ -1294,7 +1294,7 @@ Non-secret config (provider id, model id, Ollama base URL, disclaimer-accepted f
 
 The AI Seed feature is a popover anchored to a small toolbar row above the snippet tray. The row (and the button it contains) is **only visible on Scale Board, Piano, and Sketch Kit** — the three instruments whose primitives the AI can write events for. Mic (audio recording) and Controller (deliberately scoped out per user) hide the row entirely. Switching instruments while the popover is open closes it.
 
-The popover renders the `AISeedPanel` component on demand (constructed when the user clicks the button, destroyed when the popover closes). All event handlers bind at construction time, so there is no "click around to wake it up" state — the popover is fully interactive the moment it appears. Click-outside closes it; Escape closes it; the X in the header closes it.
+The popover renders the `AISeedPanel` component on demand (constructed when the user clicks the button, destroyed when the popover closes). All event handlers bind at construction time, so there is no "click around to wake it up" state — the popover is fully interactive the moment it appears. Click-outside closes it; Escape closes it; clicking the AI Seed button again closes it.
 
 ### Cost transparency
 
@@ -1330,6 +1330,7 @@ App version `0.0.33` cleaned up the Canvas toolbar as the second frontend-design
 - Mobile toolbar touch targets are slightly taller at the `640px` breakpoint, while preserving the horizontal scrolling behavior needed for the full control strip.
 - `#canvas-tone-preset` and `#canvas-tone-apply` are disabled until a MIDI or drum clip is selected. Audio clips keep these controls disabled because Tone presets do not apply to audio clips.
 - Clicking empty timeline space clears the selected clip and disables selected-clip tools. `_syncClipTools()` is the canonical helper for keeping these toolbar controls aligned with `_selectedClip`.
+- App version `0.0.35` removed the non-functional `Bar 1.1` label from the right side of the Canvas toolbar. The ruler already communicates bar/beat position, and the playhead handles motion during playback. Do not reintroduce a static position label unless it is tied to a real cursor/playhead behavior.
 
 ### Design intent
 
@@ -1340,6 +1341,41 @@ The Canvas toolbar is an editing surface, not a marketing strip. Keep it compact
 - edit/loop tools next
 - selected-clip Tone tools last
 - avoid per-button inline styles so future polish can happen from CSS
+
+---
+
+## Inspect Blank Clip Creation
+
+App version `0.0.35` adds a direct writing path for users who do not want to record live.
+
+### What changed
+
+- `EditMode` exposes `New MIDI Clip` and `New Drum Clip` actions in the empty Inspect state.
+- The active Inspect toolbar also exposes compact `New MIDI` and `New Drum` buttons so users can start another clip without returning to Create.
+- Blank snippets are added to `project.snippets`, auto-saved, surfaced in `SnippetTray` via `EditMode.onSnippetCreated`, and immediately loaded into Inspect.
+- New MIDI snippets start with `{ type: 'midi', notes: [], hits: [] }`; new drum snippets start with `{ type: 'drum', notes: [], hits: [] }`.
+- `durationTicks` defaults to the current project bar length (`transport.ticksPerBar`) so the blank clip aligns with the current meter from the start.
+
+### Design intent
+
+Create remains the performance-first path, but Inspect now supports note-by-note composition from nothing. This matters for users who think by clicking notes onto a grid rather than recording a live take.
+
+---
+
+## Popover Close Language
+
+App version `0.0.35` removes the small `x` close buttons from Tone, AI Seed, and Create/Edit Instrument popovers.
+
+### What changed
+
+- Tone popovers in `CreativeMode` and `SketchKit` close by clicking the Tone button again or clicking outside the popover.
+- Create/Edit Instrument closes by clicking the Create/Edit Instrument button again or clicking outside the popover.
+- AI Seed already supported opener-toggle and click-outside; its internal header close button was removed to match the rest of the app.
+- `tone-popover__close` and `ai-seed-panel__close` CSS is now unused/removed.
+
+### Design intent
+
+Short-lived popovers should feel like tool flyouts, not modal windows. Tool flyouts close through their trigger or outside-click. Keep visible close buttons for drawers/modals like Settings where the panel is large and persistent.
 
 ---
 

@@ -128,7 +128,7 @@ export class AISeedPanel {
   /**
    * Render the disabled state shown when AI seed isn't available in the
    * current context (e.g. Scale Board's Voice Sketch mode). The panel
-   * still has a header + close button, but the inputs are gone.
+   * still has a header, but the inputs are gone.
    */
   _renderUnavailableBody(availability) {
     const { reason } = availability || {};
@@ -148,7 +148,6 @@ export class AISeedPanel {
       <header class="ai-seed-panel__header">
         <span class="ai-seed-panel__icon" aria-hidden="true">🤖</span>
         <h3 class="ai-seed-panel__title">AI seed</h3>
-        <button class="ai-seed-panel__close" id="ai-close" type="button" aria-label="Close AI seed">x</button>
       </header>
       <div class="ai-seed-panel__unavailable">
         <p class="ai-seed-panel__unavailable-headline">${escapeHtml(message)}</p>
@@ -171,7 +170,6 @@ export class AISeedPanel {
       <header class="ai-seed-panel__header">
         <span class="ai-seed-panel__icon" aria-hidden="true">🤖</span>
         <h3 class="ai-seed-panel__title">AI seed</h3>
-        <button class="ai-seed-panel__close" id="ai-close" type="button" aria-label="Close AI seed">x</button>
       </header>
       <div class="ai-seed-panel__row ai-seed-panel__row--meta">
         <span class="ai-seed-panel__chip ai-seed-panel__chip--readonly" title="Set in Settings → AI Seed">${escapeHtml(providerLabel)}</span>
@@ -206,11 +204,6 @@ export class AISeedPanel {
 
   _bindEvents() {
     if (!this.el) return;
-    this.el.querySelector('#ai-close')?.addEventListener('click', (e) => {
-      e.preventDefault();
-      this._onClose?.();
-    });
-
     this.el.querySelectorAll('.ai-seed-panel__length').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.preventDefault();

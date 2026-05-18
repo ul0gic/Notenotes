@@ -67,14 +67,6 @@ export class CanvasMode {
     return Math.max(0, snappedBeat / this._beatsPerBar());
   }
 
-  _formatPosition(tick = this.transport?.currentTick || 0) {
-    const ticksPerBar = this.transport.ticksPerBar;
-    const ticksPerBeat = this.transport.ticksPerBeat;
-    const bar = Math.floor(tick / ticksPerBar) + 1;
-    const beat = Math.floor((tick % ticksPerBar) / ticksPerBeat) + 1;
-    return `Bar ${bar}.${beat}`;
-  }
-
   _autoSetLoopFromClips() {
     this._syncCanvasLoopRegion();
   }
@@ -160,10 +152,6 @@ export class CanvasMode {
           ${this._renderTonePresetOptions()}
         </select>
         <button class="btn btn--ghost canvas-toolbar__btn" id="canvas-tone-apply" title="Select a MIDI or drum clip first" disabled>Apply to Clip</button>
-      </div>
-      <div class="canvas-toolbar__spacer"></div>
-      <div class="canvas-toolbar__group">
-        <span class="canvas-toolbar__label" id="canvas-bar-display">Bar 1.1</span>
       </div>
     `;
     this.el.appendChild(toolbar);
@@ -1108,8 +1096,6 @@ export class CanvasMode {
 
       if (this.transport.state === TransportState.STOPPED) {
         this._playheadEl.style.display = 'none';
-        const barDisplay = this.el.querySelector('#canvas-bar-display');
-        if (barDisplay) barDisplay.textContent = this._formatPosition(this.transport.currentTick);
         return;
       }
 
@@ -1119,12 +1105,6 @@ export class CanvasMode {
       const barPosition = tick / ticksPerBar;
       const x = 140 + barPosition * this.barWidth; // 140px offset for track headers
       this._playheadEl.style.left = `${x}px`;
-
-      // Update position display
-      const barDisplay = this.el.querySelector('#canvas-bar-display');
-      if (barDisplay) {
-        barDisplay.textContent = this._formatPosition(tick);
-      }
     };
     animate();
   }

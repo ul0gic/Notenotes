@@ -114,7 +114,9 @@ export class CreativeMode {
     this._heldScaleKeyPads = new Map();
     this._heldPianoKeyIndexes = new Map();
     this._tonePopover = null;
+    this._toneClickOutsideHandler = null;
     this._instrumentPopover = null;
+    this._instrumentClickOutsideHandler = null;
     this._activePatchId = 'chip_lead';
     this._currentToneTraits = this._currentToneTraits || null;
   }
@@ -489,7 +491,6 @@ export class CreativeMode {
     popover.innerHTML = `
       <div class="tone-popover__header">
         <span>${editingInstrument ? 'Edit Instrument' : 'Create Instrument'}</span>
-        <button class="tone-popover__close" type="button" aria-label="Close create instrument">x</button>
       </div>
       <div class="custom-instrument-form">
         <label class="custom-instrument-field">
@@ -558,10 +559,14 @@ export class CreativeMode {
       if (slider && label) label.textContent = `${slider.value}%`;
     };
 
-    popover.querySelector('.tone-popover__close')?.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
+    const handleOutside = (e) => {
+      if (!this._instrumentPopover) return;
+      if (this._instrumentPopover.contains(e.target)) return;
+      if (anchor.contains(e.target)) return;
       this._closeCreateInstrumentPopover();
-    });
+    };
+    queueMicrotask(() => document.addEventListener('pointerdown', handleOutside, true));
+    this._instrumentClickOutsideHandler = handleOutside;
     popover.querySelector('#ci-type')?.addEventListener('change', syncType);
     popover.querySelector('#ci-brightness')?.addEventListener('input', () => syncSlider('brightness'));
     popover.querySelector('#ci-gain')?.addEventListener('input', () => syncSlider('gain'));
@@ -837,6 +842,10 @@ export class CreativeMode {
   }
 
   _closeCreateInstrumentPopover() {
+    if (this._instrumentClickOutsideHandler) {
+      document.removeEventListener('pointerdown', this._instrumentClickOutsideHandler, true);
+      this._instrumentClickOutsideHandler = null;
+    }
     this._instrumentPopover?.remove();
     this._instrumentPopover = null;
   }
@@ -1165,7 +1174,6 @@ export class CreativeMode {
     popover.innerHTML = `
       <div class="tone-popover__header">
         <span>Tone</span>
-        <button class="tone-popover__close" type="button" aria-label="Close tone">x</button>
       </div>
       ${this._renderTonePresetControls()}
       <div class="tone-popover__list">
@@ -1187,10 +1195,14 @@ export class CreativeMode {
     anchor.querySelector('#tone-button')?.setAttribute('aria-expanded', 'true');
     this._tonePopover = popover;
 
-    popover.querySelector('.tone-popover__close')?.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
+    const handleOutside = (e) => {
+      if (!this._tonePopover) return;
+      if (this._tonePopover.contains(e.target)) return;
+      if (anchor.contains(e.target)) return;
       this._closeTonePopover();
-    });
+    };
+    queueMicrotask(() => document.addEventListener('pointerdown', handleOutside, true));
+    this._toneClickOutsideHandler = handleOutside;
 
     popover.querySelectorAll('[data-tone-amount]').forEach(slider => {
       const update = () => this._setToneTraitAmount(slider.dataset.toneAmount, Number(slider.value) / 100, slider);
@@ -1328,6 +1340,10 @@ export class CreativeMode {
   }
 
   _closeTonePopover() {
+    if (this._toneClickOutsideHandler) {
+      document.removeEventListener('pointerdown', this._toneClickOutsideHandler, true);
+      this._toneClickOutsideHandler = null;
+    }
     this._tonePopover?.remove();
     this._tonePopover = null;
     this.el?.querySelector('#tone-button')?.setAttribute('aria-expanded', 'false');
