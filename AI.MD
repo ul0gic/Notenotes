@@ -985,7 +985,7 @@ On import/migration, embedded `audioDataUrl` should always be converted into a f
 
 ## App Versioning
 
-Current App Version: `0.0.33`
+Current App Version: `0.0.34`
 
 The visible app version is displayed in Settings. Bump it for meaningful user-facing changes or architecture/storage changes, especially when AI.MD is updated for completed work.
 
@@ -1320,7 +1320,7 @@ Mock and Ollama report "$0".
 
 ## Canvas Toolbar Polish
 
-App version `0.0.33` cleaned up the Canvas toolbar as the second frontend-design pass.
+App version `0.0.33` cleaned up the Canvas toolbar as the second frontend-design pass. App version `0.0.34` extended this by making selected-clip tools visually honest.
 
 ### What changed
 
@@ -1328,6 +1328,8 @@ App version `0.0.33` cleaned up the Canvas toolbar as the second frontend-design
 - Inline divider `<div style="...">` elements were replaced with `.canvas-toolbar__divider`.
 - Zoom buttons now render as simple `-` and `+` controls with explicit `aria-label`s instead of emoji/text hybrids. This keeps the toolbar calmer and avoids inconsistent emoji rendering across mobile browsers.
 - Mobile toolbar touch targets are slightly taller at the `640px` breakpoint, while preserving the horizontal scrolling behavior needed for the full control strip.
+- `#canvas-tone-preset` and `#canvas-tone-apply` are disabled until a MIDI or drum clip is selected. Audio clips keep these controls disabled because Tone presets do not apply to audio clips.
+- Clicking empty timeline space clears the selected clip and disables selected-clip tools. `_syncClipTools()` is the canonical helper for keeping these toolbar controls aligned with `_selectedClip`.
 
 ### Design intent
 
@@ -1338,6 +1340,25 @@ The Canvas toolbar is an editing surface, not a marketing strip. Keep it compact
 - edit/loop tools next
 - selected-clip Tone tools last
 - avoid per-button inline styles so future polish can happen from CSS
+
+---
+
+## Build Verification / dist Tracking
+
+App version `0.0.34` also fixed the recurring `dist/` build-noise problem.
+
+### What changed
+
+- `dist/` was already listed in `.gitignore`, but old generated build artifacts were still tracked by git.
+- Those tracked `dist/` files have been removed from the git index with `git rm -r --cached dist`.
+- The files remain on disk locally, but future `npm run build` runs should no longer dirty tracked `dist` assets.
+- GitHub Pages does not need committed `dist/` files because `.github/workflows/deploy.yml` installs dependencies, runs `npm run build`, uploads `./dist`, and deploys the generated artifact.
+
+### Agent workflow
+
+- Do run `npm run build` for verification after source changes.
+- Do not restore `dist/` after every build; it is intentionally ignored and untracked.
+- If deployment strategy changes away from the current Pages workflow, revisit whether `dist/` should stay ignored.
 
 ---
 

@@ -45,6 +45,12 @@
   font-weight: var(--font-weight-semibold);
 }
 
+.canvas-toolbar__btn:disabled,
+.canvas-toolbar__select:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .canvas-toolbar__divider {
   width: 1px;
   height: 18px;

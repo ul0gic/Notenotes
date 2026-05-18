@@ -156,10 +156,10 @@ export class CanvasMode {
         <button class="btn btn--ghost canvas-toolbar__btn" id="canvas-trim-btn" title="Trim empty space from all snippets">Trim</button>
         <button class="btn btn--ghost canvas-loop-toggle" id="canvas-loop-toggle" type="button" aria-pressed="${this._canvasLoopEnabled() ? 'true' : 'false'}" title="Loop Canvas from the start to the latest clip">Loop</button>
         <div class="canvas-toolbar__divider"></div>
-        <select class="canvas-toolbar__select" id="canvas-tone-preset" aria-label="Tone preset for selected clip">
+        <select class="canvas-toolbar__select" id="canvas-tone-preset" aria-label="Tone preset for selected clip" disabled>
           ${this._renderTonePresetOptions()}
         </select>
-        <button class="btn btn--ghost canvas-toolbar__btn" id="canvas-tone-apply" title="Apply Tone preset to selected clip">Apply to Clip</button>
+        <button class="btn btn--ghost canvas-toolbar__btn" id="canvas-tone-apply" title="Select a MIDI or drum clip first" disabled>Apply to Clip</button>
       </div>
       <div class="canvas-toolbar__spacer"></div>
       <div class="canvas-toolbar__group">
@@ -361,6 +361,7 @@ export class CanvasMode {
     `;
     inner.appendChild(addRow);
     this._syncCanvasLoopRegion();
+    this._syncClipTools();
   }
 
   /** Render clips within a track's content area */
@@ -380,6 +381,7 @@ export class CanvasMode {
     const el = document.createElement('div');
     el.className = 'canvas-clip';
     el.dataset.clipId = clip.id;
+    if (clip.id === this._selectedClip) el.classList.add('is-selected');
     el.style.left = `${x}px`;
     el.style.width = `${w}px`;
     el.style.background = color;
@@ -511,6 +513,7 @@ export class CanvasMode {
     const value = select.value;
     select.innerHTML = this._renderTonePresetOptions();
     if (this._tonePresets().some(p => p.id === value)) select.value = value;
+    this._syncClipTools();
   }
 
   _findClip(clipId = this._selectedClip) {
@@ -533,6 +536,23 @@ export class CanvasMode {
     this.store?.scheduleAutoSave(this.project);
     this._renderTracks();
     showToast(`Tone preset applied: ${preset.name}`);
+  }
+
+  _syncClipTools() {
+    const select = this.el?.querySelector('#canvas-tone-preset');
+    const applyBtn = this.el?.querySelector('#canvas-tone-apply');
+    if (!select || !applyBtn) return;
+    const clip = this._findClip();
+    const canApplyTone = !!clip && clip.snippet?.type !== 'audio';
+    select.disabled = !canApplyTone;
+    applyBtn.disabled = !canApplyTone;
+    const title = !clip
+      ? 'Select a MIDI or drum clip first'
+      : clip.snippet?.type === 'audio'
+        ? 'Tone presets work on MIDI and drum clips'
+        : 'Apply Tone preset to selected clip';
+    select.title = title;
+    applyBtn.title = title;
   }
 
   _renderModOverlay(clip, clipWidth) {
@@ -648,6 +668,13 @@ export class CanvasMode {
     this.el.querySelectorAll('.canvas-clip.is-selected').forEach(c => c.classList.remove('is-selected'));
     el.classList.add('is-selected');
     this._selectedClip = clipId;
+    this._syncClipTools();
+  }
+
+  _clearClipSelection() {
+    this.el?.querySelectorAll('.canvas-clip.is-selected').forEach(c => c.classList.remove('is-selected'));
+    this._selectedClip = null;
+    this._syncClipTools();
   }
 
   /** Handle clip drag-to-move */
@@ -1021,6 +1048,7 @@ export class CanvasMode {
       // Ignore if clicking on a clip, track header, or scrollbar
       if (e.target.closest('.canvas-clip') || e.target.closest('.canvas-lane__header')) return;
       if (e.target.closest('button') || e.target.closest('select')) return;
+      this._clearClipSelection();
 
       const startX = e.clientX;
       const startY = e.clientY;
