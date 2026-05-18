@@ -834,10 +834,10 @@ export class EditMode {
         if (e.target.closest('.piano-roll__note')) return;
 
         const rect = pane.gridEl.getBoundingClientRect();
-        const x = e.clientX - rect.left + pane.gridContainer.scrollLeft;
-        const y = e.clientY - rect.top + pane.gridContainer.scrollTop;
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
 
-        const tick = Math.round(x / TICK_WIDTH / this._gridSize) * this._gridSize;
+        const tick = Math.floor(x / TICK_WIDTH / this._gridSize) * this._gridSize;
         const isDrum = this._snippet?.type === 'drum';
         let pitch;
         if (isDrum) {
