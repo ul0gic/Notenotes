@@ -61,7 +61,8 @@ export class TransportBar {
 
       <div class="transport-bar__more" id="tb-more">
         <button class="btn btn--ghost arp-toggle" id="btn-arp" title="Hold/Arpeggio" aria-label="Cycle hold/arpeggio mode" style="min-height:32px;padding:2px 10px;font-size:0.75rem;border-radius:var(--radius-sm);min-width:54px;">
-          OFF
+          <span class="transport-bar__menu-icon">OFF</span>
+          <span class="transport-bar__menu-label">Hold / Arp</span>
         </button>
         <span class="transport-bar__mod" id="mod-display" style="font-size:0.65rem;color:var(--text-tertiary);display:flex;gap:8px;align-items:center;">
           <span>Pitch <span id="mod-pitch" style="color:var(--accent-light);">0%</span></span>
@@ -75,18 +76,23 @@ export class TransportBar {
               <path d="M12 2L6 22h12L12 2z"/>
               <line x1="12" y1="8" x2="16" y2="4"/>
             </svg>
+            <span class="transport-bar__menu-label">Metronome</span>
           </button>
         </div>
-        <button class="btn btn--icon btn--ghost" id="btn-keys" title="Keyboard shortcuts" aria-label="Show keyboard shortcuts">⌨</button>
+        <button class="btn btn--icon btn--ghost" id="btn-keys" title="Keyboard shortcuts" aria-label="Show keyboard shortcuts">
+          <span class="transport-bar__menu-icon">⌨</span>
+          <span class="transport-bar__menu-label">Keyboard Controls</span>
+        </button>
         <button class="btn btn--icon btn--ghost" id="btn-settings" title="Settings" aria-label="Open settings">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="3"/>
             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
           </svg>
+          <span class="transport-bar__menu-label">Settings</span>
         </button>
       </div>
 
-      <button class="btn btn--icon btn--ghost transport-bar__more-btn" id="tb-more-btn" title="More" aria-label="More options">⋯</button>
+      <button class="btn btn--icon btn--ghost transport-bar__more-btn" id="tb-more-btn" title="More" aria-label="More options" aria-expanded="false">⋯</button>
     `;
 
     this._beatDots = this.el.querySelectorAll('.beat-indicator__dot');
@@ -187,28 +193,35 @@ export class TransportBar {
       const shouldOpen = !more.classList.contains('is-open');
       if (shouldOpen && this.onMoreOpen) this.onMoreOpen();
       more.classList.toggle('is-open', shouldOpen);
+      const moreBtn = this.el.querySelector('#tb-more-btn');
+      moreBtn?.classList.toggle('is-active', shouldOpen);
+      moreBtn?.setAttribute('aria-expanded', String(shouldOpen));
     };
     this.el.querySelector('#tb-more-btn')?.addEventListener('pointerdown', toggleMore);
-    this.el.querySelector('#tb-more-btn')?.addEventListener('touchend', toggleMore);
   }
 
   setArpLabel(mode) {
     const btn = this.el?.querySelector('#btn-arp');
     if (!btn) return;
     btn.classList.remove('is-arp', 'is-hold');
+    const label = btn.querySelector('.transport-bar__menu-icon');
+    if (!label) return;
     if (mode === ARP_MODES.ARP) {
       btn.classList.add('is-arp');
-      btn.textContent = 'ARP';
+      label.textContent = 'ARP';
     } else if (mode === ARP_MODES.HOLD) {
       btn.classList.add('is-hold');
-      btn.textContent = 'HLD';
+      label.textContent = 'HLD';
     } else {
-      btn.textContent = 'OFF';
+      label.textContent = 'OFF';
     }
   }
 
   closeMore() {
     this.el?.querySelector('#tb-more')?.classList.remove('is-open');
+    const btn = this.el?.querySelector('#tb-more-btn');
+    btn?.classList.remove('is-active');
+    btn?.setAttribute('aria-expanded', 'false');
   }
 
   setModDisplay(pitch, mod) {

@@ -329,6 +329,17 @@ input, textarea, select, [contenteditable] {
   gap: var(--space-sm);
 }
 
+.transport-bar__menu-label {
+  display: none;
+}
+
+.transport-bar__menu-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2ch;
+}
+
 .transport-bar__more-btn {
   display: none;
 }
@@ -343,16 +354,16 @@ input, textarea, select, [contenteditable] {
     position: absolute;
     top: 100%;
     right: var(--space-sm);
-    min-width: 172px;
+    min-width: min(240px, calc(100vw - 24px));
     flex-direction: column;
     align-items: stretch;
     gap: var(--space-xs);
     background: var(--surface-1);
-    border: var(--border-subtle);
-    border-radius: var(--radius-sm);
+    border: 1px solid var(--surface-4);
+    border-radius: var(--radius-md);
     padding: var(--space-sm);
     z-index: 250;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+    box-shadow: 0 12px 28px rgba(0,0,0,0.55);
   }
 
   .transport-bar__more.is-open {
@@ -360,8 +371,37 @@ input, textarea, select, [contenteditable] {
   }
 
   .transport-bar__more > .btn,
-  .transport-bar__more .metronome-toggle {
-    align-self: center;
+  .transport-bar__more .metronome-toggle,
+  .transport-bar__more .metronome-toggle .btn {
+    width: 100%;
+    min-height: 44px;
+    min-width: 0;
+    border-radius: var(--radius-sm);
+  }
+
+  .transport-bar__more > .btn,
+  .transport-bar__more .metronome-toggle .btn {
+    display: grid;
+    grid-template-columns: 42px 1fr;
+    align-items: center;
+    justify-content: stretch;
+    gap: var(--space-sm);
+    padding: var(--space-xs) var(--space-sm);
+    text-align: left;
+  }
+
+  .transport-bar__more > .btn > svg,
+  .transport-bar__more .metronome-toggle svg,
+  .transport-bar__menu-icon {
+    justify-self: center;
+  }
+
+  .transport-bar__menu-label {
+    display: inline;
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    white-space: nowrap;
   }
 
   .transport-bar__more .metronome-toggle {
@@ -372,9 +412,15 @@ input, textarea, select, [contenteditable] {
 
   .transport-bar__more .transport-bar__mod {
     align-items: center;
-    flex-direction: column;
-    gap: 2px;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
     width: 100%;
+    min-height: 40px;
+    padding: var(--space-xs) var(--space-sm);
+    border: 1px solid var(--surface-3);
+    border-radius: var(--radius-sm);
+    background: rgba(255, 255, 255, 0.02);
   }
 
   .transport-bar__more-btn {
@@ -386,6 +432,12 @@ input, textarea, select, [contenteditable] {
     align-items: center;
     justify-content: center;
     font-size: 1.1rem;
+  }
+
+  .transport-bar__more-btn.is-active {
+    background: var(--surface-4);
+    color: var(--accent-light);
+    border-color: var(--surface-5);
   }
 }
 

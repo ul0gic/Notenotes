@@ -985,7 +985,7 @@ On import/migration, embedded `audioDataUrl` should always be converted into a f
 
 ## App Versioning
 
-Current App Version: `0.0.31`
+Current App Version: `0.0.32`
 
 The visible app version is displayed in Settings. Bump it for meaningful user-facing changes or architecture/storage changes, especially when AI.MD is updated for completed work.
 
@@ -1317,6 +1317,29 @@ Mock and Ollama report "$0".
 - **Prompt is single-shot.** No retry on validator failure with a self-correction message. If the LLM returns garbage, the user sees the error and can refine their prompt.
 - **No streaming.** Sequences come back atomically. With small JSON outputs this isn't a UX problem.
 - **No multi-tool conversations.** One tool, one call, one snippet.
+
+## Mobile Transport Menu Polish
+
+App version `0.0.32` tightened the narrow-screen transport dropdown as a first frontend-design pass.
+
+### What changed
+
+- `TransportBar` still renders the same desktop controls, but mobile now treats the collapsed `...` area as a labeled control tray instead of a cluster of icon-only buttons.
+- ARP/Hold, Metronome, Keyboard Controls, and Settings now carry `.transport-bar__menu-label` text. The labels are hidden on desktop and shown in the mobile dropdown.
+- The dropdown rows are full-width, 44px-tall touch targets with a fixed icon column and a text column. This specifically fixes the iPhone issue where the metronome icon looked off-center because it was being centered as a standalone round icon inside a vertical menu.
+- `#tb-more-btn` now tracks `.is-active` and `aria-expanded`, and `TransportBar.closeMore()` clears both. If future code closes the menu, use `closeMore()` so CSS state and ARIA state stay in sync.
+- The duplicate `touchend` listener was removed from the `...` button. Pointer events already cover touch on modern mobile browsers, and having both could double-toggle the menu on some devices.
+
+### Design intent
+
+The mobile transport should feel like a compact hardware control surface:
+
+- top row keeps the immediate transport actions visible: stop, play, record, beats, BPM, more
+- secondary controls live in the `...` tray
+- tray controls should be readable by name, not just by icon
+- Settings and the `...` tray should not visually stack as two open menus
+
+---
 
 ### Adding a new provider
 
