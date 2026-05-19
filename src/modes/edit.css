@@ -341,13 +341,13 @@
 }
 
 .piano-roll__note--midi {
-  background: linear-gradient(135deg, rgba(106,140,175,0.8), rgba(106,140,175,0.5));
-  border: 1px solid rgba(106,140,175,0.6);
+  background: linear-gradient(135deg, rgba(106,140,175,var(--note-fill-alpha, 0.72)), rgba(106,140,175,var(--note-fill-alpha-soft, 0.46)));
+  border: 1px solid rgba(106,140,175,var(--note-border-alpha, 0.62));
 }
 
 .piano-roll__note--drum {
-  background: linear-gradient(135deg, rgba(175,138,106,0.8), rgba(175,138,106,0.5));
-  border: 1px solid rgba(175,138,106,0.6);
+  background: linear-gradient(135deg, rgba(175,138,106,var(--note-fill-alpha, 0.72)), rgba(175,138,106,var(--note-fill-alpha-soft, 0.46)));
+  border: 1px solid rgba(175,138,106,var(--note-border-alpha, 0.62));
   border-radius: var(--radius-round);
 }
 
@@ -373,16 +373,33 @@
   background: transparent;
 }
 
-/* --- Velocity Bar (bottom of each note) --- */
+/* --- Velocity Meter (left side of each note) --- */
 .piano-roll__note-velocity {
   position: absolute;
   bottom: 0;
   left: 0;
-  right: 0;
-  height: 2px;
-  background: var(--accent);
-  border-radius: 0 0 2px 2px;
-  opacity: 0.6;
+  width: 4px;
+  height: 100%;
+  background: rgba(255,255,255,0.88);
+  border-radius: 0 2px 2px 0;
+  opacity: 0.88;
+  transform: scaleY(var(--note-velocity, 0.8));
+  transform-origin: bottom;
+}
+
+.piano-roll__note-velocity-label {
+  position: relative;
+  z-index: 1;
+  margin-left: 5px;
+  color: rgba(255,255,255,0.78);
+  font-size: 8px;
+  font-weight: var(--font-weight-semibold);
+  line-height: 1;
+  pointer-events: none;
+}
+
+.piano-roll__note[style*="width: 6px"] .piano-roll__note-velocity-label {
+  display: none;
 }
 
 /* --- Shadow Clip Preview (from one other clip) --- */
@@ -397,15 +414,27 @@
 }
 
 .piano-roll__shadow-note--midi {
-  background: rgba(86, 219, 154, 0.18);
+  background: rgba(86, 219, 154, var(--note-velocity-alpha, 0.5));
   border: 1px solid rgba(86, 219, 154, 0.5);
   box-shadow: inset 0 0 0 1px rgba(86, 219, 154, 0.12);
 }
 
 .piano-roll__shadow-note--drum {
-  background: rgba(241, 87, 87, 0.24);
+  background: rgba(241, 87, 87, var(--note-velocity-alpha, 0.5));
   border: 1px solid rgba(241, 87, 87, 0.58);
   border-radius: var(--radius-round);
+}
+
+.piano-roll__shadow-velocity {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 3px;
+  height: 100%;
+  background: rgba(255,255,255,0.64);
+  border-radius: 0 2px 2px 0;
+  transform: scaleY(var(--note-velocity, 0.8));
+  transform-origin: bottom;
 }
 
 /* --- Time Ruler (mini, inside the piano roll) --- */

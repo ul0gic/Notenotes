@@ -985,7 +985,7 @@ On import/migration, embedded `audioDataUrl` should always be converted into a f
 
 ## App Versioning
 
-Current App Version: `0.0.39`
+Current App Version: `0.0.40`
 
 The visible app version is displayed in Settings. Bump it for meaningful user-facing changes or architecture/storage changes, especially when AI.MD is updated for completed work.
 
@@ -1346,7 +1346,7 @@ The Canvas toolbar is an editing surface, not a marketing strip. Keep it compact
 
 ## Inspect Blank Clip Creation
 
-App version `0.0.35` adds a direct writing path for users who do not want to record live. App version `0.0.36` fixes Inspect click-to-place coordinate math. App version `0.0.37` cleans up the Inspect toolbar styling. App version `0.0.38` adds a one-clip Shadow reference in Inspect. App version `0.0.39` adds active clip loading, velocity editing, duplicate-add prevention, and a clearer four-bar minimum ruler/grid display.
+App version `0.0.35` adds a direct writing path for users who do not want to record live. App version `0.0.36` fixes Inspect click-to-place coordinate math. App version `0.0.37` cleans up the Inspect toolbar styling. App version `0.0.38` adds a one-clip Shadow reference in Inspect. App version `0.0.39` adds active clip loading, velocity editing, duplicate-add prevention, and a clearer four-bar minimum ruler/grid display. App version `0.0.40` makes velocity easier to read directly on notes and shadows.
 
 ### What changed
 
@@ -1366,6 +1366,7 @@ App version `0.0.35` adds a direct writing path for users who do not want to rec
 - Selected notes/hits expose a `Velocity` slider. Velocity is stored back onto the selected note/hit as `0.01` to `1.0`, and the existing mini velocity strip remains the visual hint inside each note.
 - Exact duplicate note/hit creation is blocked when clicking the same pitch/type at the same start tick. Duplicates can make notes look brighter and can also stack playback voices, so new accidental duplicates should not be created.
 - `_displayDurationTicks()` keeps the Inspect ruler and grid visually extended to at least four bars, while `_updateSnippetDuration()` still keeps the actual snippet duration based on content.
+- Velocity is now represented by three cues on active notes: block opacity, a left-side vertical meter scaled by `--note-velocity`, and a small percentage label on MIDI notes when there is room. Shadow notes/hits also use velocity-scaled opacity and a left meter so reference clips do not all read as the same strength.
 
 ### Design intent
 

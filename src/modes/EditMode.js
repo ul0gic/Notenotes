@@ -559,13 +559,18 @@ export class EditMode {
     const x = note.startTick * TICK_WIDTH;
     const w = Math.max(6, (note.durationTick || this._gridSize) * TICK_WIDTH);
     const y = (pitchMax - 1 - note.pitch) * this._noteHeight;
+    const velocity = this._normalizedVelocity(note.velocity);
+    const velocityPct = this._velocityPercent(note.velocity);
 
     const el = document.createElement('div');
     el.className = 'piano-roll__shadow-note piano-roll__shadow-note--midi';
     el.style.left = `${x}px`;
     el.style.top = `${y}px`;
     el.style.width = `${w}px`;
-    el.title = 'Shadow MIDI note';
+    el.style.setProperty('--note-velocity', velocity);
+    el.style.setProperty('--note-velocity-alpha', 0.22 + velocity * 0.5);
+    el.title = `Shadow MIDI note - velocity ${velocityPct}%`;
+    el.innerHTML = `<div class="piano-roll__shadow-velocity"></div>`;
     return el;
   }
 
@@ -593,11 +598,16 @@ export class EditMode {
 
     const el = document.createElement('div');
     el.className = 'piano-roll__shadow-note piano-roll__shadow-note--drum';
+    const velocity = this._normalizedVelocity(hit.velocity);
+    const velocityPct = this._velocityPercent(hit.velocity);
     el.style.left = `${hit.startTick * TICK_WIDTH}px`;
     el.style.top = y;
     el.style.height = h;
     el.style.width = width;
-    el.title = `Shadow ${hit.type}`;
+    el.style.setProperty('--note-velocity', velocity);
+    el.style.setProperty('--note-velocity-alpha', 0.24 + velocity * 0.5);
+    el.title = `Shadow ${hit.type} - velocity ${velocityPct}%`;
+    el.innerHTML = `<div class="piano-roll__shadow-velocity"></div>`;
     return el;
   }
 
@@ -639,6 +649,8 @@ export class EditMode {
     const x = note.startTick * TICK_WIDTH;
     const w = Math.max(6, note.durationTick * TICK_WIDTH);
     const y = (pitchMax - 1 - note.pitch) * this._noteHeight;
+    const velocity = this._normalizedVelocity(note.velocity);
+    const velocityPct = this._velocityPercent(note.velocity);
 
     const el = document.createElement('div');
     el.className = 'piano-roll__note piano-roll__note--midi';
@@ -647,10 +659,14 @@ export class EditMode {
     el.style.left = `${x}px`;
     el.style.top = `${y}px`;
     el.style.width = `${w}px`;
-
-    const velHeight = Math.max(1, (note.velocity || 0.8) * 2);
+    el.style.setProperty('--note-velocity', velocity);
+    el.style.setProperty('--note-fill-alpha', 0.28 + velocity * 0.52);
+    el.style.setProperty('--note-fill-alpha-soft', 0.18 + velocity * 0.32);
+    el.style.setProperty('--note-border-alpha', 0.3 + velocity * 0.45);
+    el.title = `${midiToNoteName(note.pitch).display} - velocity ${velocityPct}%`;
     el.innerHTML = `
-      <div class="piano-roll__note-velocity" style="height:${velHeight}px;"></div>
+      <div class="piano-roll__note-velocity"></div>
+      <span class="piano-roll__note-velocity-label">${velocityPct}</span>
       <div class="piano-roll__note-resize"></div>
     `;
 
@@ -699,13 +715,20 @@ export class EditMode {
     const x = hit.startTick * TICK_WIDTH;
     const el = document.createElement('div');
     el.className = 'piano-roll__note piano-roll__note--drum';
+    const velocity = this._normalizedVelocity(hit.velocity);
+    const velocityPct = this._velocityPercent(hit.velocity);
     el.dataset.hitIdx = idx;
     el.style.left = `${x}px`;
     el.style.top = y;
     el.style.height = h;
     el.style.width = isDrum ? '8px' : `${this._noteHeight - 2}px`;
     el.style.borderRadius = isDrum ? '4px' : '';
-    el.title = hit.type;
+    el.style.setProperty('--note-velocity', velocity);
+    el.style.setProperty('--note-fill-alpha', 0.3 + velocity * 0.5);
+    el.style.setProperty('--note-fill-alpha-soft', 0.2 + velocity * 0.3);
+    el.style.setProperty('--note-border-alpha', 0.32 + velocity * 0.45);
+    el.title = `${hit.type} - velocity ${velocityPct}%`;
+    el.innerHTML = `<div class="piano-roll__note-velocity"></div>`;
 
     el.addEventListener('pointerdown', (e) => {
       e.stopPropagation();
@@ -719,6 +742,14 @@ export class EditMode {
     });
 
     return el;
+  }
+
+  _normalizedVelocity(value) {
+    return Math.max(0.01, Math.min(1, Number.isFinite(value) ? value : 0.8));
+  }
+
+  _velocityPercent(value) {
+    return Math.round(this._normalizedVelocity(value) * 100);
   }
 
   _selectNote(idx) {
