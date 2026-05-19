@@ -171,11 +171,10 @@
   gap: var(--space-sm);
 }
 
-.ai-seed-panel__cost {
+.ai-seed-panel__billing-note {
   flex: 0 0 auto;
   color: var(--text-tertiary);
   font-size: var(--font-size-xs);
-  font-variant-numeric: tabular-nums;
 }
 
 .ai-seed-panel__status {

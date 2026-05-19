@@ -160,10 +160,6 @@ export class MockProvider extends AIProvider {
     return ['mock-canned-v1'];
   }
 
-  getPricing() {
-    return { inputPerMillion: 0, outputPerMillion: 0 };
-  }
-
   async generate({ tool, requestedLengthBars }) {
     if (!tool || !tool.input_schema) {
       throw new Error('Mock provider expects a tool definition with input_schema.');

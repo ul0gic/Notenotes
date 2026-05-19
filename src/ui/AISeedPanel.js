@@ -9,7 +9,6 @@
  *   - Read-only chips: provider label, active instrument label.
  *   - Bar-length picker (1 / 2 / 4 / 8).
  *   - Free-text prompt textarea with per-instrument suggestion chips.
- *   - Cost estimate (refreshed when prompt or settings change).
  *   - Generate button (or Cancel while in flight).
  *   - Status line with success/error feedback.
  *
@@ -71,7 +70,6 @@ export class AISeedPanel {
     this._promptText = '';
     this._statusText = '';
     this._statusKind = '';
-    this._costEstimate = null;
     this._unsubscribeStatus = null;
   }
 
@@ -86,16 +84,13 @@ export class AISeedPanel {
     this._bindEvents();
 
     if (this.controller) {
-      this._unsubscribeStatus = this.controller.onStatus(({ state, error, costUsd }) => {
-        if (state === 'generating') this._setStatus('Generating…', 'info');
-        else if (state === 'success') this._setStatus(`Snippet added · ${formatCost(costUsd)}`, 'success');
+      this._unsubscribeStatus = this.controller.onStatus(({ state, error }) => {
+        if (state === 'generating') this._setStatus('Generating...', 'info');
+        else if (state === 'success') this._setStatus('Snippet added', 'success');
         else if (state === 'error') this._setStatus(error || 'Generation failed', 'error');
         this._updateGenerateButtonState();
       });
     }
-
-    // Initialize the cost preview now that everything is wired up.
-    this._updateCost();
 
     // Focus the prompt textarea so the user can start typing immediately.
     queueMicrotask(() => {
@@ -121,7 +116,6 @@ export class AISeedPanel {
     if (!this.el) return;
     this.el.innerHTML = this._renderBody();
     this._bindEvents();
-    this._updateCost();
     this._updateGenerateButtonState();
   }
 
@@ -193,7 +187,7 @@ export class AISeedPanel {
         ${suggestions.map(s => `<button class="ai-seed-panel__suggestion" data-suggestion="${escapeAttr(s)}" type="button">${escapeHtml(s)}</button>`).join('')}
       </div>
       <div class="ai-seed-panel__row ai-seed-panel__footer">
-        <span class="ai-seed-panel__cost" id="ai-cost">${this._renderCostText()}</span>
+        <span class="ai-seed-panel__billing-note">Provider billing may apply</span>
         <span class="ai-seed-panel__status ${this._statusKind ? 'ai-seed-panel__status--' + this._statusKind : ''}" id="ai-status" aria-live="polite">${escapeHtml(this._statusText)}</span>
         <button class="btn btn--primary ai-seed-panel__generate" id="ai-generate" type="button">Generate</button>
         <button class="btn btn--ghost ai-seed-panel__cancel" id="ai-cancel" type="button" hidden>Cancel</button>
@@ -230,7 +224,6 @@ export class AISeedPanel {
     if (ta) {
       ta.addEventListener('input', () => {
         this._promptText = ta.value;
-        this._updateCost();
       });
       ta.addEventListener('keydown', (e) => {
         if ((e.key === 'Enter') && (e.ctrlKey || e.metaKey)) {
@@ -261,26 +254,6 @@ export class AISeedPanel {
       el.textContent = this._statusText;
       el.className = 'ai-seed-panel__status' + (kind ? ' ai-seed-panel__status--' + kind : '');
     }
-  }
-
-  _updateCost() {
-    if (!this.controller || !this.el) return;
-    try {
-      this._costEstimate = this.controller.estimateGenerationCost({ prompt: this._promptText });
-    } catch (_) {
-      this._costEstimate = null;
-    }
-    const node = this.el.querySelector('#ai-cost');
-    if (node) node.textContent = this._renderCostText();
-  }
-
-  _renderCostText() {
-    const e = this._costEstimate;
-    if (!e) return '';
-    if (e.providerId === 'mock' || e.providerId === 'ollama') {
-      return 'Mock / local · no cost';
-    }
-    return `~${formatCost(e.costUsd)} (${e.inputTokens}+${e.outputTokens} tokens, est.)`;
   }
 
   _updateGenerateButtonState() {
@@ -326,12 +299,6 @@ function providerLabelFor(id) {
     case 'mock': return 'Mock (offline)';
     default: return id || 'Mock (offline)';
   }
-}
-
-function formatCost(usd) {
-  if (typeof usd !== 'number' || !Number.isFinite(usd) || usd <= 0) return '$0';
-  if (usd < 0.01) return '<$0.01';
-  return '$' + usd.toFixed(2);
 }
 
 function escapeHtml(s) {

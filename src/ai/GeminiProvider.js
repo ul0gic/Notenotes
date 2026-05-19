@@ -29,13 +29,13 @@ import { AI_INSTRUMENTS, ALLOWED_LENGTHS_BARS, KIT_DRUMS, MIDI_MAX, MIDI_MIN } f
 const DEFAULT_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
 const DEFAULT_MODEL = 'gemini-2.5-flash';
 
-const GEMINI_PRICING = {
-  'gemini-2.5-flash':       { inputPerMillion: 0.075, outputPerMillion: 0.30 },
-  'gemini-2.5-flash-lite':  { inputPerMillion: 0.075, outputPerMillion: 0.30 },
-  'gemini-2.5-pro':         { inputPerMillion: 1.25,  outputPerMillion: 5.00 },
-  'gemini-1.5-flash':       { inputPerMillion: 0.075, outputPerMillion: 0.30 },
-  'gemini-1.5-pro':         { inputPerMillion: 1.25,  outputPerMillion: 5.00 },
-};
+const GEMINI_MODELS = [
+  'gemini-2.5-flash',
+  'gemini-2.5-flash-lite',
+  'gemini-2.5-pro',
+  'gemini-1.5-flash',
+  'gemini-1.5-pro',
+];
 
 const GEMINI_MAX_EVENTS = 32; // hard cap so the constrained decoder stays sane
 
@@ -47,11 +47,7 @@ export class GeminiProvider extends AIProvider {
   }
 
   listModels() {
-    return Object.keys(GEMINI_PRICING);
-  }
-
-  getPricing(modelId) {
-    return GEMINI_PRICING[modelId] || null;
+    return GEMINI_MODELS;
   }
 
   async generate({ systemPrompt, userPrompt, tool, model, signal, requestedLengthBars }) {

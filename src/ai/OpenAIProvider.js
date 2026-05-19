@@ -17,12 +17,7 @@ import { AIProvider, parseToolCallArguments, safeFetch } from './AIProvider.js';
 const DEFAULT_BASE_URL = 'https://api.openai.com/v1';
 const DEFAULT_MODEL = 'gpt-4o-mini';
 
-const OPENAI_PRICING = {
-  'gpt-4o': { inputPerMillion: 2.5, outputPerMillion: 10 },
-  'gpt-4o-mini': { inputPerMillion: 0.15, outputPerMillion: 0.6 },
-  'gpt-4-turbo': { inputPerMillion: 10, outputPerMillion: 30 },
-  'gpt-3.5-turbo': { inputPerMillion: 0.5, outputPerMillion: 1.5 },
-};
+const OPENAI_MODELS = ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo'];
 
 export class OpenAIProvider extends AIProvider {
   /**
@@ -52,12 +47,7 @@ export class OpenAIProvider extends AIProvider {
       // call. Default to a few common ones; the user can type a custom model.
       return ['llama3.1:8b', 'llama3.1:70b', 'qwen2.5:7b', 'mistral:7b'];
     }
-    return Object.keys(OPENAI_PRICING);
-  }
-
-  getPricing(modelId) {
-    if (this.isOllama) return { inputPerMillion: 0, outputPerMillion: 0 };
-    return OPENAI_PRICING[modelId] || null;
+    return OPENAI_MODELS;
   }
 
   async generate({ systemPrompt, userPrompt, tool, model, signal }) {

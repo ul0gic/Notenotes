@@ -62,16 +62,6 @@ export class AIProvider {
     return [];
   }
 
-  /**
-   * Pricing per million tokens for cost estimation. Override; defaults to
-   * "unknown" which means estimateCostUsd returns 0 (safe — no false bills).
-   *
-   * @param {string} _modelId
-   * @returns {{ inputPerMillion: number, outputPerMillion: number } | null}
-   */
-  getPricing(_modelId) {
-    return null;
-  }
 }
 
 /**

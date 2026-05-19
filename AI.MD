@@ -985,7 +985,7 @@ On import/migration, embedded `audioDataUrl` should always be converted into a f
 
 ## App Versioning
 
-Current App Version: `0.0.40`
+Current App Version: `0.0.41`
 
 The visible app version is displayed in Settings. Bump it for meaningful user-facing changes or architecture/storage changes, especially when AI.MD is updated for completed work.
 
@@ -1214,7 +1214,7 @@ The feature is BYO-key: the user pastes their own provider API key, the request 
 - `src/ai/sequence-schema.js` — Single source of truth for the shape an AI emits. Exports `AI_INSTRUMENTS`, `KIT_DRUMS`, `getSequenceSchemaForInstrument(id)`, and `getSubmitSequenceTool(id)`. Used by validator, executor, prompt builder, and the LLM tool surface.
 - `src/ai/SequenceValidator.js` — Pure `validateSequence(sequence, context)` that rejects malformed AI output before it touches the project.
 - `src/ai/SequenceExecutor.js` — `buildSnippetFromSequence(sequence, context)` constructs a snippet directly compatible with `project.snippets[]` from a validated sequence. No transport coordination, no real-time playback.
-- `src/ai/PromptBuilder.js` — Builds the system prompt, tool definition, and user prompt. Also has token/cost estimation helpers.
+- `src/ai/PromptBuilder.js` — Builds the system prompt, tool definition, and user prompt.
 - `src/ai/AIProvider.js` — Base interface for LLM providers.
 - `src/ai/MockProvider.js` — Canned-pattern provider for offline testing without a key.
 - `src/ai/OpenAIProvider.js` — OpenAI Chat Completions with tool calling. Reused for Ollama by passing a custom `baseUrl`.
@@ -1296,11 +1296,9 @@ The AI Seed feature is a popover anchored to a small toolbar row above the snipp
 
 The popover renders the `AISeedPanel` component on demand (constructed when the user clicks the button, destroyed when the popover closes). All event handlers bind at construction time, so there is no "click around to wake it up" state — the popover is fully interactive the moment it appears. Click-outside closes it; Escape closes it; clicking the AI Seed button again closes it.
 
-### Cost transparency
+### Provider billing
 
-`AIController.estimateGenerationCost({ prompt })` returns an approximate USD cost based on per-million-token pricing tables in each provider class. The AI Seed Panel surfaces this estimate ("~$0.02") below the prompt textarea before the user clicks Generate.
-
-Mock and Ollama report "$0".
+App version `0.0.41` removed AI Seed cost estimation entirely. Notenotes still warns that provider billing may apply, but it does not show estimated dollars, token counts, or running totals. Provider prices and token accounting change too often for a FOSS client app to maintain honestly.
 
 ### Provider quirks
 
@@ -1312,7 +1310,7 @@ Mock and Ollama report "$0".
 ### v1 limitations (intentional, not bugs)
 
 - **No reference snippet picker.** The pipeline supports a `referencedSnippet` context field, but the UI does not yet expose a way to attach one. Add a "+ Reference snippet" picker in a follow-up.
-- **No running cost counter.** The per-generation estimate is shown; cumulative session/project totals are not tracked.
+- **No cost estimates or counters.** Provider billing may apply, but Notenotes does not attempt to price individual generations.
 - **No rate limiting / per-session budget cap.** A user could spam Generate. Acceptable for v1; surfaced as a future "max $X per session" setting.
 - **Prompt is single-shot.** No retry on validator failure with a self-correction message. If the LLM returns garbage, the user sees the error and can refine their prompt.
 - **No streaming.** Sequences come back atomically. With small JSON outputs this isn't a UX problem.
@@ -1438,5 +1436,4 @@ The mobile transport should feel like a compact hardware control surface:
 1. Subclass `AIProvider`. Implement `generate({systemPrompt, userPrompt, tool, model, signal})`.
 2. Add the provider to `AIController._resolveProvider`.
 3. Add an option to the Settings AI section's provider dropdown (in `SettingsPanel._renderAISection`) and a `case` in `providerModelsForUi`.
-4. If the provider has its own pricing, override `getPricing(modelId)`.
-5. If credentials are required, read them via `readApiKey('<providerId>')`. Keys live in the in-memory Map only — do not write a custom credential store, and do not persist them.
+4. If credentials are required, read them via `readApiKey('<providerId>')`. Keys live in the in-memory Map only — do not write a custom credential store, and do not persist them.

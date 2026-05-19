@@ -14,14 +14,14 @@ const DEFAULT_BASE_URL = 'https://api.anthropic.com/v1';
 const DEFAULT_MODEL = 'claude-3-5-haiku-latest';
 const ANTHROPIC_VERSION = '2023-06-01';
 
-const ANTHROPIC_PRICING = {
-  'claude-3-5-haiku-latest':   { inputPerMillion: 0.8,  outputPerMillion: 4 },
-  'claude-3-5-haiku-20241022': { inputPerMillion: 0.8,  outputPerMillion: 4 },
-  'claude-3-5-sonnet-latest':  { inputPerMillion: 3,    outputPerMillion: 15 },
-  'claude-3-5-sonnet-20241022':{ inputPerMillion: 3,    outputPerMillion: 15 },
-  'claude-3-opus-latest':      { inputPerMillion: 15,   outputPerMillion: 75 },
-  'claude-3-haiku-20240307':   { inputPerMillion: 0.25, outputPerMillion: 1.25 },
-};
+const ANTHROPIC_MODELS = [
+  'claude-3-5-haiku-latest',
+  'claude-3-5-haiku-20241022',
+  'claude-3-5-sonnet-latest',
+  'claude-3-5-sonnet-20241022',
+  'claude-3-opus-latest',
+  'claude-3-haiku-20240307',
+];
 
 export class AnthropicProvider extends AIProvider {
   /**
@@ -36,11 +36,7 @@ export class AnthropicProvider extends AIProvider {
   }
 
   listModels() {
-    return Object.keys(ANTHROPIC_PRICING);
-  }
-
-  getPricing(modelId) {
-    return ANTHROPIC_PRICING[modelId] || null;
+    return ANTHROPIC_MODELS;
   }
 
   async generate({ systemPrompt, userPrompt, tool, model, signal }) {

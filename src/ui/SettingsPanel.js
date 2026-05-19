@@ -332,7 +332,7 @@ export class SettingsPanel {
         <div class="settings-row" style="display: block;">
           <p class="settings-help" style="margin: 0 0 var(--space-sm) 0; color: var(--text-tertiary); font-size: var(--font-size-xs); line-height: 1.45;">
             Lets you ask an LLM to seed a snippet you'll then play with or refine. The AI is one of your instruments — the user is still the composer.
-            Notenotes is BYO-key. <strong>Keys live in memory only and are forgotten when you reload — you'll re-enter them each session.</strong> Costs go to your provider, not us. We never see, log, or relay your prompts.
+            Notenotes is BYO-key. <strong>Keys live in memory only and are forgotten when you reload — you'll re-enter them each session.</strong> Provider billing may apply. We never see, log, or relay your prompts.
           </p>
         </div>
         <div class="settings-row">

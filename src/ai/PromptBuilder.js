@@ -139,34 +139,4 @@ export function buildToolDefinition(instrumentId) {
   return getSubmitSequenceTool(instrumentId);
 }
 
-/**
- * Helper: rough token count for cost estimation. Not exact; OpenAI/Anthropic
- * tokenize differently. Good enough for "is this prompt huge?" heuristics.
- *
- * @param {string} text
- * @returns {number}
- */
-export function approxTokens(text) {
-  if (!text) return 0;
-  // ~4 characters per token is the rule of thumb for English.
-  return Math.ceil(String(text).length / 4);
-}
-
-/**
- * Estimate cost in USD for a generation. Returns rough USD; don't trust the
- * cents place. Used purely for the UI cost preview, not for billing.
- *
- * @param {object} model
- * @param {number} model.inputTokens
- * @param {number} model.outputTokens
- * @param {object} pricing - per-million-token rates
- * @returns {number} dollars
- */
-export function estimateCostUsd({ inputTokens, outputTokens, pricing }) {
-  if (!pricing) return 0;
-  const inUsd = (inputTokens / 1_000_000) * (pricing.inputPerMillion || 0);
-  const outUsd = (outputTokens / 1_000_000) * (pricing.outputPerMillion || 0);
-  return inUsd + outUsd;
-}
-
 export { ALLOWED_LENGTHS_BARS };

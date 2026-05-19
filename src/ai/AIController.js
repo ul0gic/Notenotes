@@ -24,11 +24,9 @@ import { OpenAIProvider } from './OpenAIProvider.js';
 import { validateSequence } from './SequenceValidator.js';
 import { buildSnippetFromSequence } from './SequenceExecutor.js';
 import {
-  approxTokens,
   buildSystemPrompt,
   buildToolDefinition,
   buildUserPrompt,
-  estimateCostUsd,
 } from './PromptBuilder.js';
 import { PROVIDER_IDS, readAiSettings, readApiKey } from './aiSettings.js';
 import { AI_INSTRUMENTS } from './sequence-schema.js';
@@ -49,7 +47,6 @@ export class AIController {
 
     this._abortController = null;
     this._lastUsage = null;
-    this._lastCostUsd = null;
 
     this._statusListeners = new Set();
   }
@@ -109,37 +106,6 @@ export class AIController {
   }
 
   /**
-   * Estimate cost of a generation BEFORE running it. Returns rough USD plus
-   * the token estimates. Used by the panel's "this will cost roughly X" hint.
-   *
-   * @param {object} opts
-   * @param {string} opts.prompt
-   * @returns {{ inputTokens: number, outputTokens: number, costUsd: number, providerId: string, model: string }}
-   */
-  estimateGenerationCost({ prompt }) {
-    const settings = readAiSettings(this._getProject());
-    const provider = this._resolveProvider(settings);
-
-    const inst = this._getActiveInstrumentInfo();
-    const ctx = this._buildPromptContext(inst, settings);
-    const sysText = buildSystemPrompt(ctx);
-    const userText = buildUserPrompt(prompt);
-
-    const inputTokens = approxTokens(sysText) + approxTokens(userText) + 400; // ~400 tokens for tool schema
-    const outputTokens = 600; // rough average for a structured sequence
-    const pricing = provider.getPricing(settings.model);
-    const costUsd = estimateCostUsd({ inputTokens, outputTokens, pricing });
-
-    return {
-      inputTokens,
-      outputTokens,
-      costUsd,
-      providerId: provider.id,
-      model: settings.model,
-    };
-  }
-
-  /**
    * Run a full generation. Returns a built snippet ready to be added to the
    * project. Throws Error with .message for any failure.
    *
@@ -147,7 +113,7 @@ export class AIController {
    * @param {string} opts.prompt
    * @param {number} [opts.lengthBars]   - Override; defaults to settings.
    * @param {string} [opts.instrument]   - Override; defaults to active.
-   * @returns {Promise<{ snippet: object, usage: object, costUsd: number, validatorWarnings: string[] }>}
+   * @returns {Promise<{ snippet: object, usage: object, validatorWarnings: string[] }>}
    */
   async seed({ prompt, lengthBars, instrument } = {}) {
     if (this._abortController) {
@@ -221,18 +187,11 @@ export class AIController {
       providerId: result.providerId,
     });
 
-    const pricing = provider.getPricing(settings.model);
-    const costUsd = estimateCostUsd({
-      inputTokens: result.usage?.inputTokens || 0,
-      outputTokens: result.usage?.outputTokens || 0,
-      pricing,
-    });
     this._lastUsage = result.usage;
-    this._lastCostUsd = costUsd;
 
-    this._emitStatus('success', { snippetId: snippet.id, costUsd, usage: result.usage });
+    this._emitStatus('success', { snippetId: snippet.id, usage: result.usage });
 
-    return { snippet, usage: result.usage, costUsd, validatorWarnings: v.warnings };
+    return { snippet, usage: result.usage, validatorWarnings: v.warnings };
   }
 
   /**
