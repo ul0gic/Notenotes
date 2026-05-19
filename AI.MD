@@ -985,7 +985,7 @@ On import/migration, embedded `audioDataUrl` should always be converted into a f
 
 ## App Versioning
 
-Current App Version: `0.0.41`
+Current App Version: `0.0.42`
 
 The visible app version is displayed in Settings. Bump it for meaningful user-facing changes or architecture/storage changes, especially when AI.MD is updated for completed work.
 
@@ -995,6 +995,53 @@ Keep these in sync:
 - `package.json`
 - `package-lock.json`
 - this section of `AI.MD`
+
+---
+
+## Canvas, Inspect, and Save Cleanup
+
+App version `0.0.42` addresses a QA pass around Canvas arrangement safety, audio snippet naming, Inspect shadows, and cleanup of local save data.
+
+### Audio clip playback
+
+- `PlaybackEngine._processTick()` now treats audio tracks as first-class audio tracks instead of trying to read `instDef.type` from an undefined instrument definition.
+- Audio clips on Canvas call `_playAudioClip(snippet, nextTickTime)` so they start on the scheduler's audio clock instead of `ctx.currentTime`.
+- The track/type guards are still strict: audio snippets only play on audio tracks, drum snippets only on drum tracks, and MIDI snippets only on MIDI tracks.
+
+### Inspect audio naming
+
+- Audio snippets in Inspect now render an editable `.edit-audio__name-input`.
+- Blur or Enter commits the name back to `snippet.name`, schedules autosave, fires `onSnippetRenamed`, and updates the snippet tray through the existing callback path.
+- Audio Inspect remains preview-only beyond naming. Destructive audio trim/normalize/gain editing is still future work.
+
+### Inspect shadow parity
+
+- Drum Inspect can now choose either drum or MIDI snippets in the one-clip `Shadow` dropdown.
+- Drum shadows still render as red hit references. MIDI shadows inside the drum editor render as green reference blocks, mapped roughly from pitch range 36-84 onto the visible drum rows.
+- This MIDI-on-drum shadow is only an alignment guide. It does not imply that a MIDI pitch maps to a specific kit sound, and it is not exported or persisted.
+
+### Canvas overlap prevention
+
+- Canvas clip placement now resolves through `_resolveClipStart(track, clip, desiredStartBar, durationBars)`.
+- New drops, touch drops, and clip drags refuse overlapping final positions.
+- When a dragged/dropped clip approaches another clip edge, the resolver snaps it to the nearest legal before/after edge. If no legal position exists, the clip is not added and the user sees `No room for that clip on this track`.
+- `Alt+drag` clip resize remains shrink-only, but it now caps against the next clip so trimming cannot create overlap.
+
+### Drum track selector parity
+
+- Drum Canvas tracks now render the same compact track instrument `<select>` shape as MIDI tracks.
+- The only built-in option today is `Drum Kit`, but this keeps the UI ready for custom kit-style instruments without changing the track header again.
+
+### History and milestone cleanup
+
+- Workspace import now replaces both snapshot stores even when a backup does not include milestones or versions. This intentionally clears stale local version history/milestones when restoring a workspace-only backup.
+- `ProjectStore` exposes `deleteVersion`, `clearVersions`, `deleteMilestone`, and `clearMilestones`.
+- Settings -> Save now has per-entry Delete buttons and Clear buttons for Version History and Milestones. All destructive actions use `confirm()` before deleting.
+- After snapshot deletes, `garbageCollectAudioAssets()` runs so audio assets that are only referenced by deleted snapshots can be cleaned up.
+
+### QA note wording
+
+The manual QA item about "decoded duration differs from stored snippet duration" means: record real Audio In, place it on Canvas, export/play it, and confirm the audible clip length matches the actual recording even if metadata says a slightly different tick duration. It is not asking the user to calculate the mismatch manually.
 
 ---
 

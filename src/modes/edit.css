@@ -499,6 +499,23 @@
   font-weight: var(--font-weight-semibold);
 }
 
+.edit-audio__name-input {
+  width: min(320px, 80vw);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--surface-4);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-primary);
+  font: inherit;
+  font-weight: var(--font-weight-semibold);
+  text-align: center;
+}
+
+.edit-audio__name-input:focus {
+  outline: 1px solid var(--accent);
+  border-color: var(--accent);
+}
+
 .edit-audio__body {
   display: flex;
   flex-direction: column;

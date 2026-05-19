@@ -104,6 +104,22 @@ Expected:
 - The exported WAV contains the recorded sound.
 - The clip does not become silent after export.
 
+### 2.4 Audio In Duration Sanity
+
+Steps:
+
+1. Record a short Audio In snippet with an obvious start and stop, such as one spoken sentence.
+2. Place it on an audio track in Canvas.
+3. Play the Canvas and export the Canvas WAV.
+4. Listen to the in-app playback and the exported WAV.
+
+Expected:
+
+- The audible recording length feels like the clip you recorded.
+- The start is not padded with surprise silence.
+- The export does not cut off the end or add a long empty tail.
+- You do not need to calculate decoded duration manually. This test is just checking that the browser's decoded audio and the stored snippet timing behave like the same clip.
+
 ## 3. Canvas Tracks And Clip Placement
 
 ### 3.1 Track Type Enforcement

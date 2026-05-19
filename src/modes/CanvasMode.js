@@ -254,6 +254,13 @@ export class CanvasMode {
     `;
   }
 
+  _drumInstrumentOptions(selectedId = 'kit') {
+    return Object.values(TRACK_INSTRUMENTS)
+      .filter(inst => inst.type === 'kit')
+      .map(inst => `<option value="${inst.id}" ${selectedId === inst.id ? 'selected' : ''}>${inst.name}</option>`)
+      .join('');
+  }
+
   _instrumentName(instrumentId) {
     if (instrumentId?.startsWith?.('custom:')) {
       return this._customPatchInstruments().find(instrument => instrument.id === instrumentId.slice(7))?.name || 'Custom instrument';
@@ -304,7 +311,7 @@ export class CanvasMode {
       this._normalizeTrackType(track);
       const trackTypeLabel = this._trackTypeLabel(track.type);
       const instOptions = track.type === 'midi' ? this._midiInstrumentOptions(track.instrumentId) : '';
-      const instSelect = track.type === 'drum' ? '<span class="canvas-lane__inst-label">Drum Kit</span>' : track.type !== 'midi'
+      const instSelect = track.type === 'drum' ? `<select class="canvas-lane__instrument" data-track-inst="${track.id}" aria-label="Drum kit">${this._drumInstrumentOptions(track.instrumentId)}</select>` : track.type !== 'midi'
         ? `<span class="canvas-lane__inst-label">🎤 Audio</span>`
         : `<select class="canvas-lane__instrument" data-track-inst="${track.id}" aria-label="Track instrument">${instOptions}</select>`;
 
@@ -568,6 +575,62 @@ export class CanvasMode {
       </svg>`;
   }
 
+  _trackForClip(clip) {
+    return this.project?.tracks?.find(track => (track.clips || []).some(c => c.id === clip?.id));
+  }
+
+  _clipEndBar(clip, startBar = clip?.startBar, durationBars = clip?.durationBars) {
+    return (startBar || 0) + Math.max(1 / this._beatsPerBar(), durationBars || 1);
+  }
+
+  _clipOverlapsAt(track, clip, startBar, durationBars = clip?.durationBars || 1) {
+    if (!track) return false;
+    const epsilon = 0.0001;
+    const endBar = this._clipEndBar(clip, startBar, durationBars);
+    return (track.clips || []).some(other => {
+      if (other.id === clip?.id) return false;
+      const otherStart = other.startBar || 0;
+      const otherEnd = this._clipEndBar(other);
+      return startBar < otherEnd - epsilon && endBar > otherStart + epsilon;
+    });
+  }
+
+  _resolveClipStart(track, clip, desiredStartBar, durationBars = clip?.durationBars || 1) {
+    const minStep = 1 / this._beatsPerBar();
+    const desired = Math.max(0, Math.round((desiredStartBar || 0) / minStep) * minStep);
+    const otherClips = (track?.clips || [])
+      .filter(other => other.id !== clip?.id)
+      .sort((a, b) => (a.startBar || 0) - (b.startBar || 0));
+    const snapDistance = Math.max(minStep, 18 / this.barWidth);
+    const candidates = [desired];
+
+    for (const other of otherClips) {
+      const before = Math.max(0, (other.startBar || 0) - durationBars);
+      const after = this._clipEndBar(other);
+      if (Math.abs(desired - before) <= snapDistance) candidates.unshift(before);
+      if (Math.abs(desired - after) <= snapDistance) candidates.unshift(after);
+      candidates.push(before, after);
+    }
+
+    let best = null;
+    for (const candidate of candidates) {
+      const start = Math.max(0, Math.round(candidate / minStep) * minStep);
+      if (this._clipOverlapsAt(track, clip, start, durationBars)) continue;
+      const distance = Math.abs(start - desired);
+      if (!best || distance < best.distance) best = { start, distance };
+    }
+
+    return best ? best.start : null;
+  }
+
+  _maxDurationForClip(track, clip) {
+    const start = clip.startBar || 0;
+    const next = (track?.clips || [])
+      .filter(other => other.id !== clip.id && (other.startBar || 0) >= start)
+      .sort((a, b) => (a.startBar || 0) - (b.startBar || 0))[0];
+    return next ? Math.max(1 / this._beatsPerBar(), (next.startBar || 0) - start) : Infinity;
+  }
+
   /** Set up drop zone for drag-and-drop from snippet dock */
   _setupDropZone(contentEl, track) {
     contentEl.addEventListener('dragover', (e) => {
@@ -597,16 +660,22 @@ export class CanvasMode {
       const rect = contentEl.getBoundingClientRect();
       const scrollLeft = contentEl.parentElement?.closest('.canvas-tracks')?.scrollLeft || 0;
       const offsetX = e.clientX - rect.left + scrollLeft;
-      const startBar = this._barPositionFromPixels(offsetX, 'floor');
       const durationBars = snippet.durationTicks / this.transport.ticksPerBar || 1;
+      const desiredStartBar = this._barPositionFromPixels(offsetX, 'floor');
 
       const clip = {
         id: crypto.randomUUID(),
         snippetId: snippet.id,
         snippet: snippet,
-        startBar,
+        startBar: desiredStartBar,
         durationBars,
       };
+      const startBar = this._resolveClipStart(track, clip, desiredStartBar, durationBars);
+      if (startBar === null) {
+        showToast('No room for that clip on this track');
+        return;
+      }
+      clip.startBar = startBar;
 
       // Add to track
       track.clips.push(clip);
@@ -670,13 +739,16 @@ export class CanvasMode {
     const startX = e.clientX;
     const startLeft = parseInt(el.style.left, 10) || 0;
     const originalBar = clip.startBar;
+    const track = this._trackForClip(clip);
 
     el.classList.add('is-dragging');
 
     const onMove = (me) => {
       const dx = me.clientX - startX;
       const newLeft = Math.max(0, startLeft + dx);
-      el.style.left = `${newLeft}px`;
+      const desiredBar = this._barPositionFromPixels(newLeft, 'round');
+      const resolvedBar = this._resolveClipStart(track, clip, desiredBar, clip.durationBars);
+      el.style.left = `${(resolvedBar ?? desiredBar) * this.barWidth}px`;
     };
 
     const onUp = () => {
@@ -684,7 +756,12 @@ export class CanvasMode {
       document.removeEventListener('pointermove', onMove);
       document.removeEventListener('pointerup', onUp);
 
-      const newBar = this._barPositionFromPixels(parseInt(el.style.left, 10), 'round');
+      const desiredBar = this._barPositionFromPixels(parseInt(el.style.left, 10), 'round');
+      const newBar = this._resolveClipStart(track, clip, desiredBar, clip.durationBars);
+      if (newBar === null) {
+        el.style.left = `${originalBar * this.barWidth}px`;
+        return;
+      }
       if (newBar !== originalBar) {
         clip.startBar = newBar;
         el.style.left = `${newBar * this.barWidth}px`;
@@ -710,12 +787,15 @@ export class CanvasMode {
     const startX = e.clientX;
     const startWidth = parseInt(el.style.width, 10) || clip.durationBars * this.barWidth;
     const originalBars = clip.durationBars;
+    const track = this._trackForClip(clip);
+    const maxBars = this._maxDurationForClip(track, clip);
 
     el.classList.add('is-dragging');
 
     const onMove = (me) => {
       const dx = me.clientX - startX;
-      const newWidth = Math.max(this.beatWidth, Math.min(startWidth, startWidth + dx));
+      const maxWidth = Number.isFinite(maxBars) ? maxBars * this.barWidth : startWidth;
+      const newWidth = Math.max(this.beatWidth, Math.min(startWidth, maxWidth, startWidth + dx));
       el.style.width = `${newWidth}px`;
     };
 
@@ -726,7 +806,7 @@ export class CanvasMode {
 
       const finalWidth = parseInt(el.style.width, 10);
       const newBeats = Math.max(1, Math.round(finalWidth / this.beatWidth));
-      const newBars = newBeats / this._beatsPerBar();
+      const newBars = Math.min(maxBars, newBeats / this._beatsPerBar());
       if (newBars !== originalBars) {
         clip.durationBars = newBars;
         el.style.width = `${newBars * this.barWidth}px`;
@@ -827,15 +907,22 @@ export class CanvasMode {
               const rect = lane.getBoundingClientRect();
               const scrollLeft = lane.parentElement?.closest('.canvas-tracks')?.scrollLeft || 0;
               const offsetX = t.clientX - rect.left + scrollLeft;
-              const startBar = this._barPositionFromPixels(offsetX, 'floor');
               const durationBars = snippet.durationTicks / this.transport.ticksPerBar || 1;
+              const desiredStartBar = this._barPositionFromPixels(offsetX, 'floor');
               const clip = {
                 id: crypto.randomUUID(),
                 snippetId: snippet.id,
                 snippet: snippet,
-                startBar,
+                startBar: desiredStartBar,
                 durationBars,
               };
+              const startBar = this._resolveClipStart(track, clip, desiredStartBar, durationBars);
+              if (startBar === null) {
+                showToast('No room for that clip on this track');
+                this._touchDrag = null;
+                return;
+              }
+              clip.startBar = startBar;
               track.clips.push(clip);
               this.store?.scheduleAutoSave(this.project);
               this._renderTracks();

@@ -100,8 +100,8 @@ Plus: **12 synth presets** (Chip Lead, Chip Bass, Cyber Secks, Heartbound, Trifo
 ### Three modes
 
 - **Create: playing and capturing.** 12 synth presets, 4 drum kits, scale-locked or chromatic, hold and arpeggio modes.
-- **Canvas: arranging.** Typed MIDI, drum, and audio tracks with drag-and-drop, per-track mute / solo, a cleaner toolbar for adding tracks and shaping selected clips, a one-click **Trim** to clean empty space, and an auto-calculated loop region. Recorded **pitch-bend**, **modulation**, and Tone badges ride on clips so you can see what has movement or effects.
-- **Inspect: refining.** Click-to-add piano roll. Switch between MIDI and drum clips from the toolbar, edit selected-note velocity with clearer note-level velocity meters, use vertical zoom, set the octave range (C1-C6), split the view, use **2x** / **1/2** snippet length buttons, snap an entire snippet with **Quantize all**, and turn on a one-clip **Shadow** view so you can line up a melody against another MIDI or drum idea without merging anything.
+- **Canvas: arranging.** Typed MIDI, drum, and audio tracks with drag-and-drop, per-track mute / solo, compact track instrument dropdowns, a cleaner toolbar for adding tracks and shaping selected clips, a one-click **Trim** to clean empty space, and an auto-calculated loop region. Clips will not stack on top of each other by accident. When you drag near another clip, they snap edge to edge instead of silently overlapping. Recorded **pitch-bend**, **modulation**, and Tone badges ride on clips so you can see what has movement or effects.
+- **Inspect: refining.** Click-to-add piano roll. Rename Audio In recordings from the audio preview, switch between MIDI and drum clips from the toolbar, edit selected-note velocity with clearer note-level velocity meters, use vertical zoom, set the octave range (C1-C6), split the view, use **2x** / **1/2** snippet length buttons, snap an entire snippet with **Quantize all**, and turn on a one-clip **Shadow** view so you can line up a melody against another MIDI or drum idea without merging anything. Drum clips can shadow MIDI too, as a rough timing guide.
 
 You never have to leave Create to make a song. The other modes are there when you want them.
 
@@ -111,8 +111,8 @@ Inspect also lets you make a blank MIDI or drum clip directly, so you do not hav
 
 - **Local-first.** IndexedDB storage. No accounts, no cloud sync, no telemetry.
 - **PWA.** Installable, works offline, lives on your home screen.
-- **Auto-save history is adjustable** - keep 5, 10, 25, or 50 versions and restore from history when you need to.
-- **Milestones and backups.** Save named checkpoints in the app, export a full workspace JSON backup, or export just your snippet library so browser storage is not the only copy. Backup files include the app version that created them. Older backups can move forward into newer Notenotes versions, but newer backups are blocked from importing into older builds.
+- **Auto-save history is adjustable** - keep 5, 10, 25, or 50 versions, restore from history when you need to, and delete individual entries or clear the list when it gets in your way.
+- **Milestones and backups.** Save named checkpoints in the app, load them later, delete the ones you no longer need, export a full workspace JSON backup, or export just your snippet library so browser storage is not the only copy. Backup files include the app version that created them. Older backups can move forward into newer Notenotes versions, but newer backups are blocked from importing into older builds.
 - **Customizable everywhere.** 2/4, 3/4, 4/4, and 5/4 time signatures for now. Custom beat colors for the background visualizer. Configurable pad, piano-key, and drum counts.
 - **Snippets are nameable** - and auto-named ones update themselves as you edit.
 - **Exports.** Sheet music as **SVG** or **ABC**, with a **percussion clef** for drum snippets. Export the whole Canvas or individual snippets as **MIDI** or **WAV**. WAV export renders Tone; MIDI export keeps the notes and timing but not the Notenotes-specific sound shaping. Empty or unavailable exports now fail clearly instead of handing you a misleading silent or tempo-only file. MP3 is still on the [roadmap](#future-vision).

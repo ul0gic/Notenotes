@@ -22,7 +22,7 @@ Prove that users can get their work out of Notenotes safely.
 
 Checklist:
 
-- Snippet WAV export for MIDI, drum, audio, and Tone.
+<!-- - Snippet WAV export for MIDI, drum, audio, and Tone.
 - Canvas WAV export with mixed MIDI, drum, and audio tracks.
 - Canvas WAV export with clips that start after bar 1.
 - Canvas WAV export in 2/4, 3/4, 4/4, and 5/4.
@@ -30,13 +30,13 @@ Checklist:
 - MIDI export with muted tracks.
 - MIDI export with soloed tracks.
 - MIDI export with empty Canvas or empty selected snippet.
-- MIDI export with mismatched clips if any older project can still produce them.
-- Real Audio In recording export after reload.
+- MIDI export with mismatched clips if any older project can still produce them. -->
+<!-- - Real Audio In recording export after reload. -->
 - Real Audio In recording whose decoded duration differs from stored snippet duration.
-- Workspace-only backup export/import.
+<!-- - Workspace-only backup export/import. -->
 - Workspace plus milestones export/import.
 - Full archive export/import.
-- Snippet backup export/import, including audio snippets.
+<!-- - Snippet backup export/import, including audio snippets. -->
 - Older backup import into current app.
 - Newer backup import rejection message.
 

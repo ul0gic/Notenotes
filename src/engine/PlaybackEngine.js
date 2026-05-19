@@ -250,8 +250,8 @@ export class PlaybackEngine {
         this._lastClipLocalTick.set(clipKey, localTick);
 
         // Play melodic notes
-        const synth = instDef.type === 'synth' ? this._getSynthForTrack(track) : null;
-        if (instDef.type === 'synth' && synth && snippet.notes) {
+        const synth = instDef?.type === 'synth' ? this._getSynthForTrack(track) : null;
+        if (instDef?.type === 'synth' && synth && snippet.notes) {
           for (const note of snippet.notes) {
             if (note.startTick === localTick) {
               synth.setSoundTraits(note.soundTraits || clip.soundTraits || snippet.soundTraits || this.project?.settings?.soundTraits);
@@ -264,7 +264,7 @@ export class PlaybackEngine {
         }
 
         // Play drum hits
-        if (instDef.type === 'kit' && snippet.hits && this._kit) {
+        if (instDef?.type === 'kit' && snippet.hits && this._kit) {
           for (const hit of snippet.hits) {
             if (hit.startTick === localTick) {
               this._kit.setSoundTraits(hit.soundTraits || clip.soundTraits || snippet.soundTraits || this.project?.settings?.soundTraits);
@@ -275,11 +275,11 @@ export class PlaybackEngine {
 
         // Play audio snippets
         if (snippet.type === 'audio' && this._hasAudioSource(snippet) && localTick === 0) {
-          this._playAudioClip(snippet);
+          this._playAudioClip(snippet, nextTickTime);
         }
 
         // Apply recorded modulation
-        if (snippet.modulation?.length && instDef.type === 'synth') {
+        if (snippet.modulation?.length && instDef?.type === 'synth') {
           this._applyModulation(snippet, synth, localTick, clipKey, nextTickTime);
         }
       }
@@ -355,7 +355,7 @@ export class PlaybackEngine {
     }
   }
 
-  async _playAudioClip(snippet) {
+  async _playAudioClip(snippet, audioTime = null) {
     const ctx = this._engine.ctx;
     if (!ctx || !this._hasAudioSource(snippet)) return;
 
@@ -380,7 +380,7 @@ export class PlaybackEngine {
       gain.gain.value = 0.7;
       source.connect(gain);
       gain.connect(this._engine.masterGain || ctx.destination);
-      source.start(ctx.currentTime);
+      source.start(audioTime ?? ctx.currentTime);
     } catch (err) {
       console.warn('[PlaybackEngine] Audio playback failed:', err);
     }

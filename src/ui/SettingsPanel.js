@@ -500,6 +500,7 @@ export class SettingsPanel {
           <div class="settings-row">
             <label class="settings-label"></label>
             <button class="btn btn--primary" id="milestone-save" style="font-size:0.75rem;min-height:30px;padding:2px 10px;">Save Milestone</button>
+            <button class="btn btn--ghost version-list__danger" id="milestone-clear" style="font-size:0.75rem;min-height:30px;padding:2px 10px;">Clear Milestones</button>
           </div>
           <div id="milestone-list" class="version-list">
             <div class="version-list__loading">Loading milestones...</div>
@@ -513,6 +514,7 @@ export class SettingsPanel {
             <select class="settings-select" id="version-history-limit" aria-label="Version history depth">
               ${VERSION_HISTORY_LIMITS.map(limit => `<option value="${limit}" ${historyLimit === limit ? 'selected' : ''}>${limit} versions</option>`).join('')}
             </select>
+            <button class="btn btn--ghost version-list__danger" id="version-history-clear" style="font-size:0.75rem;min-height:30px;padding:2px 10px;">Clear History</button>
           </div>
           <div id="version-list" class="version-list">
             <div class="version-list__loading">Loading versions...</div>
@@ -909,7 +911,10 @@ export class SettingsPanel {
               <span class="version-list__time">${timeStr}</span>
               <span class="version-list__meta">${v.bpm} BPM</span>
             </div>
-            <button class="btn btn--ghost version-list__restore" data-version-id="${v.versionId}">Restore</button>
+            <div class="version-list__actions">
+              <button class="btn btn--ghost version-list__restore" data-version-id="${v.versionId}">Restore</button>
+              <button class="btn btn--ghost version-list__delete" data-version-id="${v.versionId}">Delete</button>
+            </div>
           </div>
         `;
       }).join('');
@@ -926,6 +931,18 @@ export class SettingsPanel {
             // Force reload to apply
             setTimeout(() => window.location.reload(), 500);
           }
+        });
+      });
+
+      listEl.querySelectorAll('.version-list__delete').forEach(btn => {
+        btn.addEventListener('pointerdown', async (e) => {
+          e.preventDefault();
+          const vid = parseInt(btn.dataset.versionId, 10);
+          if (!Number.isFinite(vid) || !confirm('Delete this version history entry?')) return;
+          await this.store.deleteVersion(vid);
+          await this._loadVersionHistory();
+          await this._loadStorageStatus();
+          showToast('Version deleted');
         });
       });
     } catch (err) {
@@ -1168,6 +1185,16 @@ export class SettingsPanel {
       showToast(`Keeping up to ${limit} versions`);
     });
 
+    body.querySelector('#version-history-clear')?.addEventListener('pointerdown', async (e) => {
+      e.preventDefault();
+      if (!this.project || !this.store) return;
+      if (!confirm('Clear all version history for this workspace?')) return;
+      await this.store.clearVersions(this.project.id);
+      await this._loadVersionHistory();
+      await this._loadStorageStatus();
+      showToast('Version history cleared');
+    });
+
     body.querySelector('#backup-workspace-save')?.addEventListener('pointerdown', async (e) => {
       e.preventDefault();
       if (!this.project) return;
@@ -1264,6 +1291,16 @@ export class SettingsPanel {
       await this._loadMilestones();
       showToast('Milestone saved');
     });
+
+    body.querySelector('#milestone-clear')?.addEventListener('pointerdown', async (e) => {
+      e.preventDefault();
+      if (!this.project || !this.store) return;
+      if (!confirm('Clear all milestones for this workspace?')) return;
+      await this.store.clearMilestones(this.project.id);
+      await this._loadMilestones();
+      await this._loadStorageStatus();
+      showToast('Milestones cleared');
+    });
   }
 
   async _loadMilestones() {
@@ -1286,7 +1323,10 @@ export class SettingsPanel {
               <span class="version-list__time">${m.label}</span>
               <span class="version-list__meta">${date.toLocaleString()} - ${m.bpm} BPM</span>
             </div>
-            <button class="btn btn--ghost milestone-list__restore" data-milestone-id="${m.milestoneId}">Load</button>
+            <div class="version-list__actions">
+              <button class="btn btn--ghost milestone-list__restore" data-milestone-id="${m.milestoneId}">Load</button>
+              <button class="btn btn--ghost milestone-list__delete" data-milestone-id="${m.milestoneId}">Delete</button>
+            </div>
           </div>
         `;
       }).join('');
@@ -1301,6 +1341,18 @@ export class SettingsPanel {
             showToast('Milestone loaded. Reloading...');
             setTimeout(() => window.location.reload(), 500);
           }
+        });
+      });
+
+      listEl.querySelectorAll('.milestone-list__delete').forEach(btn => {
+        btn.addEventListener('pointerdown', async (e) => {
+          e.preventDefault();
+          const id = parseInt(btn.dataset.milestoneId, 10);
+          if (!Number.isFinite(id) || !confirm('Delete this milestone?')) return;
+          await this.store.deleteMilestone(id);
+          await this._loadMilestones();
+          await this._loadStorageStatus();
+          showToast('Milestone deleted');
         });
       });
     } catch (err) {

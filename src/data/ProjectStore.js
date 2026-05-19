@@ -496,12 +496,8 @@ export class ProjectStore {
     await this.migrateProjectAudioAssets(project);
     await this.save(project);
 
-    if (Array.isArray(archive.milestones)) {
-      await this._replaceSnapshots(STORE_MILESTONES, project.id, archive.milestones, 'milestoneId');
-    }
-    if (Array.isArray(archive.versions)) {
-      await this._replaceSnapshots(STORE_VERSIONS, project.id, archive.versions, 'versionId');
-    }
+    await this._replaceSnapshots(STORE_MILESTONES, project.id, Array.isArray(archive.milestones) ? archive.milestones : [], 'milestoneId');
+    await this._replaceSnapshots(STORE_VERSIONS, project.id, Array.isArray(archive.versions) ? archive.versions : [], 'versionId');
     await this.garbageCollectAudioAssets();
   }
 
@@ -531,6 +527,37 @@ export class ProjectStore {
       await tx.store.add(clean);
     }
     await tx.done;
+  }
+
+  async _clearSnapshots(storeName, projectId) {
+    const tx = this._db.transaction(storeName, 'readwrite');
+    const index = tx.store.index('projectId');
+    let cursor = await index.openCursor(projectId);
+    while (cursor) {
+      await cursor.delete();
+      cursor = await cursor.continue();
+    }
+    await tx.done;
+  }
+
+  async deleteVersion(versionId) {
+    await this._db.delete(STORE_VERSIONS, versionId);
+    await this.garbageCollectAudioAssets();
+  }
+
+  async clearVersions(projectId) {
+    await this._clearSnapshots(STORE_VERSIONS, projectId);
+    await this.garbageCollectAudioAssets();
+  }
+
+  async deleteMilestone(milestoneId) {
+    await this._db.delete(STORE_MILESTONES, milestoneId);
+    await this.garbageCollectAudioAssets();
+  }
+
+  async clearMilestones(projectId) {
+    await this._clearSnapshots(STORE_MILESTONES, projectId);
+    await this.garbageCollectAudioAssets();
   }
 
   /**

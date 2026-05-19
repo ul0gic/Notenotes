@@ -94,10 +94,11 @@ export class EditMode {
   _renderAudioPlayer() {
     const immediateSource = this._snippet.audioDataUrl || this._snippet.audioUrl || '';
     const unavailable = this._snippet.audioUnavailable || (!immediateSource && !this._snippet.audioAssetId);
+    const name = this._escapeAttr(this._snippet.name || 'Audio');
     this.el.innerHTML = `
       <div class="edit-audio">
         <div class="edit-audio__header">
-          <span class="edit-audio__title">🎤 ${this._snippet.name || 'Audio'}</span>
+          <input class="edit-audio__name-input" id="edit-audio-name" type="text" value="${name}" placeholder="Audio clip name" aria-label="Audio clip name" />
         </div>
         <div class="edit-audio__body">
           <audio class="edit-audio__player" controls src="${immediateSource}"></audio>
@@ -109,7 +110,34 @@ export class EditMode {
         </div>
       </div>
     `;
+    this._bindAudioPlayerEvents();
     this._resolveAudioPlayerSource();
+  }
+
+  _bindAudioPlayerEvents() {
+    const input = this.el.querySelector('#edit-audio-name');
+    if (!input) return;
+    const saveName = () => {
+      const name = input.value.trim() || 'Audio';
+      if (!this._snippet || this._snippet.name === name) return;
+      this._snippet.name = name;
+      this.store?.scheduleAutoSave(this.project);
+      this.onSnippetRenamed?.(this._snippet);
+      showToast('Audio clip renamed');
+    };
+    input.addEventListener('blur', saveName);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        input.blur();
+      }
+    });
+  }
+
+  _escapeAttr(value) {
+    return String(value ?? '').replace(/[&<>"']/g, c => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[c]));
   }
 
   async _resolveAudioPlayerSource() {
@@ -344,7 +372,7 @@ export class EditMode {
   _shadowCandidates(isDrum = this._snippet?.type === 'drum') {
     const snippets = (this.project?.snippets || []).filter(s => {
       if (!s || s.id === this._snippet?.id || s.type === 'audio') return false;
-      if (isDrum) return s.type === 'drum';
+      if (isDrum) return s.type === 'midi' || s.type === 'drum';
       return s.type === 'midi' || s.type === 'drum';
     });
     return snippets;
@@ -355,7 +383,6 @@ export class EditMode {
     if (this._shadowSnippetId === this._snippet?.id) return null;
     const shadow = this.project.snippets.find(s => s.id === this._shadowSnippetId);
     if (!shadow || shadow.type === 'audio') return null;
-    if (this._snippet?.type === 'drum' && shadow.type !== 'drum') return null;
     return shadow;
   }
 
@@ -549,10 +576,33 @@ export class EditMode {
 
     const notes = shadow.notes || [];
     notes.forEach((note) => {
-      if (note.pitch >= pitchMin && note.pitch < pitchMax) {
+      if (isDrumEditor) {
+        const el = this._createShadowMidiOnDrumElement(note, pitchMin, pitchMax);
+        if (el) grid.appendChild(el);
+      } else if (note.pitch >= pitchMin && note.pitch < pitchMax) {
         grid.appendChild(this._createShadowNoteElementForPane(note, pitchMax));
       }
     });
+  }
+
+  _createShadowMidiOnDrumElement(note, pitchMin, pitchMax) {
+    if (pitchMin !== 0 || pitchMax !== DRUM_TYPES.length) return null;
+    const normalized = Math.max(0, Math.min(1, ((note.pitch || 60) - 36) / 48));
+    const row = Math.max(0, Math.min(DRUM_TYPES.length - 1, Math.round(normalized * (DRUM_TYPES.length - 1))));
+    const pct = 100 / DRUM_TYPES.length;
+    const velocity = this._normalizedVelocity(note.velocity);
+    const velocityPct = this._velocityPercent(note.velocity);
+    const el = document.createElement('div');
+    el.className = 'piano-roll__shadow-note piano-roll__shadow-note--midi';
+    el.style.left = `${note.startTick * TICK_WIDTH}px`;
+    el.style.top = `${(DRUM_TYPES.length - 1 - row) * pct}%`;
+    el.style.height = `${pct - 0.5}%`;
+    el.style.width = `${Math.max(8, (note.durationTick || this._gridSize) * TICK_WIDTH)}px`;
+    el.style.setProperty('--note-velocity', velocity);
+    el.style.setProperty('--note-velocity-alpha', 0.22 + velocity * 0.5);
+    el.title = `Shadow ${midiToNoteName(note.pitch).display} - velocity ${velocityPct}%`;
+    el.innerHTML = `<div class="piano-roll__shadow-velocity"></div>`;
+    return el;
   }
 
   _createShadowNoteElementForPane(note, pitchMax) {
