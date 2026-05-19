@@ -101,7 +101,7 @@ Plus: **12 synth presets** (Chip Lead, Chip Bass, Cyber Secks, Heartbound, Trifo
 
 - **Create: playing and capturing.** 12 synth presets, 4 drum kits, scale-locked or chromatic, hold and arpeggio modes.
 - **Canvas: arranging.** Typed MIDI, drum, and audio tracks with drag-and-drop, per-track mute / solo, a cleaner toolbar for adding tracks and shaping selected clips, a one-click **Trim** to clean empty space, and an auto-calculated loop region. Recorded **pitch-bend**, **modulation**, and Tone badges ride on clips so you can see what has movement or effects.
-- **Inspect: refining.** Click-to-add piano roll. Vertical zoom, configurable octave range (C1–C6), **split view** for two-handed work, **2×** / **½** snippet length buttons, and a **Quantize all** button to snap an entire snippet to the grid.
+- **Inspect: refining.** Click-to-add piano roll. Vertical zoom, configurable octave range (C1-C6), **split view** for two-handed work, **2x** / **1/2** snippet length buttons, a **Quantize all** button to snap an entire snippet to the grid, and a one-clip **Shadow** view so you can line up a melody against another MIDI or drum idea without merging anything.
 
 You never have to leave Create to make a song. The other modes are there when you want them.
 

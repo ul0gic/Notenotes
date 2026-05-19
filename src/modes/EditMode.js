@@ -55,6 +55,7 @@ export class EditMode {
     this._splitMode = false;
 
     this._panes = [];
+    this._shadowSnippetId = '';
   }
 
   render() {
@@ -284,6 +285,10 @@ export class EditMode {
           <option value="120" ${this._gridSize === 120 ? 'selected' : ''}>1/16</option>
           <option value="960" ${this._gridSize === 960 ? 'selected' : ''}>1/2</option>
         </select>
+        <span class="edit-toolbar__label">Shadow</span>
+        <select class="edit-toolbar__select edit-toolbar__select--shadow" id="edit-shadow-select" aria-label="Shadow clip">
+          ${this._renderShadowOptions(isDrum)}
+        </select>
       </div>
       ${zoomHTML}
       ${rangeHTML}
@@ -294,6 +299,40 @@ export class EditMode {
         <button class="btn btn--ghost edit-toolbar__btn edit-toolbar__btn--danger" id="edit-delete-btn">Delete ${isDrum ? 'Hit' : 'Note'}</button>
       </div>
     `;
+  }
+
+  _renderShadowOptions(isDrum) {
+    const snippets = this._shadowCandidates(isDrum);
+    if (!snippets.length) {
+      return '<option value="">No clips</option>';
+    }
+
+    const currentSelection = snippets.some(s => s.id === this._shadowSnippetId) ? this._shadowSnippetId : '';
+    return '<option value="">Off</option>' + snippets.map(s => {
+      const count = (s.notes?.length || 0) + (s.hits?.length || 0);
+      const type = s.type === 'drum' ? 'Drum' : 'MIDI';
+      const label = s.name || `${type} clip`;
+      const selected = currentSelection === s.id ? 'selected' : '';
+      return `<option value="${s.id}" ${selected}>${type}: ${label} (${count})</option>`;
+    }).join('');
+  }
+
+  _shadowCandidates(isDrum = this._snippet?.type === 'drum') {
+    const snippets = (this.project?.snippets || []).filter(s => {
+      if (!s || s.id === this._snippet?.id || s.type === 'audio') return false;
+      if (isDrum) return s.type === 'drum';
+      return s.type === 'midi' || s.type === 'drum';
+    });
+    return snippets;
+  }
+
+  _selectedShadowSnippet() {
+    if (!this._shadowSnippetId || !this.project?.snippets) return null;
+    if (this._shadowSnippetId === this._snippet?.id) return null;
+    const shadow = this.project.snippets.find(s => s.id === this._shadowSnippetId);
+    if (!shadow || shadow.type === 'audio') return null;
+    if (this._snippet?.type === 'drum' && shadow.type !== 'drum') return null;
+    return shadow;
   }
 
   _renderRollPane(pitchMin, pitchMax, paneId) {
@@ -457,9 +496,78 @@ export class EditMode {
       grid.appendChild(line);
     }
 
+    this._renderShadowForPane(grid, pitchMin, pitchMax);
     this._renderNotesForPane(grid, pitchMin, pitchMax);
 
     return grid;
+  }
+
+  _renderShadowForPane(grid, pitchMin, pitchMax) {
+    const shadow = this._selectedShadowSnippet();
+    if (!shadow) return;
+
+    const isDrumEditor = this._snippet?.type === 'drum';
+    if (shadow.type === 'drum') {
+      const hits = shadow.hits || [];
+      hits.forEach((hit) => {
+        const el = this._createShadowHitElementForPane(hit, pitchMin, pitchMax, isDrumEditor);
+        if (el) grid.appendChild(el);
+      });
+      return;
+    }
+
+    const notes = shadow.notes || [];
+    notes.forEach((note) => {
+      if (note.pitch >= pitchMin && note.pitch < pitchMax) {
+        grid.appendChild(this._createShadowNoteElementForPane(note, pitchMax));
+      }
+    });
+  }
+
+  _createShadowNoteElementForPane(note, pitchMax) {
+    const x = note.startTick * TICK_WIDTH;
+    const w = Math.max(6, (note.durationTick || this._gridSize) * TICK_WIDTH);
+    const y = (pitchMax - 1 - note.pitch) * this._noteHeight;
+
+    const el = document.createElement('div');
+    el.className = 'piano-roll__shadow-note piano-roll__shadow-note--midi';
+    el.style.left = `${x}px`;
+    el.style.top = `${y}px`;
+    el.style.width = `${w}px`;
+    el.title = 'Shadow MIDI note';
+    return el;
+  }
+
+  _createShadowHitElementForPane(hit, pitchMin, pitchMax, isDrumEditor) {
+    const typeIdx = DRUM_TYPES.findIndex(d => d.id === hit.type);
+    if (typeIdx < 0) return null;
+
+    let y;
+    let h;
+    let width;
+    if (isDrumEditor) {
+      if (typeIdx < pitchMin || typeIdx >= pitchMax) return null;
+      const pct = 100 / DRUM_TYPES.length;
+      y = `${(DRUM_TYPES.length - 1 - typeIdx) * pct}%`;
+      h = `${pct - 0.5}%`;
+      width = '10px';
+    } else {
+      const pitchMap = { kick: 36, snare: 40, clap: 40, hihat: 44, cymbal: 46, tomlo: 43, tommid: 45, tomhi: 48, rim: 37, shaker: 44 };
+      const pitch = pitchMap[hit.type] || 38;
+      if (pitch < pitchMin || pitch >= pitchMax) return null;
+      y = `${(pitchMax - 1 - pitch) * this._noteHeight}px`;
+      h = `${this._noteHeight - 2}px`;
+      width = `${this._noteHeight - 2}px`;
+    }
+
+    const el = document.createElement('div');
+    el.className = 'piano-roll__shadow-note piano-roll__shadow-note--drum';
+    el.style.left = `${hit.startTick * TICK_WIDTH}px`;
+    el.style.top = y;
+    el.style.height = h;
+    el.style.width = width;
+    el.title = `Shadow ${hit.type}`;
+    return el;
   }
 
   _renderNotesForPane(grid, pitchMin, pitchMax) {
@@ -731,6 +839,11 @@ export class EditMode {
   _bindEvents(toolbar) {
     toolbar.querySelector('#edit-grid-select')?.addEventListener('change', (e) => {
       this._gridSize = parseInt(e.target.value, 10);
+      this._rebuildGrids();
+    });
+
+    toolbar.querySelector('#edit-shadow-select')?.addEventListener('change', (e) => {
+      this._shadowSnippetId = e.target.value || '';
       this._rebuildGrids();
     });
 

@@ -985,7 +985,7 @@ On import/migration, embedded `audioDataUrl` should always be converted into a f
 
 ## App Versioning
 
-Current App Version: `0.0.37`
+Current App Version: `0.0.38`
 
 The visible app version is displayed in Settings. Bump it for meaningful user-facing changes or architecture/storage changes, especially when AI.MD is updated for completed work.
 
@@ -1346,7 +1346,7 @@ The Canvas toolbar is an editing surface, not a marketing strip. Keep it compact
 
 ## Inspect Blank Clip Creation
 
-App version `0.0.35` adds a direct writing path for users who do not want to record live. App version `0.0.36` fixes Inspect click-to-place coordinate math. App version `0.0.37` cleans up the Inspect toolbar styling.
+App version `0.0.35` adds a direct writing path for users who do not want to record live. App version `0.0.36` fixes Inspect click-to-place coordinate math. App version `0.0.37` cleans up the Inspect toolbar styling. App version `0.0.38` adds a one-clip Shadow reference in Inspect.
 
 ### What changed
 
@@ -1359,6 +1359,9 @@ App version `0.0.35` adds a direct writing path for users who do not want to rec
 - Pointer coordinates are measured against `pane.gridEl.getBoundingClientRect()` without adding `gridContainer.scrollLeft/scrollTop`. The grid element's rect is already shifted by scroll, so adding scroll again caused notes to be placed down and to the right after scrolling.
 - Inspect toolbar controls now use `.edit-toolbar__btn`, `.edit-toolbar__btn--compact`, `.edit-toolbar__btn--tiny`, `.edit-toolbar__btn--danger`, `.edit-toolbar__name-input`, and `.edit-toolbar__range-separator` instead of inline per-button styles.
 - The toolbar now allows horizontal overflow, with taller touch targets under `640px`, matching the Canvas toolbar approach.
+- The Inspect toolbar's `Shadow` select is intentionally immediate-use UI state only. `EditMode._shadowSnippetId` is not persisted to the project, milestones, backups, or exports.
+- Shadow clips render as `.piano-roll__shadow-note` elements before editable notes, so they sit behind the active clip and never intercept pointer events. MIDI shadows are green translucent blocks. Drum shadows are red translucent hits.
+- MIDI Inspect can shadow MIDI or drum snippets. Drum hits are mapped onto approximate MIDI pitches for melody alignment. Drum Inspect only lists drum snippets because melody notes do not map cleanly to drum rows.
 
 ### Design intent
 
