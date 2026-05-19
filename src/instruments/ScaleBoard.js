@@ -4,6 +4,7 @@
  * Pad Mode dropdown options:
  *   - "single": each pad plays a single note from the scale.
  *   - "chords": each pad plays a triad rooted on its scale degree.
+ *     The Extensions toggle continues single/chord layouts up to degree 13.
  *   - "root": chromatic pads; each pad plays itself plus the selected root
  *             note in the octave nearest the pad note.
  *   - "voices": each pad sings a syllable from a typed phrase, at the pad's pitch.
@@ -36,6 +37,7 @@ export class ScaleBoard {
     this.rootNote = 'C';
     this.octave = 4;
     this.padMode = 'single'; // 'single', 'chords', 'root', 'voices', 'custom'
+    this.extensionsEnabled = false;
     this.isEditingLayout = false;
     this.customPadTypes = []; // 'single' or 'chord'
 
@@ -48,6 +50,7 @@ export class ScaleBoard {
     this._lastVoiceMidiByPad = new Map(); // padIndex -> last midi sung (for release)
     this.onVoicePhraseChanged = null;
     this.onPadModeChange = null;
+    this.onExtensionsChanged = null;
 
     this._notes = [];
     this._fullScaleNotes = [];
@@ -84,6 +87,7 @@ export class ScaleBoard {
 
   set project(p) {
     this._project = p;
+    this.extensionsEnabled = !!p?.settings?.scaleExtensionsEnabled;
     this._updateNotes();
     this._loadVoiceStateFromProject();
     if (this.el) {
@@ -152,7 +156,8 @@ export class ScaleBoard {
     } else {
       const scaleDef = SCALES[this.scaleName];
       const degreeCount = scaleDef ? scaleDef.intervals.length : 7;
-      this._notes = this._fullScaleNotes.slice(0, degreeCount);
+      const count = this._usesExtensions() ? 13 : degreeCount;
+      this._notes = this._fullScaleNotes.slice(0, Math.min(count, this._fullScaleNotes.length));
     }
 
     const noteCount = this._notes.length;
@@ -213,6 +218,13 @@ export class ScaleBoard {
           </button>
         </div>
         ` : ''}
+        ${this._canUseExtensions() ? `
+        <div class="scaleboard__control-group">
+          <button class="btn btn--sm ${this.extensionsEnabled ? 'btn--primary' : 'btn--ghost'} scaleboard__extensions-btn" id="sb-extensions" type="button" aria-pressed="${this.extensionsEnabled ? 'true' : 'false'}" title="Show scale degrees 1 through 13">
+            Extensions
+          </button>
+        </div>
+        ` : ''}
       </div>
       ${this._renderVoiceRow()}
       <div class="scaleboard__pads" id="sb-pads" style="grid-template-columns: ${this._gridColumns()}; gap: ${this._gridGap()};">
@@ -238,6 +250,14 @@ export class ScaleBoard {
     return this._notes.length > 9 ? '6px' : 'var(--space-md)';
   }
 
+  _canUseExtensions() {
+    return this.padMode === 'single' || this.padMode === 'chords';
+  }
+
+  _usesExtensions() {
+    return this.extensionsEnabled && this._canUseExtensions();
+  }
+
   _renderPads() {
     return this._notes.map((midi, i) => {
       const noteInfo = midiToNoteName(midi);
@@ -245,14 +265,15 @@ export class ScaleBoard {
       const rootMidi = isRootMode ? this._rootMidiNear(midi) : midi;
       const rootInfo = midiToNoteName(rootMidi);
       let isChord = this.padMode === 'chords' || (this.padMode === 'custom' && this.customPadTypes[i] === 'chord');
+      const degree = i + 1;
       let typeLabel = isRootMode ? `+ ${rootInfo.display}` : (isChord ? 'Chord' : 'Note');
       const isVoice = this.padMode === 'voices';
       const voiceLabel = isVoice ? this._previewSyllableForPad(i) : null;
       const voiceClass = isVoice ? ' scaleboard__pad--voice' : '';
       return `
         <button class="scaleboard__pad${voiceClass} ${this.isEditingLayout ? 'is-editing' : ''}" data-index="${i}" data-midi="${midi}"
-                aria-label="${isRootMode ? `${noteInfo.display} plus nearest ${this.rootNote}, ${rootInfo.display}` : `Scale degree ${i + 1}, ${noteInfo.display}`}${voiceLabel ? ', sings ' + voiceLabel : ''}">
-          <span class="scaleboard__pad-degree">${isRootMode ? noteInfo.name : i + 1}</span>
+                aria-label="${isRootMode ? `${noteInfo.display} plus nearest ${this.rootNote}, ${rootInfo.display}` : `Scale degree ${degree}, ${noteInfo.display}`}${voiceLabel ? ', sings ' + voiceLabel : ''}">
+          <span class="scaleboard__pad-degree">${isRootMode ? noteInfo.name : degree}</span>
           <span class="scaleboard__pad-note">${noteInfo.display}</span>
           ${(this.padMode === 'custom' || isRootMode) ? `<span class="scaleboard__pad-type">${typeLabel}</span>` : ''}
           ${isVoice && voiceLabel ? `<span class="scaleboard__pad-syllable">${this._escapeHtml(voiceLabel)}</span>` : ''}
@@ -416,6 +437,19 @@ export class ScaleBoard {
       // AI is hidden in Voices mode because the AI emits MIDI/drum events,
       // not vocal-phrase events.
       if (this.onPadModeChange) this.onPadModeChange(this.padMode);
+    });
+
+    this.el.querySelector('#sb-extensions')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      this.releaseAllPads();
+      this.extensionsEnabled = !this.extensionsEnabled;
+      if (this._project) {
+        if (!this._project.settings) this._project.settings = {};
+        this._project.settings.scaleExtensionsEnabled = this.extensionsEnabled;
+      }
+      this._refreshLayout();
+      showToast(this.extensionsEnabled ? 'Extensions: scale degrees 1-13' : 'Extensions off');
+      if (this.onExtensionsChanged) this.onExtensionsChanged(this.extensionsEnabled);
     });
 
     // Edit Layout toggle

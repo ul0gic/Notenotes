@@ -551,7 +551,7 @@ class App {
         <hr style="border:none;border-top:1px solid var(--surface-3);margin:var(--space-sm) 0;" />
         <h4 style="margin:var(--space-sm) 0;font-size:var(--font-size-sm);">Creative Mode</h4>
         <table style="width:100%;font-size:var(--font-size-sm);border-collapse:collapse;">
-          <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Scale: 1-9, 0</td><td style="padding:4px 8px;color:var(--text-secondary);">Hold visible scale pads</td></tr>
+          <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Scale: 1-9, 0, -, =, &#96;</td><td style="padding:4px 8px;color:var(--text-secondary);">Hold visible scale pads left to right</td></tr>
           <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Kit: 1-9, 0</td><td style="padding:4px 8px;color:var(--text-secondary);">Trigger visible drum pads</td></tr>
           <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Piano: \`- =</td><td style="padding:4px 8px;color:var(--text-secondary);">Hold visible piano keys left to right</td></tr>
           <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Up / Down</td><td style="padding:4px 8px;color:var(--text-secondary);">Shift octave on active Scale, Piano, or Ctrl screen</td></tr>

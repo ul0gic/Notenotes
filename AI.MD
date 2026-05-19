@@ -332,6 +332,10 @@ This also creates a version history snapshot. Max 5 versions kept per project.
 **Pad Count Logic**
 - `root` pad mode hides the Scale selector, shows the existing Root dropdown as `Root Note`, renders 12 chromatic pads for the current octave, and each pad plays a dyad: the pad note plus the selected root note in the octave nearest to that pad. Example: with root `C`, the `B4` pad plays `B4 + C5`, while the `D4` pad plays `D4 + C4`.
 - In `single`/`chords` pad modes, pad count equals the scale's interval count (`SCALES[name].intervals.length`): Major → 7, Pentatonic → 5, Blues → 6.
+- App version `0.1.3` adds an `Extensions` toggle for `single` and `chords` pad modes. When enabled, ScaleBoard continues the current scale up to degree 13 instead of stopping after the scale's first octave. This is not a modifier/chord-color system: pad 9 is a real higher scale-degree pad, not a hold/toggle that changes another pad.
+- In Chords mode with Extensions enabled, extended pads are chord roots in the continued scale. Example in C major: pad 2 plays a D chord; pad 9 plays a D chord one octave higher. This keeps mouse/touch use direct and avoids hidden "current chord" state.
+- The persisted setting is `project.settings.scaleExtensionsEnabled`. `CreativeMode` schedules autosave through `scaleBoard.onExtensionsChanged`.
+- Keyboard mapping for Scale pads now supports up to 13 visible pads with `1-9`, `0`, `-`, `=`, and `` ` `` left-to-right. The mapping still ignores pads that are not currently visible.
 - In `custom` pad mode, pad count comes from Settings → `scalePadsCount` slider (1–16).
 - Changing scale or root recalculates pad count accordingly. `customPadTypes` array is trimmed to match current pad count.
 
@@ -985,7 +989,7 @@ On import/migration, embedded `audioDataUrl` should always be converted into a f
 
 ## App Versioning
 
-Current App Version: `0.1.2`
+Current App Version: `0.1.3`
 
 The visible app version is displayed in Settings. Bump it for meaningful user-facing changes or architecture/storage changes, especially when AI.MD is updated for completed work.
 

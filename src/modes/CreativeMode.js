@@ -31,7 +31,7 @@ const INSTRUMENTS = {
   CONTROLLER: 'controller',
 };
 
-const SCALE_KEYS = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9', 'Digit0'];
+const SCALE_KEYS = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9', 'Digit0', 'Minus', 'Equal', 'Backquote'];
 const PIANO_KEYS = ['Backquote', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9', 'Digit0', 'Minus', 'Equal'];
 const KIT_KEYS = SCALE_KEYS;
 
@@ -61,6 +61,7 @@ export class CreativeMode {
     // Instruments
     this.scaleBoard = new ScaleBoard(this.synth, this.project, this.voiceEngine);
     this.scaleBoard.onVoicePhraseChanged = () => this.store?.scheduleAutoSave(this.project);
+    this.scaleBoard.onExtensionsChanged = () => this.store?.scheduleAutoSave(this.project);
     // When Scale Board switches into/out of Voice Sketch mode, refresh any
     // open AI Seed popover. AI can't generate voice phrases, so the panel
     // disables itself with "Unavailable in Voice Sketch mode" instead of
