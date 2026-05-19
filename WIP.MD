@@ -58,6 +58,9 @@ Checklist:
 
 - Save, apply, overwrite, and delete Tone presets from synth Tone.
 - Save, apply, overwrite, and delete Tone presets from Kit Tone.
+- Reset synth Tone and Kit Tone back to zero.
+- Rename a Tone preset by selecting it, editing the name field, and saving.
+- Save an existing Tone preset as a separate new preset.
 - Confirm preset deletion asks before deleting.
 - Apply Tone preset to a selected MIDI clip.
 - Apply Tone preset to a selected drum clip.
@@ -66,8 +69,7 @@ Checklist:
 
 Later polish:
 
-- Rename Tone preset.
-- Apply Tone preset directly to a snippet from the snippet library.
+- Apply Tone preset directly to an editable snippet from Inspect. Do not describe this as "from the snippet library" unless the tray gains a real editing action.
 
 ## 3. Manual QA: Controller Trigger Polish
 
@@ -279,6 +281,45 @@ Storage and backup requirements:
 Expected scope:
 
 Medium. Basic playable sample patch is not hard; durable persistence, backup/restore, and WAV export make it a real feature.
+
+## 10. Instrument Selection UX
+
+Goal:
+
+As built-in presets, custom sample patches, kits, and future voice instruments grow, users should not have to scroll through a long native dropdown and guess what each sound is.
+
+Recommendation:
+
+Build one reusable searchable instrument picker, then use it from Create, Kit, and Canvas.
+
+Keep native selects for now as quick compact controls, but add a `Browse...` action when the list starts feeling crowded.
+
+Picker shape:
+
+- Opens as a popover or modal from the current patch/kit/track instrument control.
+- Search field at the top.
+- Category tabs or sections: Chip, Modern, Samples, Kits, Voices, Custom.
+- Rows show name, family/type badge, and a tiny description where useful.
+- Built-in instruments are read-only.
+- Custom instruments expose Edit and Delete actions from the same row.
+- Recently used instruments should float near the top once the list gets large.
+- The same picker should support three contexts:
+  - Create patch selection.
+  - Kit selection.
+  - Canvas track instrument selection.
+
+Behavior rules:
+
+- In Create, selecting a patch changes the live instrument immediately.
+- In Canvas, selecting an instrument changes the track sound and invalidates the cached playback synth for that track.
+- A MIDI track should only show MIDI-capable instruments.
+- A drum track should only show kit-capable instruments.
+- Audio tracks should not show the picker.
+- If a snippet has `patchRecorded`, that remains a standalone snippet-export fallback; Canvas track selection still overrides it.
+
+Expected scope:
+
+Small for a planning/prototype pass, medium for a polished picker shared across Create and Canvas.
 
 ## Release Deploy Strategy
 
