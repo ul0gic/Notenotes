@@ -134,6 +134,50 @@
   gap: var(--space-xs);
 }
 
+.create-control-popover {
+  width: min(300px, calc(100vw - 32px));
+}
+
+.create-control-popover__row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: var(--space-sm);
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  padding: var(--space-xs) 0;
+}
+
+.create-control-popover__row--slider {
+  grid-template-columns: auto 34px minmax(120px, 1fr);
+}
+
+.create-control-popover__row .tone-row__slider {
+  width: 100%;
+}
+
+.create-control-popover__value {
+  color: var(--accent-light);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  justify-self: end;
+}
+
+.create-control-popover__select {
+  min-width: 80px;
+  height: 30px;
+  border: 1px solid var(--surface-4);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-primary);
+}
+
+.create-control-popover__hint {
+  margin: var(--space-xs) 0 0;
+  color: var(--text-tertiary);
+  font-size: var(--font-size-xs);
+}
+
 .tone-preset {
   display: flex;
   flex-direction: column;

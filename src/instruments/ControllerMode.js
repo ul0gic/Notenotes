@@ -28,6 +28,7 @@ export class ControllerMode {
     this._activeChords = new Map();
     this._onNoteOn = null;
     this._onNoteOff = null;
+    this._onBeforeNoteOn = null;
     this.onToneAssignmentChanged = null;
     this.onToneOverrideChanged = null;
 
@@ -61,6 +62,10 @@ export class ControllerMode {
   setNoteCallbacks(onNoteOn, onNoteOff) {
     this._onNoteOn = onNoteOn;
     this._onNoteOff = onNoteOff;
+  }
+
+  setBeforeNoteCallback(fn) {
+    this._onBeforeNoteOn = fn;
   }
 
   _updateNotes() {
@@ -516,6 +521,7 @@ export class ControllerMode {
       const chordMidis = [...new Set([...this._getChordMidis(deg), ...this._getModifiedMidis(deg)])];
       this._activeChords.set(deg, chordMidis);
       chordMidis.forEach(m => {
+        if (this._onBeforeNoteOn) this._onBeforeNoteOn();
         this.synth.noteOn(m);
         if (this._onNoteOn) this._onNoteOn(m, 0.8);
       });
@@ -527,6 +533,7 @@ export class ControllerMode {
       if (midis.some(m => this._activeMidis.has(m))) return;
       midis.forEach(m => {
         this._activeMidis.set(m, true);
+        if (this._onBeforeNoteOn) this._onBeforeNoteOn();
         this.synth.noteOn(m, 0.8);
         if (this._onNoteOn) this._onNoteOn(m, 0.8);
       });

@@ -21,9 +21,11 @@ export class TransportBar {
     this.onKeysClick = null;
     this.onModResetClick = null;
     this.onPanicClick = null;
+    this.onArmRecordClick = null;
     this.onMoreOpen = null;
     this._lastMoreToggle = 0;
     this._lastStopPress = 0;
+    this._recordArmed = false;
   }
 
   /**
@@ -48,6 +50,7 @@ export class TransportBar {
         <button class="btn btn--icon btn--record" id="btn-record" title="Record" aria-label="Record">
           <svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="currentColor"/></svg>
         </button>
+        <button class="btn btn--ghost btn--arm-record" id="btn-arm-record" type="button" title="Arm recording. Recording starts on the first note or drum hit." aria-label="Arm recording">Arm</button>
       </div>
 
       <div class="beat-indicator" id="beat-indicator">
@@ -115,6 +118,7 @@ export class TransportBar {
       const now = Date.now();
       const isDoubleStop = now - this._lastStopPress < 650;
       this._lastStopPress = now;
+      if (this._recordArmed && this.onArmRecordClick) this.onArmRecordClick(false);
       this.transport.stop();
       if (isDoubleStop && this.onPanicClick) this.onPanicClick();
     });
@@ -122,11 +126,17 @@ export class TransportBar {
     // Record
     this.el.querySelector('#btn-record').addEventListener('pointerdown', (e) => {
       e.preventDefault();
+      this.setRecordArmed(false);
       if (this.transport.state === TransportState.RECORDING) {
         this.transport.pause();
       } else {
         this.transport.record();
       }
+    });
+
+    this.el.querySelector('#btn-arm-record')?.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      if (this.onArmRecordClick) this.onArmRecordClick(!this._recordArmed);
     });
 
     // BPM input
@@ -237,6 +247,17 @@ export class TransportBar {
     if (m) m.textContent = `${mod}%`;
   }
 
+  setRecordArmed(armed) {
+    this._recordArmed = !!armed;
+    const btn = this.el?.querySelector('#btn-arm-record');
+    if (!btn) return;
+    btn.classList.toggle('is-armed', this._recordArmed);
+    btn.setAttribute('aria-pressed', String(this._recordArmed));
+    btn.title = this._recordArmed
+      ? 'Armed. Recording starts on the first note or drum hit.'
+      : 'Arm recording. Recording starts on the first note or drum hit.';
+  }
+
   syncFromTransport() {
     const bpmInput = this.el?.querySelector('#bpm-input');
     if (bpmInput) bpmInput.value = this.transport.bpm;
@@ -276,6 +297,7 @@ export class TransportBar {
   _updateRecordButton(state) {
     const btn = this.el.querySelector('#btn-record');
     btn.classList.toggle('is-active', state === TransportState.RECORDING);
+    if (state === TransportState.RECORDING) this.setRecordArmed(false);
   }
 
   _updateBeatIndicator(beat) {

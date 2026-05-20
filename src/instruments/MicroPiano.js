@@ -13,6 +13,7 @@ export class MicroPiano {
 
     this._onNoteOn = null;
     this._onNoteOff = null;
+    this._onBeforeNoteOn = null;
 
     window.addEventListener('settings-piano-changed', () => {
       if (this.el) this._refreshAll();
@@ -54,6 +55,10 @@ export class MicroPiano {
   setNoteCallbacks(onNoteOn, onNoteOff) {
     this._onNoteOn = onNoteOn;
     this._onNoteOff = onNoteOff;
+  }
+
+  setBeforeNoteCallback(fn) {
+    this._onBeforeNoteOn = fn;
   }
 
   render() {
@@ -208,6 +213,7 @@ export class MicroPiano {
     const key = this.el?.querySelector(`.micropiano__key[data-midi="${midi}"]`);
     if (!key) return;
 
+    if (this._onBeforeNoteOn) this._onBeforeNoteOn();
     this.synth.noteOn(midi);
     key.classList.add('is-active');
     this._activeKeys.add(midi);

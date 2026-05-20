@@ -62,6 +62,7 @@ export class ScaleBoard {
     // Callbacks for note recording
     this._onNoteOn = null;
     this._onNoteOff = null;
+    this._onBeforeNoteOn = null;
 
     this._onResize = () => {
       if (this.el) {
@@ -142,6 +143,10 @@ export class ScaleBoard {
   setNoteCallbacks(onNoteOn, onNoteOff) {
     this._onNoteOn = onNoteOn;
     this._onNoteOff = onNoteOff;
+  }
+
+  setBeforeNoteCallback(fn) {
+    this._onBeforeNoteOn = fn;
   }
 
   /** Recalculate scale notes */
@@ -647,6 +652,7 @@ export class ScaleBoard {
       this._phrasePointer = (ptr + 1) % this._playableSyllables.length;
     }
     if (syllable) {
+      if (this._onBeforeNoteOn) this._onBeforeNoteOn();
       this.voiceEngine.singSyllable(syllable, midi, 0.85);
       this._lastVoiceMidiByPad.set(index, midi);
       // Preserve voice intent for recorded snippets; playback/export routing is
@@ -695,6 +701,7 @@ export class ScaleBoard {
   }
 
   _noteOn(midi) {
+    if (this._onBeforeNoteOn) this._onBeforeNoteOn();
     this.synth.noteOn(midi);
     this._activePads.add(midi);
     if (this._onNoteOn) this._onNoteOn(midi, 0.8);

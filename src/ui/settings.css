@@ -156,7 +156,7 @@
 }
 
 .settings-row--version {
-  align-items: flex-start;
+  align-items: center;
 }
 
 .settings-version {
@@ -165,6 +165,7 @@
   justify-content: flex-end;
   flex-wrap: wrap;
   gap: var(--space-xs);
+  min-height: 32px;
 }
 
 .settings-version__status {

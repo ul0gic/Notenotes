@@ -138,7 +138,6 @@ class App {
     this.settingsPanel = new SettingsPanel({
       transport: this.transport,
       metronome: this.metronome,
-      quantizer: this.quantizer,
       store: this.store,
       project: this.project,
     });
@@ -172,6 +171,13 @@ class App {
       this.creativeMode?.panic?.();
       this.playbackEngine?.panic?.();
       showToast('Audio stopped');
+    };
+
+    this.transportBar.onArmRecordClick = (armed) => {
+      this.creativeMode?.setRecordArmed?.(armed);
+    };
+    this.creativeMode.onRecordArmChanged = (armed) => {
+      this.transportBar.setRecordArmed(armed);
     };
 
     window.addEventListener('project-time-signature-changed', () => {
@@ -400,7 +406,8 @@ class App {
         this.transport.bpm = this.project.bpm;
         this.transport.timeSignature = this.project.timeSignature || { beats: 4, subdivision: 4 };
         this.project.timeSignature = this.transport.timeSignature;
-        this.quantizer.setGrid(this.project.settings.quantize || 0);
+        this.quantizer.setGrid(0);
+        if (this.project.settings) this.project.settings.quantize = 0;
         this.metronome.enabled = this.project.settings.metronomeOn || false;
         this.transportBar.syncFromTransport();
         console.log('[App] Loaded project:', this.project.name);

@@ -67,7 +67,10 @@ export class CreativeMode {
     // disables itself with "Unavailable in Voice Sketch mode" instead of
     // hiding the button entirely (the user might want to see the AI button
     // is there, just not usable right now).
-    this.scaleBoard.onPadModeChange = () => this._aiSeedPanelInstance?.refresh();
+    this.scaleBoard.onPadModeChange = () => {
+      this._aiSeedPanelInstance?.refresh();
+      this._syncCreateToolbarButtons();
+    };
     this.microPiano = new MicroPiano(this.synth, this.project);
     this.sketchKit = new SketchKit(this.project);
     this.sketchKit.onSoundTraitsChanged = (traits) => this._applyProjectSoundTraits(traits);
@@ -118,6 +121,12 @@ export class CreativeMode {
     this._toneClickOutsideHandler = null;
     this._instrumentPopover = null;
     this._instrumentClickOutsideHandler = null;
+    this._padsPopover = null;
+    this._padsClickOutsideHandler = null;
+    this._keysPopover = null;
+    this._keysClickOutsideHandler = null;
+    this._recordArmed = false;
+    this.onRecordArmChanged = null;
     this._activePatchId = 'chip_lead';
     this._currentToneTraits = this._currentToneTraits || null;
   }
@@ -178,6 +187,11 @@ export class CreativeMode {
     this.scaleBoard.setNoteCallbacks(noteOn, noteOff);
     this.microPiano.setNoteCallbacks(noteOn, noteOff);
     this.controllerMode.setNoteCallbacks(noteOn, noteOff);
+    const startArmedRecording = () => this._beginArmedRecordingIfNeeded();
+    this.scaleBoard.setBeforeNoteCallback(startArmedRecording);
+    this.microPiano.setBeforeNoteCallback(startArmedRecording);
+    this.controllerMode.setBeforeNoteCallback(startArmedRecording);
+    this.sketchKit.setBeforeHitCallback(startArmedRecording);
     this.sketchKit.setHitCallback((drumName) => this.recordingManager.drumHit(drumName));
 
     // When snippets are created
@@ -198,6 +212,7 @@ export class CreativeMode {
     // Arm recording when transport enters recording state
     this.transport.onStateChange((state) => {
       this.recordingManager.setArmed(state === TransportState.RECORDING);
+      if (state === TransportState.RECORDING) this.setRecordArmed(false, { silent: true });
       if (state === TransportState.RECORDING && this.activeInstrument === INSTRUMENTS.MIC) {
         this.micRecorder._startRecording();
       }
@@ -363,6 +378,8 @@ export class CreativeMode {
       <button class="tone-button" id="delete-instrument-button" type="button">Delete</button>
       <button class="tone-button" id="tone-button" type="button" aria-expanded="false" aria-controls="tone-popover">Tone</button>
       <button class="tone-button ai-seed-button" id="ai-seed-button" type="button" aria-expanded="false" aria-controls="ai-seed-popover" title="Seed a snippet with AI">AI</button>
+      <button class="tone-button" id="pads-button" type="button" aria-expanded="false" aria-controls="pads-popover">Pads</button>
+      <button class="tone-button" id="keys-button" type="button" aria-expanded="false" aria-controls="keys-popover">Keys</button>
       <span class="tone-trigger-indicator" id="tone-trigger-indicator" aria-live="polite"></span>
     `;
     patchSel.querySelector('#patch-select').addEventListener('change', async (e) => {
@@ -384,6 +401,14 @@ export class CreativeMode {
     patchSel.querySelector('#ai-seed-button').addEventListener('click', (e) => {
       e.preventDefault();
       this._toggleAISeedPopover(patchSel, patchSel.querySelector('#ai-seed-button'));
+    });
+    patchSel.querySelector('#pads-button').addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      this._togglePadsPopover(patchSel, patchSel.querySelector('#pads-button'));
+    });
+    patchSel.querySelector('#keys-button').addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      this._toggleKeysPopover(patchSel, patchSel.querySelector('#keys-button'));
     });
     this.el.appendChild(patchSel);
     this._syncInstrumentButtons();
@@ -413,8 +438,8 @@ export class CreativeMode {
     // Snippet tray (bottom)
     this.el.appendChild(this.snippetTray.render());
 
-    // Sync AI Seed button visibility now that everything is mounted.
-    this._syncAISeedButtonVisibility();
+    // Sync context-specific toolbar buttons once the instruments exist.
+    this._syncCreateToolbarButtons();
     this._bindKeyboardPerformance();
 
     return this.el;
@@ -1066,14 +1091,18 @@ export class CreativeMode {
     const patchSel = this.el.querySelector('#patch-selector');
     const isSynth = id === INSTRUMENTS.SCALEBOARD || id === INSTRUMENTS.PIANO || id === INSTRUMENTS.CONTROLLER;
     patchSel.style.display = isSynth ? 'flex' : 'none';
-    if (!isSynth) this._closeTonePopover();
+    if (!isSynth) {
+      this._closeTonePopover();
+      this._closePadsPopover();
+      this._closeKeysPopover();
+    }
 
     // AI Seed: visible only on Scale Board / Piano / Sketch Kit. Close the
     // popover when leaving a supported instrument so it doesn't linger over
     // a context the AI can't write for. If the popover is open and the new
     // instrument is supported, refresh it so the suggestion chips and the
     // active-instrument label update.
-    this._syncAISeedButtonVisibility();
+    this._syncCreateToolbarButtons();
     if (!this._aiCanGenerateForInstrument(id)) {
       this._closeAISeedPopover();
     } else {
@@ -1108,6 +1137,40 @@ export class CreativeMode {
     const showInPatchSelector =
       id === INSTRUMENTS.SCALEBOARD || id === INSTRUMENTS.PIANO;
     btn.style.display = showInPatchSelector ? '' : 'none';
+  }
+
+  _syncCreateToolbarButtons() {
+    this._syncAISeedButtonVisibility();
+    const padsBtn = this.el?.querySelector('#pads-button');
+    const keysBtn = this.el?.querySelector('#keys-button');
+    if (padsBtn) {
+      const showPads = this.activeInstrument === INSTRUMENTS.SCALEBOARD
+        && this.scaleBoard?.padMode === 'custom';
+      padsBtn.style.display = showPads ? '' : 'none';
+      if (!showPads) this._closePadsPopover();
+    }
+    if (keysBtn) {
+      const showKeys = this.activeInstrument === INSTRUMENTS.PIANO;
+      keysBtn.style.display = showKeys ? '' : 'none';
+      if (!showKeys) this._closeKeysPopover();
+    }
+  }
+
+  setRecordArmed(armed, options = {}) {
+    const next = !!armed;
+    if (next && this.transport.state === TransportState.RECORDING) return;
+    this._recordArmed = next;
+    if (!options.silent) {
+      showToast(next ? 'Recording armed. Play a note or drum hit to start.' : 'Recording arm off');
+    }
+    if (this.onRecordArmChanged) this.onRecordArmChanged(this._recordArmed);
+  }
+
+  _beginArmedRecordingIfNeeded() {
+    if (!this._recordArmed || this.transport.state === TransportState.RECORDING) return;
+    this._recordArmed = false;
+    if (this.onRecordArmChanged) this.onRecordArmChanged(false);
+    this.transport.record();
   }
 
   /**
@@ -1334,6 +1397,114 @@ export class CreativeMode {
     this._bindTonePresetControls();
   }
 
+  _togglePadsPopover(anchor, buttonEl) {
+    if (this._padsPopover) {
+      this._closePadsPopover();
+      return;
+    }
+    this._closeTonePopover();
+    this._closeKeysPopover();
+
+    const count = this.project?.settings?.scalePadsCount || 7;
+    const popover = document.createElement('div');
+    popover.className = 'tone-popover create-control-popover';
+    popover.id = 'pads-popover';
+    popover.innerHTML = `
+      <div class="tone-popover__header">
+        <span>Pads</span>
+      </div>
+      <label class="create-control-popover__row create-control-popover__row--slider">
+        <span>Custom pad count</span>
+        <span class="create-control-popover__value" id="pads-count-value">${count}</span>
+        <input class="tone-row__slider" id="pads-count-slider" type="range" min="1" max="16" value="${count}" aria-label="Custom pad count">
+      </label>
+      <p class="create-control-popover__hint">Used by Scale Board Custom mode.</p>
+    `;
+
+    anchor.appendChild(popover);
+    buttonEl?.setAttribute('aria-expanded', 'true');
+    this._padsPopover = popover;
+
+    const slider = popover.querySelector('#pads-count-slider');
+    slider?.addEventListener('input', (e) => {
+      const value = Math.max(1, Math.min(16, parseInt(e.target.value, 10) || 7));
+      this.project.settings ||= {};
+      this.project.settings.scalePadsCount = value;
+      popover.querySelector('#pads-count-value')?.replaceChildren(String(value));
+      this.store?.scheduleAutoSave(this.project);
+      window.dispatchEvent(new CustomEvent('settings-pads-changed', { detail: { count: value } }));
+    });
+
+    const handleOutside = (e) => {
+      if (!this._padsPopover) return;
+      if (this._padsPopover.contains(e.target)) return;
+      if (buttonEl?.contains(e.target)) return;
+      this._closePadsPopover();
+    };
+    queueMicrotask(() => document.addEventListener('pointerdown', handleOutside, true));
+    this._padsClickOutsideHandler = handleOutside;
+  }
+
+  _toggleKeysPopover(anchor, buttonEl) {
+    if (this._keysPopover) {
+      this._closeKeysPopover();
+      return;
+    }
+    this._closeTonePopover();
+    this._closePadsPopover();
+
+    const count = this.project?.settings?.pianoCount || 1;
+    const keys = this.project?.settings?.pianoKeys || 12;
+    const popover = document.createElement('div');
+    popover.className = 'tone-popover create-control-popover';
+    popover.id = 'keys-popover';
+    popover.innerHTML = `
+      <div class="tone-popover__header">
+        <span>Keys</span>
+      </div>
+      <label class="create-control-popover__row">
+        <span>Pianos</span>
+        <select class="create-control-popover__select" id="keys-piano-count" aria-label="Number of pianos">
+          <option value="1" ${count === 1 ? 'selected' : ''}>1</option>
+          <option value="2" ${count === 2 ? 'selected' : ''}>2</option>
+        </select>
+      </label>
+      <label class="create-control-popover__row create-control-popover__row--slider">
+        <span>Keys</span>
+        <span class="create-control-popover__value" id="keys-count-value">${keys}</span>
+        <input class="tone-row__slider" id="keys-count-slider" type="range" min="10" max="32" value="${keys}" aria-label="Piano key count">
+      </label>
+    `;
+
+    anchor.appendChild(popover);
+    buttonEl?.setAttribute('aria-expanded', 'true');
+    this._keysPopover = popover;
+
+    popover.querySelector('#keys-piano-count')?.addEventListener('change', (e) => {
+      this.project.settings ||= {};
+      this.project.settings.pianoCount = parseInt(e.target.value, 10) || 1;
+      this.store?.scheduleAutoSave(this.project);
+      window.dispatchEvent(new CustomEvent('settings-piano-changed'));
+    });
+    popover.querySelector('#keys-count-slider')?.addEventListener('input', (e) => {
+      const value = Math.max(10, Math.min(32, parseInt(e.target.value, 10) || 12));
+      this.project.settings ||= {};
+      this.project.settings.pianoKeys = value;
+      popover.querySelector('#keys-count-value')?.replaceChildren(String(value));
+      this.store?.scheduleAutoSave(this.project);
+      window.dispatchEvent(new CustomEvent('settings-piano-changed'));
+    });
+
+    const handleOutside = (e) => {
+      if (!this._keysPopover) return;
+      if (this._keysPopover.contains(e.target)) return;
+      if (buttonEl?.contains(e.target)) return;
+      this._closeKeysPopover();
+    };
+    queueMicrotask(() => document.addEventListener('pointerdown', handleOutside, true));
+    this._keysClickOutsideHandler = handleOutside;
+  }
+
   _bindTonePresetControls() {
     const popover = this._tonePopover;
     if (!popover) return;
@@ -1493,5 +1664,25 @@ export class CreativeMode {
     this._tonePopover?.remove();
     this._tonePopover = null;
     this.el?.querySelector('#tone-button')?.setAttribute('aria-expanded', 'false');
+  }
+
+  _closePadsPopover() {
+    if (this._padsClickOutsideHandler) {
+      document.removeEventListener('pointerdown', this._padsClickOutsideHandler, true);
+      this._padsClickOutsideHandler = null;
+    }
+    this._padsPopover?.remove();
+    this._padsPopover = null;
+    this.el?.querySelector('#pads-button')?.setAttribute('aria-expanded', 'false');
+  }
+
+  _closeKeysPopover() {
+    if (this._keysClickOutsideHandler) {
+      document.removeEventListener('pointerdown', this._keysClickOutsideHandler, true);
+      this._keysClickOutsideHandler = null;
+    }
+    this._keysPopover?.remove();
+    this._keysPopover = null;
+    this.el?.querySelector('#keys-button')?.setAttribute('aria-expanded', 'false');
   }
 }

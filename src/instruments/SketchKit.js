@@ -97,6 +97,7 @@ export class SketchKit {
     this.soundTraits = normalizeSoundTraits();
     this._kitId = 'classic';
     this._onHit = null;
+    this._onBeforeHit = null;
     this.onSoundTraitsChanged = null;
     this.onKitChanged = null;
     this.onCreateInstrument = null;
@@ -131,6 +132,7 @@ export class SketchKit {
   }
 
   setHitCallback(onHit) { this._onHit = onHit; }
+  setBeforeHitCallback(fn) { this._onBeforeHit = fn; }
 
   init() {
     if (this._output && this._toneInput) return;
@@ -305,6 +307,7 @@ export class SketchKit {
     if (!this._output || !this._toneInput) this.init();
     this.engine.unlockGesture?.();
     const pad = this.el?.querySelector(`.sketchkit__pad[data-pad="${sid}"]`);
+    if (this._onBeforeHit) this._onBeforeHit();
     this._triggerSound(sid);
     if (pad) {
       pad.classList.add('is-active');

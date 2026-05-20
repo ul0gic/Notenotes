@@ -4,7 +4,6 @@
  * version history, project milestones, install help, and export.
  */
 
-import { QuantizeGrid } from '../engine/Quantizer.js';
 import { SheetMusicView } from '../export/SheetMusicView.js';
 import { downloadBlob, projectToMidiBlob, safeFilename, snippetToMidiBlob } from '../export/MidiExporter.js';
 import { projectToWavBlob, snippetToWavBlob } from '../export/WavExporter.js';
@@ -121,12 +120,11 @@ function providerModelsForUi(providerId) {
 
 export class SettingsPanel {
   /**
-   * @param {object} deps - { transport, metronome, quantizer, store, project }
+   * @param {object} deps - { transport, metronome, store, project }
    */
   constructor(deps) {
     this.transport = deps.transport;
     this.metronome = deps.metronome;
-    this.quantizer = deps.quantizer;
     this.store = deps.store;
     this.project = deps.project;
     this.el = null;
@@ -163,7 +161,6 @@ export class SettingsPanel {
   }
 
   _renderSettingsSection() {
-    const q = this.project?.settings?.quantize || 0;
     const metVol = this.project?.settings?.metronomeVolume ?? 0.5;
     const masterVol = this.project?.settings?.masterVolume ?? 0.8;
     const timeSig = this.project?.timeSignature || this.transport?.timeSignature || { beats: 4, subdivision: 4 };
@@ -215,22 +212,6 @@ export class SettingsPanel {
         </div>
 
         <div class="settings-group">
-          <h3 class="settings-group__title">Quantization</h3>
-          <div class="settings-row">
-            <label class="settings-label">Grid</label>
-            <select class="settings-select" id="setting-quantize" aria-label="Quantize grid">
-              <option value="0" ${q === 0 ? 'selected' : ''}>Free (OFF)</option>
-              <option value="1" ${q === 1 ? 'selected' : ''}>1/4 Note</option>
-              <option value="2" ${q === 2 ? 'selected' : ''}>1/8 Note</option>
-              <option value="3" ${q === 3 ? 'selected' : ''}>1/16 Note</option>
-              <option value="4" ${q === 4 ? 'selected' : ''}>1/4 Triplet</option>
-              <option value="5" ${q === 5 ? 'selected' : ''}>1/8 Triplet</option>
-              <option value="6" ${q === 6 ? 'selected' : ''}>1/32 Note</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="settings-group">
           <h3 class="settings-group__title">Metronome</h3>
           <div class="settings-row">
             <label class="settings-label">Volume</label>
@@ -243,29 +224,6 @@ export class SettingsPanel {
           <div class="settings-row">
             <label class="settings-label">Volume</label>
             <input class="settings-range" id="setting-master-vol" type="range" min="0" max="100" value="${Math.round(masterVol * 100)}" aria-label="Master volume"/>
-          </div>
-        </div>
-
-        <div class="settings-group">
-          <h3 class="settings-group__title">Scale Board</h3>
-          <div class="settings-row">
-            <label class="settings-label">Number of Pads (<span id="setting-pads-display">${this.project?.settings?.scalePadsCount || 7}</span>)</label>
-            <input class="settings-range" id="setting-pads-count" type="range" min="1" max="16" value="${this.project?.settings?.scalePadsCount || 7}" aria-label="Scale board pads count"/>
-          </div>
-        </div>
-
-        <div class="settings-group">
-          <h3 class="settings-group__title">Piano</h3>
-          <div class="settings-row">
-            <label class="settings-label">Pianos</label>
-            <select class="settings-select" id="setting-piano-count" aria-label="Number of pianos">
-              <option value="1" ${(this.project?.settings?.pianoCount || 1) === 1 ? 'selected' : ''}>1</option>
-              <option value="2" ${(this.project?.settings?.pianoCount || 1) === 2 ? 'selected' : ''}>2</option>
-            </select>
-          </div>
-          <div class="settings-row">
-            <label class="settings-label">Keys (<span id="setting-keys-display">${this.project?.settings?.pianoKeys || 12}</span>)</label>
-            <input class="settings-range" id="setting-piano-keys" type="range" min="10" max="32" value="${this.project?.settings?.pianoKeys || 12}" aria-label="Piano keys"/>
           </div>
         </div>
 
@@ -628,16 +586,6 @@ export class SettingsPanel {
       }
     });
 
-    // Quantize
-    body.querySelector('#setting-quantize')?.addEventListener('change', (e) => {
-      const grid = parseInt(e.target.value, 10);
-      this.quantizer?.setGrid(grid);
-      if (this.project) {
-        this.project.settings.quantize = grid;
-        this.store?.scheduleAutoSave(this.project);
-      }
-    });
-
     // Metronome volume
     body.querySelector('#setting-met-vol')?.addEventListener('input', (e) => {
       const vol = parseInt(e.target.value, 10) / 100;
@@ -653,48 +601,6 @@ export class SettingsPanel {
           engine.masterGain.gain.setTargetAtTime(vol, engine.currentTime, 0.01);
         }
         if (this.project) this.project.settings.masterVolume = vol;
-      });
-
-      // Scale pads count
-      body.querySelector('#setting-pads-count')?.addEventListener('input', (e) => {
-        let count = parseInt(e.target.value, 10);
-        if (isNaN(count) || count < 1) count = 7;
-        if (count > 16) count = 16;
-        
-        const display = body.querySelector('#setting-pads-display');
-        if (display) display.textContent = count;
-
-        if (this.project) {
-          this.project.settings.scalePadsCount = count;
-          this.store?.scheduleAutoSave(this.project);
-          window.dispatchEvent(new CustomEvent('settings-pads-changed', { detail: { count } }));
-        }
-      });
-
-      // Piano count
-      body.querySelector('#setting-piano-count')?.addEventListener('change', (e) => {
-        const count = parseInt(e.target.value, 10);
-        if (this.project) {
-          this.project.settings.pianoCount = count;
-          this.store?.scheduleAutoSave(this.project);
-          window.dispatchEvent(new CustomEvent('settings-piano-changed'));
-        }
-      });
-
-      // Piano keys
-      body.querySelector('#setting-piano-keys')?.addEventListener('input', (e) => {
-        let keys = parseInt(e.target.value, 10);
-        if (isNaN(keys) || keys < 10) keys = 12;
-        if (keys > 32) keys = 32;
-
-        const display = body.querySelector('#setting-keys-display');
-        if (display) display.textContent = keys;
-
-        if (this.project) {
-          this.project.settings.pianoKeys = keys;
-          this.store?.scheduleAutoSave(this.project);
-          window.dispatchEvent(new CustomEvent('settings-piano-changed'));
-        }
       });
 
       // Drum pads count

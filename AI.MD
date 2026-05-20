@@ -990,7 +990,7 @@ On import/migration, embedded `audioDataUrl` should always be converted into a f
 
 ## App Versioning
 
-Current App Version: `0.1.9`
+Current App Version: `0.1.10`
 
 The visible app version is displayed in Settings. Bump it for meaningful user-facing changes or architecture/storage changes, especially when AI.MD is updated for completed work.
 
@@ -1831,3 +1831,40 @@ App version `0.1.9` is a small safety and polish pass after the snippet cleanup 
   - same version: confirms the browser is on the latest public version
   - local is newer than GitHub: useful while testing local builds before the repo is updated
 - If the fetch fails, Settings tells the user the GitHub check could not run and still gives the stale-cache advice. This preserves offline-first behavior; the app does not require the network to run.
+
+---
+
+## Arm Recording / Local Create Controls 0.1.10
+
+App version `0.1.10` moves more creation-specific controls out of Settings and adds an armed recording flow for users who want recording to begin with their first played sound.
+
+### Arm to record
+
+- `TransportBar` now renders a separate `Arm` button next to the normal Record button.
+- `TransportBar.onArmRecordClick(armed)` is wired in `main.js` to `CreativeMode.setRecordArmed(armed)`, and `CreativeMode.onRecordArmChanged` pushes the state back to `TransportBar.setRecordArmed(armed)`.
+- Arm is not a transport state. It is a Creative Mode pre-record flag. The app remains stopped or playing until the user plays a note or drum hit.
+- To ensure the first sound is included, instruments now expose pre-sound callbacks:
+  - `ScaleBoard.setBeforeNoteCallback(fn)`
+  - `MicroPiano.setBeforeNoteCallback(fn)`
+  - `ControllerMode.setBeforeNoteCallback(fn)`
+  - `SketchKit.setBeforeHitCallback(fn)`
+- Those callbacks call `CreativeMode._beginArmedRecordingIfNeeded()` before the synth/drum sound is fired. That method clears the arm flag, starts `transport.record()`, and lets the normal `RecordingManager.noteOn()` / `drumHit()` callbacks capture the first event at the start of the recording.
+- Pressing the normal Record button or Stop clears the armed state. Entering actual `TransportState.RECORDING` also clears the arm UI.
+
+### Pads and Keys moved out of Settings
+
+- The old Settings Quantization Grid row was removed. It was the legacy global recording quantizer and was easy to confuse with the active grid controls in Inspect/Canvas.
+- `main.js` now resets the recording `Quantizer` to `OFF` when loading a project and clears `project.settings.quantize` to `0` for older workspaces. This prevents an old hidden Settings value from silently quantizing new recordings after the UI has been removed.
+- Scale Board pad count was removed from Settings. It now lives behind a `Pads` button in the Create toolbar, shown only when Scale Board is in Custom mode because `project.settings.scalePadsCount` only affects Custom pad layouts.
+- Piano count/key count were removed from Settings. They now live behind a `Keys` button in the Create toolbar when Piano is active.
+- The new popovers are lightweight `tone-popover` siblings, not modal settings drawers. They write the same existing project settings:
+  - `project.settings.scalePadsCount`
+  - `project.settings.pianoCount`
+  - `project.settings.pianoKeys`
+- The same existing events are dispatched after changes:
+  - `settings-pads-changed`
+  - `settings-piano-changed`
+
+### Settings version row
+
+- `.settings-row--version` now aligns its label and value/button group on the same center line. The GitHub status message remains a separate help line below the row.
