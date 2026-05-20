@@ -243,6 +243,9 @@ export class EditMode {
     this.project.snippets.push(snippet);
     this.store?.scheduleAutoSave(this.project);
     this.onSnippetCreated?.(snippet);
+    window.dispatchEvent(new CustomEvent('project-snippets-changed', {
+      detail: { snippetId: snippet.id, action: 'created' },
+    }));
     this.loadSnippet(snippet);
     showToast(`${isDrum ? 'Drum' : 'MIDI'} clip created`);
   }
@@ -321,6 +324,12 @@ export class EditMode {
 
     return `
       <div class="edit-toolbar__group">
+        <span class="edit-toolbar__label">Load</span>
+        <select class="edit-toolbar__select edit-toolbar__select--clip" id="edit-load-clip-select" aria-label="Load editable clip">
+          ${this._renderClipOptions()}
+        </select>
+      </div>
+      <div class="edit-toolbar__group">
         <input type="text" class="edit-toolbar__name-input" id="edit-snippet-name" value="${this._snippet.name || 'Snippet'}" placeholder="Snippet name" title="Edit snippet name" />
         <button class="btn btn--ghost edit-toolbar__btn edit-toolbar__btn--tiny" id="edit-double-btn" title="Double snippet length">2x</button>
         <button class="btn btn--ghost edit-toolbar__btn edit-toolbar__btn--tiny" id="edit-half-btn" title="Halve snippet length">1/2</button>
@@ -329,12 +338,6 @@ export class EditMode {
       <div class="edit-toolbar__group">
         <button class="btn btn--ghost edit-toolbar__btn" id="edit-new-midi-toolbar" type="button">New MIDI</button>
         <button class="btn btn--ghost edit-toolbar__btn" id="edit-new-drum-toolbar" type="button">New Drum</button>
-      </div>
-      <div class="edit-toolbar__group">
-        <span class="edit-toolbar__label">Load</span>
-        <select class="edit-toolbar__select edit-toolbar__select--clip" id="edit-load-clip-select" aria-label="Load editable clip">
-          ${this._renderClipOptions()}
-        </select>
       </div>
       <div class="edit-toolbar__group">
         <span class="edit-toolbar__label">Grid</span>
@@ -437,10 +440,8 @@ export class EditMode {
     const gridWrapper = document.createElement('div');
     gridWrapper.style.cssText = 'flex:1;display:flex;flex-direction:column;overflow:hidden;';
 
-    if (!isDrum) {
-      const ruler = this._renderRuler();
-      gridWrapper.appendChild(ruler);
-    }
+    const ruler = this._renderRuler();
+    gridWrapper.appendChild(ruler);
 
     const gridContainer = document.createElement('div');
     gridContainer.className = 'piano-roll__grid-container';
@@ -1245,7 +1246,14 @@ export class EditMode {
     this._snippet.hits.push(hit);
     this._selectedNoteIdx = this._snippet.hits.length - 1;
     this._onEdit('Add hit', beforeState);
-    showToast(`Added ${drumType}`);
+    showToast(`Added ${this._drumLabel(drumType)}`);
+  }
+
+  _drumLabel(drumType) {
+    const label = DRUM_TYPES.find(d => d.id === drumType)?.label || drumType;
+    return label
+      .toLowerCase()
+      .replace(/\b\w/g, char => char.toUpperCase());
   }
 
   _deleteSelectedNote() {
@@ -1361,6 +1369,7 @@ export class EditMode {
   _onEdit(description, beforeState = null) {
     this._updateSnippetDuration();
     const afterState = this._snapshotSnippetState();
+    const durationChanged = beforeState?.durationTicks !== afterState?.durationTicks;
 
     if (beforeState && afterState && JSON.stringify(beforeState) !== JSON.stringify(afterState)) {
       this.undoManager?.push({
@@ -1371,7 +1380,8 @@ export class EditMode {
       });
     }
 
-    this._rebuildGrids();
+    if (durationChanged) this._rebuildAll();
+    else this._rebuildGrids();
 
     const count = (this._snippet.notes?.length || 0) + (this._snippet.hits?.length || 0);
     const isDrum = this._snippet?.type === 'drum';
@@ -1388,6 +1398,9 @@ export class EditMode {
     }
 
     this.store?.scheduleAutoSave(this.project);
+    window.dispatchEvent(new CustomEvent('project-snippets-changed', {
+      detail: { snippetId: this._snippet?.id, action: 'updated' },
+    }));
   }
 
   _updateSnippetDuration() {
@@ -1398,7 +1411,8 @@ export class EditMode {
       if (end > maxEnd) maxEnd = end;
     }
     for (const h of (this._snippet.hits || [])) {
-      if (h.startTick > maxEnd) maxEnd = h.startTick;
+      const end = h.startTick + this._gridSize;
+      if (end > maxEnd) maxEnd = end;
     }
     const ticksPerBeat = 480;
     this._snippet.durationTicks = Math.ceil((maxEnd + ticksPerBeat) / ticksPerBeat) * ticksPerBeat;

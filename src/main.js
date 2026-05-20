@@ -197,6 +197,8 @@ class App {
     });
 
     window.addEventListener('project-snippets-changed', () => {
+      this.creativeMode?.snippetTray?._renderSnippets?.();
+      this.canvasMode?.refresh?.();
       this.editMode?.refreshSnippetList?.();
     });
 

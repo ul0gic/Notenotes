@@ -990,7 +990,7 @@ On import/migration, embedded `audioDataUrl` should always be converted into a f
 
 ## App Versioning
 
-Current App Version: `0.1.11`
+Current App Version: `0.1.12`
 
 The visible app version is displayed in Settings. Bump it for meaningful user-facing changes or architecture/storage changes, especially when AI.MD is updated for completed work.
 
@@ -1892,3 +1892,35 @@ App version `0.1.11` is a small usability pass around the AI Seed panel and drum
 - Drum shadow hits use the same width rule, so a shadow drum clip and the edited drum clip speak the same visual language.
 - CSS changed `.piano-roll__note--drum` and `.piano-roll__shadow-note--drum` from rounded dots/pills to 4px-radius rectangular blocks with a subtle inset edge.
 - The intent is user-facing clarity: clicking a drum cell should visually produce a block in that cell, closer to MIDI note rectangles, while playback/export still treat the event as a drum hit at the block's left edge.
+
+---
+
+## Inspect Drum Consistency 0.1.12
+
+App version `0.1.12` tightens the Inspect drum editor so it follows the same broad mental model as MIDI Inspect.
+
+### Toolbar order
+
+- `EditMode._buildToolbarHTML()` now puts the Load selector first, followed by the snippet name/count/length controls.
+- New MIDI/New Drum, Grid/Shadow, Velocity, Split, Quantize all, and Delete follow after that.
+- Drum snippets still disable Split because split view is a MIDI note-range tool. The button remains visible and disabled so the user can see that the feature exists but does not apply to drums.
+- Range, vertical zoom, and Quantize all remain MIDI-only because they operate on pitches and note durations, not drum rows or instantaneous hits.
+
+### Drum ruler and clip length
+
+- `EditMode._renderRollPane()` now renders the timeline ruler for drum snippets too. MIDI and drum Inspect both show the same bar/beat labels above the grid.
+- Drum hit placement now contributes `hit.startTick + currentGridSize` when `_updateSnippetDuration()` calculates snippet length.
+- This matches the new block-style drum hit visual: a hit at the edge of the current clip grows the editable grid by the visible cell, instead of only considering the hit's left edge.
+- When an edit changes `durationTicks`, `_onEdit()` rebuilds the full editor instead of only rebuilding the grid. That keeps the ruler width, scrollable grid width, and toolbar state in sync.
+
+### Snippet tray and Canvas freshness
+
+- Inspect edit operations now dispatch `project-snippets-changed` with `{ action: 'updated' }` after autosave scheduling.
+- Blank Inspect-created snippets dispatch the same event with `{ action: 'created' }` after `onSnippetCreated`.
+- `main.js` now responds to `project-snippets-changed` by rerendering the snippet tray, refreshing Canvas, and refreshing Inspect's load selectors.
+- This fixes the stale-preview problem where a newly edited drum clip could look blank in Create until another clip forced the tray to rerender, even though the actual snippet data was already present and could play from Canvas.
+
+### Drum labels
+
+- Drum add toasts now call `EditMode._drumLabel(id)` instead of showing raw ids.
+- Raw ids such as `tommid` remain the stored data model, but UI messages show readable labels such as `Tom Mid`.
