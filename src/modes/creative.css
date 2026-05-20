@@ -116,8 +116,19 @@
 }
 
 .snippet-tray__item-icon {
-  font-size: 12px;
+  padding: 1px 4px;
+  border: 1px solid var(--surface-5);
+  border-radius: 3px;
+  font-size: 8px;
+  font-weight: var(--font-weight-bold);
   line-height: 1;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+.snippet-tray__item-icon--audio {
+  border-color: rgba(110, 205, 190, 0.45);
+  color: #6ecdbd;
 }
 
 .snippet-tray__item-meta {

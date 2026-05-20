@@ -417,8 +417,10 @@ export class CanvasMode {
 
     const noteCount = (clip.snippet?.notes?.length || 0) + (clip.snippet?.hits?.length || 0);
     const snippetName = clip.snippet?.name || `${noteCount} notes`;
+    const typeBadge = clip.snippet?.type === 'audio' ? 'LINE' : clip.snippet?.type === 'drum' ? 'DRUM' : 'MIDI';
     el.innerHTML = `
       <div class="canvas-clip__label-row">
+        <span class="canvas-clip__type-badge canvas-clip__type-badge--${clip.snippet?.type || 'midi'}">${typeBadge}</span>
         <span class="canvas-clip__label">${snippetName}</span>
         ${this._renderToneBadges(clip)}
       </div>
@@ -865,6 +867,28 @@ export class CanvasMode {
     this._syncClipTools();
   }
 
+  removeSnippetReferences(snippetId) {
+    if (!snippetId || !this.project?.tracks) return;
+    let removedSelected = false;
+    let changed = false;
+    for (const track of this.project.tracks) {
+      const before = track.clips?.length || 0;
+      track.clips = (track.clips || []).filter(clip => {
+        const keep = clip.snippetId !== snippetId && clip.snippet?.id !== snippetId;
+        if (!keep && clip.id === this._selectedClip) removedSelected = true;
+        return keep;
+      });
+      if ((track.clips?.length || 0) !== before) changed = true;
+    }
+    if (!changed) return;
+    if (removedSelected) this._selectedClip = null;
+    this.store?.scheduleAutoSave(this.project);
+    this._renderTracks();
+    this._renderSnippetDock();
+    this._autoSetLoopFromClips();
+    this._syncClipTools();
+  }
+
   /** Handle clip drag-to-move */
   _startClipDrag(e, clip, el) {
     const startX = e.clientX;
@@ -974,9 +998,9 @@ export class CanvasMode {
     dock.innerHTML = snippets.map(s => {
       const count = (s.notes?.length || 0) + (s.hits?.length || 0);
       const name = s.name || `${count} notes`;
-      const icon = s.type === 'drum' ? '🥁' : '🎵';
+      const icon = s.type === 'drum' ? 'DRUM' : s.type === 'audio' ? 'LINE' : 'MIDI';
       return `<div class="canvas-snippet-dock__item" draggable="true" data-snippet-id="${s.id}">
-        ${icon} ${name}
+        <span class="canvas-snippet-dock__type canvas-snippet-dock__type--${s.type || 'midi'}">${icon}</span> ${name}
       </div>`;
     }).join('');
 

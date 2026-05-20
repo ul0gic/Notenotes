@@ -119,6 +119,9 @@ class App {
     this.creativeMode.snippetTray.onSnippetDeleted((id) => {
       if (this.project && this.project.snippets) {
         this.project.snippets = this.project.snippets.filter(s => s.id !== id);
+        this.canvasMode?.removeSnippetReferences?.(id);
+        this.editMode?.refreshSnippetList?.();
+        window.dispatchEvent(new CustomEvent('project-snippets-changed', { detail: { snippetId: id, action: 'deleted' } }));
         this.store?.scheduleAutoSave(this.project);
         setTimeout(() => this.store?.garbageCollectAudioAssets?.(), 2500);
       }

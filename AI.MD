@@ -990,7 +990,7 @@ On import/migration, embedded `audioDataUrl` should always be converted into a f
 
 ## App Versioning
 
-Current App Version: `0.1.7`
+Current App Version: `0.1.8`
 
 The visible app version is displayed in Settings. Bump it for meaningful user-facing changes or architecture/storage changes, especially when AI.MD is updated for completed work.
 
@@ -1334,6 +1334,27 @@ App version `0.1.7` fixes a visual communication issue in Canvas audio clips and
 
 - `.edit-toolbar__btn:disabled` now has explicit disabled styling: lower opacity, tertiary text, not-allowed cursor, and muted surface background.
 - Drum Inspect still disables Split because split view is for MIDI note ranges. With the new button styling this should read as unavailable rather than broken.
+
+---
+
+## Snippet Delete Cleanup / Clip Type Badges 0.1.8
+
+App version `0.1.8` fixes stale snippet references after deletion and makes Canvas/Tray clip types easier to distinguish.
+
+### Snippet deletion cleanup
+
+- Deleting a snippet from `SnippetTray` now removes that snippet from `project.snippets`, removes matching Canvas clips, refreshes Inspect, dispatches `project-snippets-changed`, schedules autosave, and then lets audio asset garbage collection run.
+- `CanvasMode.removeSnippetReferences(snippetId)` removes clips where either `clip.snippetId` or `clip.snippet.id` matches the deleted snippet. This matters because Canvas clips can hold a nested snippet object even after the library entry is removed.
+- If the deleted clip was selected, Canvas clears the selection and syncs the clip toolbar state.
+- `EditMode.refreshSnippetList()` now unloads the current Inspect clip if that snippet no longer exists in `project.snippets`. This prevents Inspect from showing a deleted clip and a stale load dropdown.
+- The intended rule is: deleting a snippet from the library deletes placements of that snippet from Canvas. Canvas should not preserve orphaned clip objects unless a future explicit "detach clip from library" feature is designed.
+
+### Type badges instead of note/mic confusion
+
+- Canvas clips now show a small type badge in the label row: `MIDI`, `DRUM`, or `LINE`.
+- The Canvas snippet dock uses the same text badges instead of emoji icons.
+- `SnippetTray` also uses text type badges. Audio snippets use `LINE` to imply line/audio input rather than a microphone, and to avoid making audio and MIDI both look like generic musical notes.
+- Audio tray mini-previews render `audioPeaks` when available. Without peaks, they show a flat line with a `LINE` label.
 
 ---
 

@@ -89,7 +89,7 @@ export class SnippetTray {
 
     list.innerHTML = this.snippets.map((s, i) => {
       const noteCount = (s.notes?.length || 0) + (s.hits?.length || 0);
-      const typeIcon = s.type === 'drum' ? '🥁' : s.type === 'audio' ? '🎤' : '🎵';
+      const typeIcon = s.type === 'drum' ? 'DRUM' : s.type === 'audio' ? 'LINE' : 'MIDI';
       const bars = Math.ceil(s.durationTicks / (480 * (s.timeSignature?.beats || 4)));
       const autoMeta = s.type === 'audio' ? 'Audio' : `${noteCount} notes · ${bars} bar${bars > 1 ? 's' : ''}`;
       const displayName = s.name || autoMeta;
@@ -109,7 +109,7 @@ export class SnippetTray {
             ${this._renderMiniPreview(s)}
           </div>
           <div class="snippet-tray__item-info">
-            <span class="snippet-tray__item-icon">${typeIcon}</span>
+            <span class="snippet-tray__item-icon snippet-tray__item-icon--${s.type || 'midi'}">${typeIcon}</span>
             <span class="snippet-tray__item-meta">${displayName}</span>
             ${aiBadge}
             ${badge}
@@ -169,12 +169,23 @@ export class SnippetTray {
     const height = 28;
 
     if (snippet.type === 'audio') {
+      const peaks = Array.isArray(snippet.audioPeaks) ? snippet.audioPeaks : [];
+      let bars = '';
+      if (peaks.length) {
+        peaks.forEach((peak, i) => {
+          const x = 4 + i * ((width - 8) / peaks.length);
+          const h = Math.max(1, Math.min(1, peak || 0) * (height - 8));
+          const y = height / 2 - h / 2;
+          bars += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="1.5" height="${h.toFixed(1)}" rx="0.75" fill="var(--accent-light)" opacity="0.75"/>`;
+        });
+      } else {
+        bars = `<line x1="8" y1="${height / 2}" x2="${width - 8}" y2="${height / 2}" stroke="var(--accent-light)" opacity="0.7"/><text x="${width/2}" y="${height/2 + 4}" text-anchor="middle" fill="var(--accent-light)" font-size="8">LINE</text>`;
+      }
       return `<svg width="${width}" height="${height}" style="display:block">
         <rect width="${width}" height="${height}" fill="var(--surface-3)" rx="3"/>
-        <text x="${width/2}" y="${height/2 + 5}" text-anchor="middle" fill="var(--accent-light)" font-size="14">🎤</text>
+        ${bars}
       </svg>`;
     }
-
     const notes = snippet.notes || [];
     const hits = snippet.hits || [];
 

@@ -93,6 +93,10 @@ export class EditMode {
 
   refreshSnippetList() {
     if (!this.el) return;
+    if (this._snippet && !this.project?.snippets?.some(s => s.id === this._snippet?.id)) {
+      this.loadSnippet(null);
+      return;
+    }
     if (!this._snippet) {
       this._renderEmpty();
       return;
