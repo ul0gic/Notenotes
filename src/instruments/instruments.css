@@ -281,6 +281,7 @@
   transition: all var(--duration-fast) var(--ease-out);
   user-select: none;
   -webkit-user-select: none;
+  touch-action: none;
   color: var(--text-primary);
   font-family: var(--font-family);
 }

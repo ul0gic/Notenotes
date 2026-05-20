@@ -246,6 +246,9 @@ export class EditMode {
   _renderEditor() {
     this._panes = [];
     const isDrum = this._snippet.type === 'drum';
+    if (isDrum && this._splitMode) {
+      this._splitMode = false;
+    }
     if (isDrum) {
       this._pitchMin = 0;
       this._pitchMax = DRUM_TYPES.length;
@@ -349,7 +352,7 @@ export class EditMode {
         <input class="edit-toolbar__velocity" id="edit-velocity-range" type="range" min="1" max="100" value="${velocityValue}" aria-label="Selected note velocity" ${this._selectedNoteIdx === null ? 'disabled' : ''} />
         <span class="edit-toolbar__velocity-value" id="edit-velocity-value">${this._selectedNoteIdx === null ? '--' : velocityValue}</span>
       </div>
-      <button class="btn btn--ghost edit-toolbar__btn${this._splitMode ? ' is-active' : ''}" id="edit-split-btn" title="Split view">Split</button>
+      <button class="btn btn--ghost edit-toolbar__btn${this._splitMode ? ' is-active' : ''}" id="edit-split-btn" title="${isDrum ? 'Split view is for MIDI note ranges' : 'Split view'}" ${isDrum ? 'disabled' : ''}>Split</button>
       ${quantizeAllHTML}
       <div class="edit-toolbar__spacer"></div>
       <div class="edit-toolbar__group">
@@ -1108,6 +1111,7 @@ export class EditMode {
 
     toolbar.querySelector('#edit-split-btn')?.addEventListener('pointerdown', (e) => {
       e.preventDefault();
+      if (this._snippet?.type === 'drum') return;
       this._splitMode = !this._splitMode;
       const btn = toolbar.querySelector('#edit-split-btn');
       btn.classList.toggle('is-active', this._splitMode);
@@ -1123,29 +1127,59 @@ export class EditMode {
     this._panes.forEach(pane => {
       pane.gridContainer.addEventListener('pointerdown', (e) => {
         if (e.target.closest('.piano-roll__note')) return;
+        const startX = e.clientX;
+        const startY = e.clientY;
+        const pointerId = e.pointerId;
+        let dragged = false;
 
-        const rect = pane.gridEl.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-
-        const tick = Math.floor(x / TICK_WIDTH / this._gridSize) * this._gridSize;
-        const isDrum = this._snippet?.type === 'drum';
-        let pitch;
-        if (isDrum) {
-          const rowH = pane.gridContainer.clientHeight / DRUM_TYPES.length;
-          pitch = pane.pitchMax - 1 - Math.floor(y / rowH);
-        } else {
-          pitch = pane.pitchMax - 1 - Math.floor(y / this._noteHeight);
-        }
-
-        if (pitch >= pane.pitchMin && pitch < pane.pitchMax && tick >= 0) {
-          if (this._snippet?.type === 'drum') {
-            const drumType = DRUM_TYPES[pitch];
-            if (drumType) this._addHit(tick, drumType.id);
-          } else {
-            this._addNote(tick, pitch);
+        const onMove = (me) => {
+          if (me.pointerId !== pointerId) return;
+          if (Math.hypot(me.clientX - startX, me.clientY - startY) > 8) {
+            dragged = true;
           }
-        }
+        };
+
+        const onUp = (ue) => {
+          if (ue.pointerId !== pointerId) return;
+          document.removeEventListener('pointermove', onMove);
+          document.removeEventListener('pointerup', onUp);
+          document.removeEventListener('pointercancel', onCancel);
+          if (dragged) return;
+
+          const rect = pane.gridEl.getBoundingClientRect();
+          const x = startX - rect.left;
+          const y = startY - rect.top;
+
+          const tick = Math.floor(x / TICK_WIDTH / this._gridSize) * this._gridSize;
+          const isDrum = this._snippet?.type === 'drum';
+          let pitch;
+          if (isDrum) {
+            const rowH = pane.gridContainer.clientHeight / DRUM_TYPES.length;
+            pitch = pane.pitchMax - 1 - Math.floor(y / rowH);
+          } else {
+            pitch = pane.pitchMax - 1 - Math.floor(y / this._noteHeight);
+          }
+
+          if (pitch >= pane.pitchMin && pitch < pane.pitchMax && tick >= 0) {
+            if (this._snippet?.type === 'drum') {
+              const drumType = DRUM_TYPES[pitch];
+              if (drumType) this._addHit(tick, drumType.id);
+            } else {
+              this._addNote(tick, pitch);
+            }
+          }
+        };
+
+        const onCancel = (ce) => {
+          if (ce.pointerId !== pointerId) return;
+          document.removeEventListener('pointermove', onMove);
+          document.removeEventListener('pointerup', onUp);
+          document.removeEventListener('pointercancel', onCancel);
+        };
+
+        document.addEventListener('pointermove', onMove);
+        document.addEventListener('pointerup', onUp);
+        document.addEventListener('pointercancel', onCancel);
       });
     });
 

@@ -990,7 +990,7 @@ On import/migration, embedded `audioDataUrl` should always be converted into a f
 
 ## App Versioning
 
-Current App Version: `0.1.5`
+Current App Version: `0.1.6`
 
 The visible app version is displayed in Settings. Bump it for meaningful user-facing changes or architecture/storage changes, especially when AI.MD is updated for completed work.
 
@@ -1277,6 +1277,43 @@ App version `0.1.5` fixes two Inspect workflow gaps and one iOS touch interactio
 - The old `pointerdown` handlers fired immediately when the user touched the horizontally scrollable toolbar on iOS, so dragging across the toolbar could accidentally create a blank clip.
 - `click` keeps tap behavior but gives mobile browsers a chance to cancel the activation during a scroll gesture.
 - `.edit-toolbar` now has `touch-action: pan-x` and `-webkit-overflow-scrolling: touch` to make its horizontal overflow row behave more naturally on iOS.
+
+---
+
+## Canvas / Inspect Touch and Instrument Fixes 0.1.6
+
+App version `0.1.6` addresses a QA pass around Canvas clip placement, recorded instrument intent, Android pad holds, and touch editing in Inspect.
+
+### Canvas edge snapping for fractional audio clips
+
+- Audio snippets can have fractional `durationBars` because their duration comes from real recorded time converted to ticks, not necessarily a clean bar or beat boundary.
+- `_resolveClipStart()` previously rounded every candidate start back to the beat grid, including candidates derived from another clip's exact end edge.
+- That meant an audio clip ending at a fractional bar could not always be followed flush by another audio clip; the "magnetic" edge candidate was rounded forward to the grid and left a small visible gap.
+- Edge candidates from neighboring clips now preserve their exact fractional start instead of being grid-rounded. Free placement still snaps to the grid.
+- `_clipOverlapsAt()` uses a slightly larger epsilon (`0.001` bars) so exact edge-to-edge placement does not get rejected as overlap because of floating-point noise.
+
+### Recorded instrument intent on Canvas
+
+- MIDI snippets already store `instrumentId` / `patchRecorded.instrumentId` when recorded.
+- Canvas now reads that metadata when a MIDI snippet is placed on a MIDI track and changes the track's `instrumentId` to the recorded instrument automatically.
+- This is track-level on purpose: the Canvas track dropdown remains the source of truth after placement, so the user can still change the whole track instrument from there.
+- The track instrument change participates in undo/redo together with the clip add. Undoing the add restores the previous track instrument.
+- Drum hook support is present through `kitRecorded` / `kitId` if future drum recording starts stamping kit identity.
+
+### Inspect touch placement
+
+- Inspect background grid note/hit creation now waits until pointer release and cancels if the pointer moves more than 8px.
+- This prevents mobile drag/pan gestures from placing unwanted notes while still allowing normal tap-to-add behavior.
+
+### Drum split guard
+
+- Drum Inspect turns split view off when a drum snippet is loaded.
+- The Split button remains visible but disabled for drum snippets because split view is a MIDI note-range tool. This avoids the broken dual-pane drum labels.
+
+### Android pad holds
+
+- `.scaleboard__pad` now uses `touch-action: none`.
+- Android Chrome could interpret a held pad as a possible scroll/gesture and fire `pointercancel`, which made some held notes turn into tiny short notes. The pad itself should own the touch gesture while pressed.
 
 ---
 

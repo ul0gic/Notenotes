@@ -618,7 +618,7 @@ export class CanvasMode {
 
   _clipOverlapsAt(track, clip, startBar, durationBars = clip?.durationBars || 1) {
     if (!track) return false;
-    const epsilon = 0.0001;
+    const epsilon = 0.001;
     const endBar = this._clipEndBar(clip, startBar, durationBars);
     return (track.clips || []).some(other => {
       if (other.id === clip?.id) return false;
@@ -635,25 +635,54 @@ export class CanvasMode {
       .filter(other => other.id !== clip?.id)
       .sort((a, b) => (a.startBar || 0) - (b.startBar || 0));
     const snapDistance = Math.max(minStep, 18 / this.barWidth);
-    const candidates = [desired];
+    const candidates = [{ start: desired, snapToGrid: true }];
 
     for (const other of otherClips) {
       const before = Math.max(0, (other.startBar || 0) - durationBars);
       const after = this._clipEndBar(other);
-      if (Math.abs(desired - before) <= snapDistance) candidates.unshift(before);
-      if (Math.abs(desired - after) <= snapDistance) candidates.unshift(after);
-      candidates.push(before, after);
+      if (Math.abs(desired - before) <= snapDistance) candidates.unshift({ start: before, snapToGrid: false });
+      if (Math.abs(desired - after) <= snapDistance) candidates.unshift({ start: after, snapToGrid: false });
+      candidates.push({ start: before, snapToGrid: false }, { start: after, snapToGrid: false });
     }
 
     let best = null;
     for (const candidate of candidates) {
-      const start = Math.max(0, Math.round(candidate / minStep) * minStep);
+      const rawStart = typeof candidate === 'number' ? candidate : candidate.start;
+      const shouldSnap = typeof candidate === 'number' ? true : candidate.snapToGrid;
+      const start = Math.max(0, shouldSnap ? Math.round(rawStart / minStep) * minStep : rawStart);
       if (this._clipOverlapsAt(track, clip, start, durationBars)) continue;
       const distance = Math.abs(start - desired);
       if (!best || distance < best.distance) best = { start, distance };
     }
 
     return best ? best.start : null;
+  }
+
+  _recordedInstrumentForSnippet(snippet) {
+    if (!snippet) return null;
+    if (snippet.type === 'midi') {
+      const id = snippet.patchRecorded?.instrumentId || snippet.instrumentId || snippet.patchId;
+      if (id?.startsWith?.('custom:')) return id;
+      if (TRACK_INSTRUMENTS[id]) return id;
+    }
+    if (snippet.type === 'drum') {
+      const id = snippet.kitRecorded?.instrumentId || snippet.instrumentId || snippet.kitId;
+      if (id?.startsWith?.('custom:')) return id;
+      if (this._isDrumInstrumentId(id)) return id;
+    }
+    return null;
+  }
+
+  _applyRecordedInstrumentToTrack(track, snippet) {
+    const instrumentId = this._recordedInstrumentForSnippet(snippet);
+    if (!track || !instrumentId) return null;
+    if (track.type === 'midi' && snippet.type !== 'midi') return null;
+    if (track.type === 'drum' && snippet.type !== 'drum') return null;
+    if (track.instrumentId === instrumentId) return null;
+    const previousInstrumentId = track.instrumentId;
+    track.instrumentId = instrumentId;
+    this.onTrackInstrumentChanged?.(track.id);
+    return previousInstrumentId;
   }
 
   _maxDurationForClip(track, clip) {
@@ -710,6 +739,8 @@ export class CanvasMode {
       }
       clip.startBar = startBar;
 
+      const previousInstrumentId = this._applyRecordedInstrumentToTrack(track, snippet);
+
       // Add to track
       track.clips.push(clip);
       this.store?.scheduleAutoSave(this.project);
@@ -720,9 +751,14 @@ export class CanvasMode {
         description: `Add clip to ${track.name}`,
         undo: () => {
           track.clips = track.clips.filter(c => c.id !== clip.id);
+          if (previousInstrumentId !== null) {
+            track.instrumentId = previousInstrumentId;
+            this.onTrackInstrumentChanged?.(track.id);
+          }
           this._renderTracks();
         },
         redo: () => {
+          this._applyRecordedInstrumentToTrack(track, snippet);
           track.clips.push(clip);
           this._renderTracks();
         }
@@ -955,9 +991,27 @@ export class CanvasMode {
                 this._touchDrag = null;
                 return;
               }
+              const previousInstrumentId = this._applyRecordedInstrumentToTrack(track, snippet);
               clip.startBar = startBar;
               track.clips.push(clip);
               this.store?.scheduleAutoSave(this.project);
+              this.undoManager?.push({
+                type: 'addClip',
+                description: `Add clip to ${track.name}`,
+                undo: () => {
+                  track.clips = track.clips.filter(c => c.id !== clip.id);
+                  if (previousInstrumentId !== null) {
+                    track.instrumentId = previousInstrumentId;
+                    this.onTrackInstrumentChanged?.(track.id);
+                  }
+                  this._renderTracks();
+                },
+                redo: () => {
+                  this._applyRecordedInstrumentToTrack(track, snippet);
+                  track.clips.push(clip);
+                  this._renderTracks();
+                },
+              });
               this._renderTracks();
               this._autoSetLoopFromClips();
               showToast(`Clip added to ${track.name}`);
