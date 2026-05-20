@@ -190,6 +190,7 @@ export class CreativeMode {
         this.project.snippets.push(snippet);
         this.store?.scheduleAutoSave(this.project);
       }
+      window.dispatchEvent(new CustomEvent('project-snippets-changed', { detail: { snippetId: snippet.id, action: 'created' } }));
 
       showToast(`Snippet captured! (${(snippet.notes?.length || 0) + (snippet.hits?.length || 0)} events)`);
     });
@@ -239,6 +240,7 @@ export class CreativeMode {
           this.project.snippets.push(snippet);
           this.store?.scheduleAutoSave(this.project);
         }
+        window.dispatchEvent(new CustomEvent('project-snippets-changed', { detail: { snippetId: snippet.id, action: 'created' } }));
         showToast('Audio snippet captured!');
       } catch (err) {
         console.warn('[CreativeMode] Audio snippet capture failed:', err);
@@ -858,6 +860,7 @@ export class CreativeMode {
       this.project.snippets.push(snippet);
       this.store?.scheduleAutoSave(this.project);
     }
+    window.dispatchEvent(new CustomEvent('project-snippets-changed', { detail: { snippetId: snippet.id, action: 'created' } }));
     const eventCount = (snippet.notes?.length || 0) + (snippet.hits?.length || 0);
     showToast(`🤖 Snippet seeded (${eventCount} event${eventCount === 1 ? '' : 's'})`);
   }

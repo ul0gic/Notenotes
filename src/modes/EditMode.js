@@ -91,6 +91,19 @@ export class EditMode {
     }
   }
 
+  refreshSnippetList() {
+    if (!this.el) return;
+    if (!this._snippet) {
+      this._renderEmpty();
+      return;
+    }
+    const select = this.el.querySelector('#edit-load-clip-select');
+    if (select) {
+      select.innerHTML = this._renderClipOptions();
+      select.value = this._snippet.id || '';
+    }
+  }
+
   _renderAudioPlayer() {
     const immediateSource = this._snippet.audioDataUrl || this._snippet.audioUrl || '';
     const unavailable = this._snippet.audioUnavailable || (!immediateSource && !this._snippet.audioAssetId);
@@ -99,6 +112,9 @@ export class EditMode {
       <div class="edit-audio">
         <div class="edit-audio__header">
           <input class="edit-audio__name-input" id="edit-audio-name" type="text" value="${name}" placeholder="Audio clip name" aria-label="Audio clip name" />
+          <select class="edit-toolbar__select edit-toolbar__select--clip" id="edit-load-clip-select" aria-label="Load clip">
+            ${this._renderClipOptions()}
+          </select>
         </div>
         <div class="edit-audio__body">
           <audio class="edit-audio__player" controls src="${immediateSource}"></audio>
@@ -116,21 +132,25 @@ export class EditMode {
 
   _bindAudioPlayerEvents() {
     const input = this.el.querySelector('#edit-audio-name');
-    if (!input) return;
-    const saveName = () => {
-      const name = input.value.trim() || 'Audio';
-      if (!this._snippet || this._snippet.name === name) return;
-      this._snippet.name = name;
-      this.store?.scheduleAutoSave(this.project);
-      this.onSnippetRenamed?.(this._snippet);
-      showToast('Audio clip renamed');
-    };
-    input.addEventListener('blur', saveName);
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        input.blur();
-      }
+    if (input) {
+      const saveName = () => {
+        const name = input.value.trim() || 'Audio';
+        if (!this._snippet || this._snippet.name === name) return;
+        this._snippet.name = name;
+        this.store?.scheduleAutoSave(this.project);
+        this.onSnippetRenamed?.(this._snippet);
+        showToast('Audio clip renamed');
+      };
+      input.addEventListener('blur', saveName);
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          input.blur();
+        }
+      });
+    }
+    this.el.querySelector('#edit-load-clip-select')?.addEventListener('change', (e) => {
+      this._loadSnippetById(e.target.value);
     });
   }
 
@@ -162,7 +182,7 @@ export class EditMode {
   }
 
   _renderEmpty() {
-    const snippets = (this.project?.snippets || []).filter(s => s.type !== 'audio');
+    const snippets = (this.project?.snippets || []);
     const options = snippets.length === 0
       ? '<option value="">No snippets yet</option>'
       : '<option value="">Select a snippet...</option>' +
@@ -170,7 +190,7 @@ export class EditMode {
           const count = (s.notes?.length || 0) + (s.hits?.length || 0);
           const icon = s.type === 'drum' ? '🥁' : '🎵';
           const label = s.name || `${count} ${s.type === 'drum' ? 'hits' : 'notes'}`;
-          return `<option value="${s.id}">${icon} ${label}</option>`;
+          return `<option value="${s.id}">${s.type === 'audio' ? 'Audio' : icon} ${s.type === 'audio' ? (s.name || 'Audio clip') : label}</option>`;
         }).join('');
 
     this.el.innerHTML = `
@@ -189,16 +209,13 @@ export class EditMode {
     `;
 
     this.el.querySelector('#edit-empty-select')?.addEventListener('change', (e) => {
-      const id = e.target.value;
-      if (!id) return;
-      const snippet = this.project?.snippets?.find(s => s.id === id);
-      if (snippet) this.loadSnippet(snippet);
+      this._loadSnippetById(e.target.value);
     });
-    this.el.querySelector('#edit-new-midi')?.addEventListener('pointerdown', (e) => {
+    this.el.querySelector('#edit-new-midi')?.addEventListener('click', (e) => {
       e.preventDefault();
       this._createBlankSnippet('midi');
     });
-    this.el.querySelector('#edit-new-drum')?.addEventListener('pointerdown', (e) => {
+    this.el.querySelector('#edit-new-drum')?.addEventListener('click', (e) => {
       e.preventDefault();
       this._createBlankSnippet('drum');
     });
@@ -309,7 +326,7 @@ export class EditMode {
       <div class="edit-toolbar__group">
         <span class="edit-toolbar__label">Load</span>
         <select class="edit-toolbar__select edit-toolbar__select--clip" id="edit-load-clip-select" aria-label="Load editable clip">
-          ${this._renderEditableClipOptions()}
+          ${this._renderClipOptions()}
         </select>
       </div>
       <div class="edit-toolbar__group">
@@ -341,16 +358,25 @@ export class EditMode {
     `;
   }
 
-  _renderEditableClipOptions() {
-    const snippets = (this.project?.snippets || []).filter(s => s?.type === 'midi' || s?.type === 'drum');
-    if (!snippets.length) return '<option value="">No editable clips</option>';
+  _renderClipOptions() {
+    const snippets = (this.project?.snippets || []).filter(Boolean);
+    if (!snippets.length) return '<option value="">No clips</option>';
     return snippets.map(s => {
       const count = (s.notes?.length || 0) + (s.hits?.length || 0);
-      const type = s.type === 'drum' ? 'Drum' : 'MIDI';
+      const type = s.type === 'audio' ? 'Audio' : s.type === 'drum' ? 'Drum' : 'MIDI';
       const label = s.name || `${type} clip`;
       const selected = s.id === this._snippet?.id ? 'selected' : '';
-      return `<option value="${s.id}" ${selected}>${type}: ${label} (${count})</option>`;
+      const suffix = s.type === 'audio' ? '' : ` (${count})`;
+      return `<option value="${s.id}" ${selected}>${type}: ${label}${suffix}</option>`;
     }).join('');
+  }
+
+  _loadSnippetById(id) {
+    if (!id || id === this._snippet?.id) return;
+    const snippet = this.project?.snippets?.find(s => s.id === id);
+    if (!snippet) return;
+    this.loadSnippet(snippet);
+    showToast(snippet.type === 'audio' ? 'Audio preview' : 'Loaded clip in Inspect');
   }
 
   _renderShadowOptions(isDrum) {
@@ -985,12 +1011,7 @@ export class EditMode {
     });
 
     toolbar.querySelector('#edit-load-clip-select')?.addEventListener('change', (e) => {
-      const id = e.target.value;
-      if (!id || id === this._snippet?.id) return;
-      const snippet = this.project?.snippets?.find(s => s.id === id && (s.type === 'midi' || s.type === 'drum'));
-      if (!snippet) return;
-      this.loadSnippet(snippet);
-      showToast('Loaded clip in Inspect');
+      this._loadSnippetById(e.target.value);
     });
 
     toolbar.querySelector('#edit-velocity-range')?.addEventListener('input', (e) => {
@@ -1029,12 +1050,12 @@ export class EditMode {
       this._deleteSelectedNote();
     });
 
-    toolbar.querySelector('#edit-new-midi-toolbar')?.addEventListener('pointerdown', (e) => {
+    toolbar.querySelector('#edit-new-midi-toolbar')?.addEventListener('click', (e) => {
       e.preventDefault();
       this._createBlankSnippet('midi');
     });
 
-    toolbar.querySelector('#edit-new-drum-toolbar')?.addEventListener('pointerdown', (e) => {
+    toolbar.querySelector('#edit-new-drum-toolbar')?.addEventListener('click', (e) => {
       e.preventDefault();
       this._createBlankSnippet('drum');
     });

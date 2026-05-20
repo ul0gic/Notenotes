@@ -183,6 +183,10 @@ class App {
       this.canvasMode?.refresh();
     });
 
+    window.addEventListener('project-snippets-changed', () => {
+      this.editMode?.refreshSnippetList?.();
+    });
+
     window.addEventListener('project-custom-instruments-changed', (event) => {
       this.canvasMode?.refresh();
       this.playbackEngine?.onCustomInstrumentsChanged(event.detail?.instrumentId || null);

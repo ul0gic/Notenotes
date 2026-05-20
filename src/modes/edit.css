@@ -20,6 +20,8 @@
   flex-shrink: 0;
   min-height: 36px;
   overflow-x: auto;
+  touch-action: pan-x;
+  -webkit-overflow-scrolling: touch;
 }
 
 .edit-toolbar__group {
@@ -495,6 +497,11 @@
 }
 
 .edit-audio__header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
   font-size: var(--font-size-md);
   font-weight: var(--font-weight-semibold);
 }
@@ -509,6 +516,11 @@
   font: inherit;
   font-weight: var(--font-weight-semibold);
   text-align: center;
+}
+
+.edit-audio__header .edit-toolbar__select--clip {
+  width: min(240px, 80vw);
+  max-width: 80vw;
 }
 
 .edit-audio__name-input:focus {

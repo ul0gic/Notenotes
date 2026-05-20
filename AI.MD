@@ -990,7 +990,7 @@ On import/migration, embedded `audioDataUrl` should always be converted into a f
 
 ## App Versioning
 
-Current App Version: `0.1.4`
+Current App Version: `0.1.5`
 
 The visible app version is displayed in Settings. Bump it for meaningful user-facing changes or architecture/storage changes, especially when AI.MD is updated for completed work.
 
@@ -1249,6 +1249,34 @@ App version `0.1.4` addresses a small Canvas interaction pass and another iOS au
 - `SketchKit.triggerPad()` does the same for drum hits.
 - `WebAudioSynth.init()` and `SketchKit.init()` are idempotent, so these defensive calls do not rebuild already-live graphs.
 - If iOS still makes chords sound like a single voice, suspect context unlock timing first, then inspect device CPU/polyphony pressure. There is no intentional iOS-specific monophonic path.
+
+---
+
+## Inspect Clip Flow / Mobile Creation Guard 0.1.5
+
+App version `0.1.5` fixes two Inspect workflow gaps and one iOS touch interaction problem.
+
+### Inspect clip switching
+
+- `EditMode` now treats Inspect as a place where the user can switch clips directly, including audio clips.
+- The empty Inspect state lists MIDI, drum, and audio snippets instead of filtering audio out.
+- The normal Inspect toolbar uses `_renderClipOptions()` instead of the old MIDI/drum-only option renderer.
+- Audio Inspect now includes the same `#edit-load-clip-select` selector next to the audio name field, so the user can move from an audio preview to any other clip without returning to Create.
+- `_loadSnippetById(id)` is the shared switch path for empty state, MIDI/drum toolbar, and audio preview. It calls `loadSnippet(snippet)` and lets the clip type decide whether to render the piano roll, drum roll, or audio preview.
+- `refreshSnippetList()` refreshes any visible `#edit-load-clip-select` in place. If Inspect is empty, it rerenders the empty selector.
+
+### Snippet list refresh after recording
+
+- `CreativeMode` dispatches `project-snippets-changed` after MIDI/drum capture, Audio In capture, and AI-generated snippet creation.
+- `main.js` listens for `project-snippets-changed` and calls `editMode.refreshSnippetList()`.
+- This is intentionally lightweight: recording a new snippet should update Inspect selectors immediately without forcing the user to refresh the app or leave the current mode.
+
+### Mobile accidental creation guard
+
+- Inspect's New MIDI and New Drum buttons now use `click` instead of `pointerdown`.
+- The old `pointerdown` handlers fired immediately when the user touched the horizontally scrollable toolbar on iOS, so dragging across the toolbar could accidentally create a blank clip.
+- `click` keeps tap behavior but gives mobile browsers a chance to cancel the activation during a scroll gesture.
+- `.edit-toolbar` now has `touch-action: pan-x` and `-webkit-overflow-scrolling: touch` to make its horizontal overflow row behave more naturally on iOS.
 
 ---
 
