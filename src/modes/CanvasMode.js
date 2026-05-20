@@ -42,6 +42,7 @@ export class CanvasMode {
     this._animFrame = null;
     this._tracksContainer = null;
     this._rulerEl = null;
+    this._audioPeakLoads = new Set();
 
     /** Called when a track's instrument changes */
     this.onTrackInstrumentChanged = null;
@@ -486,7 +487,7 @@ export class CanvasMode {
     const svgWidth = Math.max(24, width - 4);
     const center = height / 2;
     const hasAudio = !!(snippet.audioAssetId || snippet.audioUrl || snippet.audioDataUrl);
-    const markerCount = Math.max(4, Math.min(28, Math.floor(svgWidth / 12)));
+    const peaks = Array.isArray(snippet.audioPeaks) ? snippet.audioPeaks : [];
     let svgContent = `<line x1="0" y1="${center}" x2="${svgWidth}" y2="${center}" stroke="rgba(255,255,255,0.24)" stroke-width="1"/>`;
 
     if (!hasAudio) {
@@ -494,16 +495,77 @@ export class CanvasMode {
       return `<svg width="${svgWidth}" height="${height}" class="canvas-clip__audio-preview" style="display:block;">${svgContent}</svg>`;
     }
 
-    svgContent += `<rect x="1" y="${center - 7}" width="${Math.max(2, svgWidth - 2)}" height="14" rx="7" fill="rgba(255,255,255,0.13)" stroke="rgba(255,255,255,0.30)" stroke-width="1"/>`;
-    for (let i = 0; i < markerCount; i++) {
-      const x = 4 + (i / Math.max(1, markerCount - 1)) * Math.max(1, svgWidth - 8);
-      const phase = i / Math.max(1, markerCount - 1);
-      const markerHeight = 5 + Math.sin(phase * Math.PI) * 6;
-      const y = center - markerHeight / 2;
-      svgContent += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="2" height="${markerHeight.toFixed(1)}" rx="1" fill="rgba(255,255,255,0.50)"/>`;
+    if (!peaks.length) {
+      this._ensureAudioPeaks(snippet);
+      svgContent += `<rect x="1" y="${center - 6}" width="${Math.max(2, svgWidth - 2)}" height="12" rx="6" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.20)" stroke-width="1"/>`;
+      svgContent += `<text x="${svgWidth / 2}" y="${center + 4}" text-anchor="middle" font-size="8" fill="rgba(255,255,255,0.36)">analyzing</text>`;
+      return `<svg width="${svgWidth}" height="${height}" class="canvas-clip__audio-preview" style="display:block;">${svgContent}</svg>`;
     }
 
+    svgContent += `<rect x="1" y="${center - 13}" width="${Math.max(2, svgWidth - 2)}" height="26" rx="5" fill="rgba(255,255,255,0.07)" stroke="rgba(255,255,255,0.22)" stroke-width="1"/>`;
+    const barGap = 1.5;
+    const barWidth = Math.max(1.5, (svgWidth - 8) / peaks.length - barGap);
+    peaks.forEach((peak, i) => {
+      const amount = Math.max(0, Math.min(1, peak || 0));
+      const markerHeight = Math.max(1, amount * (height - 12));
+      const x = 4 + i * (barWidth + barGap);
+      const y = center - markerHeight / 2;
+      const alpha = 0.28 + amount * 0.55;
+      svgContent += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barWidth.toFixed(1)}" height="${markerHeight.toFixed(1)}" rx="1" fill="rgba(255,255,255,${alpha.toFixed(2)})"/>`;
+    });
+
     return `<svg width="${svgWidth}" height="${height}" class="canvas-clip__audio-preview" style="display:block;">${svgContent}</svg>`;
+  }
+
+  _ensureAudioPeaks(snippet) {
+    if (!snippet?.id || snippet.audioPeaks?.length || !this.store?.audioSnippetToArrayBuffer) return;
+    if (this._audioPeakLoads.has(snippet.id)) return;
+    this._audioPeakLoads.add(snippet.id);
+    this.store.audioSnippetToArrayBuffer(snippet)
+      .then(arrayBuffer => this._audioPeaksFromArrayBuffer(arrayBuffer))
+      .then(peaks => {
+        if (peaks?.length) {
+          snippet.audioPeaks = peaks;
+          this.store?.scheduleAutoSave(this.project);
+          this._renderTracks();
+        }
+      })
+      .catch(err => console.warn('[CanvasMode] Audio peak analysis failed:', err))
+      .finally(() => this._audioPeakLoads.delete(snippet.id));
+  }
+
+  async _audioPeaksFromArrayBuffer(arrayBuffer, bins = 48) {
+    if (!arrayBuffer) return [];
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return [];
+    const ctx = new AudioCtx();
+    try {
+      const decoded = await ctx.decodeAudioData(arrayBuffer.slice(0));
+      const length = decoded.length || 0;
+      if (!length) return [];
+      const channels = Math.max(1, decoded.numberOfChannels || 1);
+      const blockSize = Math.max(1, Math.floor(length / bins));
+      const peaks = [];
+      for (let i = 0; i < bins; i++) {
+        const start = i * blockSize;
+        const end = i === bins - 1 ? length : Math.min(length, start + blockSize);
+        let sum = 0;
+        let count = 0;
+        for (let ch = 0; ch < channels; ch++) {
+          const data = decoded.getChannelData(ch);
+          for (let j = start; j < end; j++) {
+            const sample = data[j] || 0;
+            sum += sample * sample;
+            count++;
+          }
+        }
+        peaks.push(count ? Math.sqrt(sum / count) : 0);
+      }
+      const max = Math.max(...peaks, 0.0001);
+      return peaks.map(value => Math.round((value / max) * 100) / 100);
+    } finally {
+      await ctx.close?.();
+    }
   }
 
   _renderToneBadges(clip) {

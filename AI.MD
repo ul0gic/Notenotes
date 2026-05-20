@@ -990,7 +990,7 @@ On import/migration, embedded `audioDataUrl` should always be converted into a f
 
 ## App Versioning
 
-Current App Version: `0.1.6`
+Current App Version: `0.1.7`
 
 The visible app version is displayed in Settings. Bump it for meaningful user-facing changes or architecture/storage changes, especially when AI.MD is updated for completed work.
 
@@ -1314,6 +1314,26 @@ App version `0.1.6` addresses a QA pass around Canvas clip placement, recorded i
 
 - `.scaleboard__pad` now uses `touch-action: none`.
 - Android Chrome could interpret a held pad as a possible scroll/gesture and fire `pointercancel`, which made some held notes turn into tiny short notes. The pad itself should own the touch gesture while pressed.
+
+---
+
+## Audio Clip Peaks / Disabled Split UI 0.1.7
+
+App version `0.1.7` fixes a visual communication issue in Canvas audio clips and makes disabled Inspect controls read as disabled.
+
+### Real audio peak previews
+
+- Canvas audio clips now render from `snippet.audioPeaks` when peak data is available.
+- Audio In recording creation computes `audioPeaks` from the captured blob with `decodeAudioData`, using 48 normalized RMS bins. The data is intentionally lightweight and suitable for project JSON/backups.
+- `CanvasMode._ensureAudioPeaks(snippet)` backfills peak data for older audio snippets when the snippet has a durable source (`audioAssetId`, `audioDataUrl`, or fetchable `audioUrl`). It reads audio bytes through `ProjectStore.audioSnippetToArrayBuffer`, decodes them, stores `snippet.audioPeaks`, schedules autosave, and rerenders tracks.
+- The preview is not meant to be a full waveform editor. It is a compact content map so silence stays visibly low and loud moments, such as a cough halfway through a clip, appear where they occur.
+- If audio exists but peaks are not ready yet, Canvas shows a subdued "analyzing" placeholder. If audio is unavailable, it keeps the dashed unavailable indicator.
+- Do not go back to fake sine/random markers for audio clips. If the app cannot derive real peaks, show a pending/unavailable state instead.
+
+### Disabled Inspect buttons
+
+- `.edit-toolbar__btn:disabled` now has explicit disabled styling: lower opacity, tertiary text, not-allowed cursor, and muted surface background.
+- Drum Inspect still disables Split because split view is for MIDI note ranges. With the new button styling this should read as unavailable rather than broken.
 
 ---
 

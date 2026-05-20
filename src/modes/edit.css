@@ -59,6 +59,14 @@
   white-space: nowrap;
 }
 
+.edit-toolbar__btn:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+  color: var(--text-tertiary);
+  border-color: var(--surface-3);
+  background: var(--surface-1);
+}
+
 .edit-toolbar__btn--compact {
   min-width: 30px;
   padding-inline: 8px;
