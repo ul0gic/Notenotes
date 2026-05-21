@@ -55,6 +55,45 @@ Expected:
 - The pad makes sound.
 - Transport controls still respond normally.
 
+### 1.3 Pads Degree Labels
+
+Steps:
+
+1. Go to Pads.
+2. Open Layout and turn on Show degree labels. Leave Highlight scale degrees off.
+3. Set the project key to C and scale to Major.
+4. Switch to Pentatonic, Minor, Blues, and Chromatic.
+5. Go to Piano with degree labels still enabled.
+
+Expected:
+
+- C Major Pads show Tonic, Supertonic, Mediant, Subdominant, Dominant, Submediant, and Leading Tone.
+- Pentatonic pad 4 says Dominant and pad 5 says Submediant.
+- Minor pad 3 says Mediant and pad 7 says Subtonic.
+- Blues pad 4 says Tritone.
+- Chromatic shows function labels for all 12 pads. Lowered Supertonic may truncate visually, but the tooltip or accessibility label still has the full text.
+- Piano keeps compact shorthand labels such as Root, b3, 5, and b7.
+
+### 1.4 Pads Compass Mode
+
+Steps:
+
+1. Go to Pads.
+2. Set the project key to C and scale to Major.
+3. Change Pad Mode to Compass.
+4. Press the outer C segment, then the inner C-position segment.
+5. Change the project key to G.
+6. Record a short Compass chord snippet.
+
+Expected:
+
+- C is at the top of the circle in C Major.
+- The outer C segment plays C major.
+- The inner C-position segment plays A minor.
+- The major-key arc highlights the home chord family around C, F, G and their relative minors.
+- Changing project key to G rotates the circle so G is at the top.
+- The recorded snippet contains simultaneous MIDI notes for the chord.
+
 ## 2. Audio In Recording
 
 ### 2.1 Audio In Creates A Snippet

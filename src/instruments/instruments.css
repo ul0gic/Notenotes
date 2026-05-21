@@ -443,13 +443,151 @@
 
 .scaleboard__pad-degree-name {
   color: var(--text-secondary);
-  font-size: 10px;
+  font-size: 9px;
   font-weight: var(--font-weight-semibold);
   line-height: 1;
+  max-width: 100%;
+  overflow: hidden;
+  padding: 0 var(--space-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .scaleboard__pad--degree-color .scaleboard__pad-degree-name {
   color: color-mix(in srgb, var(--degree-color) 78%, var(--text-primary));
+}
+
+/* --- Tonal Compass pad mode --- */
+.tonal-compass {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: var(--space-sm) 0 var(--space-lg);
+}
+
+.tonal-compass__stage {
+  aspect-ratio: 1;
+  max-width: min(520px, calc(100vw - 28px));
+  position: relative;
+  width: min(72vh, 520px);
+}
+
+.tonal-compass__ring {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  left: 50%;
+  pointer-events: none;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.tonal-compass__ring--outer {
+  height: 92%;
+  width: 92%;
+}
+
+.tonal-compass__ring--inner {
+  height: 58%;
+  width: 58%;
+}
+
+.tonal-compass__segment {
+  align-items: center;
+  background: var(--surface-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  height: clamp(42px, 8.5vw, 56px);
+  justify-content: center;
+  min-width: 0;
+  padding: var(--space-xs);
+  position: absolute;
+  touch-action: none;
+  transform: translate(-50%, -50%);
+  transition: background 120ms ease, border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+  width: clamp(48px, 9vw, 64px);
+}
+
+.tonal-compass__segment:hover,
+.tonal-compass__segment.is-active {
+  background: color-mix(in srgb, var(--accent) 22%, var(--surface-elevated));
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-dim), 0 0 18px rgba(139, 92, 246, 0.18);
+  transform: translate(-50%, -50%) scale(1.04);
+}
+
+.tonal-compass__segment.is-diatonic {
+  border-color: color-mix(in srgb, var(--accent) 62%, var(--border));
+}
+
+.tonal-compass__segment.is-home::after {
+  background: var(--accent);
+  border-radius: 999px;
+  content: '';
+  height: 5px;
+  position: absolute;
+  right: 5px;
+  top: 5px;
+  width: 5px;
+}
+
+.tonal-compass__segment--inner {
+  background: color-mix(in srgb, var(--surface-elevated) 84%, #000);
+}
+
+.tonal-compass__chord {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+}
+
+.tonal-compass__quality {
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.tonal-compass__center {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  display: flex;
+  flex-direction: column;
+  height: 28%;
+  justify-content: center;
+  left: 50%;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 28%;
+}
+
+.tonal-compass__key {
+  font-size: clamp(24px, 5vw, 36px);
+  font-weight: var(--font-weight-bold);
+  line-height: 1;
+}
+
+.tonal-compass__hint,
+.tonal-compass__caption {
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+}
+
+.tonal-compass__caption {
+  margin: 0;
+  max-width: 560px;
+  text-align: center;
 }
 
 /* --- Voice mode --- */
@@ -702,21 +840,39 @@
 
 .micropiano__degree-label {
   position: absolute;
-  top: 6px;
+  top: 5px;
   left: 50%;
   transform: translateX(-50%);
-  color: var(--surface-2);
-  font-size: 10px;
+  z-index: 2;
+  min-width: 18px;
+  padding: 2px 5px;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--degree-color) 82%, white) 0%, color-mix(in srgb, var(--degree-color) 58%, white) 72%);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--degree-color) 78%, white),
+    0 0 10px color-mix(in srgb, var(--degree-color) 78%, transparent),
+    0 1px 4px rgba(0, 0, 0, 0.42);
+  color: #050505;
+  font-size: 11px;
   font-weight: var(--font-weight-bold);
+  line-height: 1;
   pointer-events: none;
+  text-align: center;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
 }
 
 .micropiano__key--black .micropiano__degree-label {
-  color: var(--text-secondary);
+  top: 4px;
 }
 
 .micropiano__key--degree-color .micropiano__degree-label {
-  color: color-mix(in srgb, var(--degree-color) 82%, white);
+  background:
+    radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--degree-color) 88%, white) 0%, color-mix(in srgb, var(--degree-color) 62%, white) 72%);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--degree-color) 82%, white),
+    0 0 14px color-mix(in srgb, var(--degree-color) 86%, transparent),
+    0 1px 5px rgba(0, 0, 0, 0.48);
 }
 
 /* === SKETCH KIT === */

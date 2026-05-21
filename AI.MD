@@ -2202,3 +2202,27 @@ project.settings.degreeHighlighting = {
 - Reason: the surface is no longer only a scale instrument. It is becoming the family for pad-based playing modes: Single, Chords, Root, Voice Sketch, Custom, and the planned Tonal Compass.
 - README, Manual QA, keyboard help, AI Seed user-facing copy, and the AI instrument display label were updated to say `Pads` where the user sees the instrument name.
 - Keep the word `scale` anywhere it means the actual musical scale selected in the project key/scale controls.
+
+## Pads Function Labels 0.1.19
+
+- `MusicTheory.degreeForMidi(midi, context)` now returns `{ interval, label, name, functionName }`.
+  - `label` remains the compact shorthand (`Root`, `b3`, `5`, `b7`) used by MicroPiano.
+  - `functionName` is the Pads-facing theory label (`Tonic`, `Supertonic`, `Mediant`, `Subdominant`, `Dominant`, `Submediant`, `Subtonic`, `Leading Tone`, `Tritone`, `Lowered Supertonic`).
+- ScaleBoard/Pads now renders `functionName` in the optional secondary degree-label line. This fixes the mismatch where Pads showed shorthand labels even though the agreed behavior was function names on Pads and shorthand on Piano.
+- The big Pads number is still the positional pad shortcut number. It is intentionally not a theory degree because it matches the `1`-`9`/`0` keyboard controls.
+- Pads accessibility labels include both the function name and the compact shorthand, e.g. `Scale degree 4, G4, Dominant (5)`.
+- MicroPiano was intentionally left on the compact shorthand path by continuing to read `degreeForMidi().label`.
+- MicroPiano shorthand labels are styled as high-contrast black-text badges with a degree-colored glow. This keeps shorthand visible on both white and black keys and still reflects custom degree colors when the user changes them.
+- `getScaleDegreeLabel()` was removed from `MusicTheory.js`; it was dead code from the older position-label scheme.
+- `DEFAULT_DEGREE_HIGHLIGHTING.showLabels` remains `false`. Function labels are available through Layout, but fresh projects do not turn them on automatically.
+- Tonal Compass now lives as `Pad Mode: Compass` inside ScaleBoard/Pads rather than as a new top-level Create tab.
+- `MusicTheory.CIRCLE_OF_FIFTHS` is the canonical clockwise order: `C, G, D, A, E, B, F#, C#, G#, D#, A#, F`.
+- Compass rendering is intentionally inside `ScaleBoard.js` for now so it shares the existing Pads patch/tone/recording/controller-learning plumbing without adding another top-bar surface.
+- Compass behavior:
+  - outer ring segments play major triads from the circle-of-fifths root at the current Pads octave
+  - inner ring segments play the relative minor triad of that outer root
+  - the current project root is rotated to the top of the circle
+  - Major scales show a subtle diatonic home-family arc for I/IV/V plus vi/ii/iii
+  - non-Major scales still render the rotated circle but do not claim a diatonic arc yet
+- Recording works by firing the existing ScaleBoard note callbacks once per chord member. This means Compass snippets are normal MIDI snippets, not a new snippet type.
+- Deferred: minor-key arc logic, inversions, chord extensions, and cross-highlighting ScaleBoard pads while Compass chords play.

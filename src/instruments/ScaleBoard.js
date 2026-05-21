@@ -18,6 +18,7 @@
  */
 
 import {
+  CIRCLE_OF_FIFTHS,
   degreeForMidi,
   getScaleNotes,
   midiToNoteName,
@@ -45,7 +46,7 @@ export class ScaleBoard {
     this.scaleName = 'major';
     this.rootNote = 'C';
     this.octave = 4;
-    this.padMode = 'single'; // 'single', 'chords', 'root', 'voices', 'custom'
+    this.padMode = 'single'; // 'single', 'chords', 'root', 'compass', 'voices', 'custom'
     this.extensionsEnabled = false;
     this.isEditingLayout = false;
     this.customPadTypes = []; // 'single' or 'chord'
@@ -66,6 +67,7 @@ export class ScaleBoard {
     this._activePads = new Set();
     this._activeChords = new Map(); // padIndex -> array of midis
     this._activeRootDyads = new Map(); // padIndex -> [pad midi, nearest root midi]
+    this._activeCompassChords = new Map(); // segmentId -> array of midis
     this._activePadIndexes = new Set();
 
     // Callbacks for note recording
@@ -223,6 +225,7 @@ export class ScaleBoard {
             <option value="single" ${this.padMode === 'single' ? 'selected' : ''}>Single</option>
             <option value="chords" ${this.padMode === 'chords' ? 'selected' : ''}>Chords</option>
             <option value="root" ${this.padMode === 'root' ? 'selected' : ''}>Root</option>
+            <option value="compass" ${this.padMode === 'compass' ? 'selected' : ''}>Compass</option>
             ${this.voiceEngine ? `<option value="voices" ${this.padMode === 'voices' ? 'selected' : ''}>Voice Sketch</option>` : ''}
             <option value="custom" ${this.padMode === 'custom' ? 'selected' : ''}>Custom</option>
           </select>
@@ -248,9 +251,11 @@ export class ScaleBoard {
         ` : ''}
       </div>
       ${this._renderVoiceRow()}
-      <div class="scaleboard__pads" id="sb-pads" style="grid-template-columns: ${this._gridColumns()}; gap: ${this._gridGap()};">
-        ${this._renderPads()}
-      </div>
+      ${this.padMode === 'compass'
+        ? this._renderCompass()
+        : `<div class="scaleboard__pads" id="sb-pads" style="grid-template-columns: ${this._gridColumns()}; gap: ${this._gridGap()};">
+            ${this._renderPads()}
+          </div>`}
     `;
 
     this._bindEvents();
@@ -279,6 +284,77 @@ export class ScaleBoard {
     return this.extensionsEnabled && this._canUseExtensions();
   }
 
+  _circleRoots() {
+    const startIdx = CIRCLE_OF_FIFTHS.indexOf(this.rootNote);
+    if (startIdx < 0) return CIRCLE_OF_FIFTHS;
+    return [
+      ...CIRCLE_OF_FIFTHS.slice(startIdx),
+      ...CIRCLE_OF_FIFTHS.slice(0, startIdx),
+    ];
+  }
+
+  _renderCompass() {
+    const roots = this._circleRoots();
+    const isMajorContext = this.scaleName === 'major';
+    const outerDiatonic = new Set([0, 1, 11]);
+    const innerDiatonic = new Set([0, 1, 11]);
+    const buttons = [];
+
+    roots.forEach((root, i) => {
+      const angle = -90 + i * 30;
+      const outer = this._compassPoint(angle, 43);
+      const inner = this._compassPoint(angle, 30);
+      const minorRoot = NOTE_NAMES[(NOTE_NAMES.indexOf(root) + 9) % 12];
+      const outerClass = isMajorContext && outerDiatonic.has(i) ? ' is-diatonic' : '';
+      const innerClass = isMajorContext && innerDiatonic.has(i) ? ' is-diatonic' : '';
+      const homeClass = i === 0 ? ' is-home' : '';
+
+      buttons.push(`
+        <button class="tonal-compass__segment tonal-compass__segment--outer${outerClass}${homeClass}"
+                style="left:${outer.x}%; top:${outer.y}%;"
+                data-compass-id="outer-${i}" data-compass-index="${i}" data-compass-quality="major"
+                aria-label="${root} major chord">
+          <span class="tonal-compass__chord">${root}</span>
+          <span class="tonal-compass__quality">maj</span>
+        </button>
+      `);
+      buttons.push(`
+        <button class="tonal-compass__segment tonal-compass__segment--inner${innerClass}${homeClass}"
+                style="left:${inner.x}%; top:${inner.y}%;"
+                data-compass-id="inner-${i}" data-compass-index="${i}" data-compass-quality="minor"
+                aria-label="${minorRoot} minor chord, relative minor of ${root}">
+          <span class="tonal-compass__chord">${minorRoot}</span>
+          <span class="tonal-compass__quality">min</span>
+        </button>
+      `);
+    });
+
+    return `
+      <div class="tonal-compass" id="sb-compass">
+        <div class="tonal-compass__stage" aria-label="Tonal Compass circle of fifths chord surface">
+          <div class="tonal-compass__ring tonal-compass__ring--outer"></div>
+          <div class="tonal-compass__ring tonal-compass__ring--inner"></div>
+          ${buttons.join('')}
+          <div class="tonal-compass__center">
+            <span class="tonal-compass__key">${this.rootNote}</span>
+            <span class="tonal-compass__hint">${isMajorContext ? 'home chord' : 'circle of fifths'}</span>
+          </div>
+        </div>
+        <p class="tonal-compass__caption">
+          Outer ring plays major chords. Inner ring plays each relative minor. In Major keys, the bright arc marks the closest in-key chord family.
+        </p>
+      </div>
+    `;
+  }
+
+  _compassPoint(angleDeg, radiusPercent) {
+    const rad = angleDeg * Math.PI / 180;
+    return {
+      x: 50 + Math.cos(rad) * radiusPercent,
+      y: 50 + Math.sin(rad) * radiusPercent,
+    };
+  }
+
   _renderPads() {
     return this._notes.map((midi, i) => {
       const noteInfo = midiToNoteName(midi);
@@ -293,13 +369,16 @@ export class ScaleBoard {
       const voiceClass = isVoice ? ' scaleboard__pad--voice' : '';
       const degreeMeta = this._degreeMetaForMidi(midi);
       const degreeClass = degreeMeta
-        ? `${degreeMeta.colorEnabled ? ' scaleboard__pad--degree-color' : ''}${degreeMeta.label ? ' scaleboard__pad--degree-label' : ''}`
+        ? `${degreeMeta.colorEnabled ? ' scaleboard__pad--degree-color' : ''}${degreeMeta.functionName ? ' scaleboard__pad--degree-label' : ''}`
         : '';
       const degreeStyle = degreeMeta ? ` style="--degree-color: ${this._escapeAttr(degreeMeta.color)}; --degree-intensity: ${this._escapeAttr(degreeMeta.intensityPercent)};"` : '';
-      const degreeLabel = degreeMeta?.label || '';
+      const degreeLabel = degreeMeta?.functionName || '';
+      const theoryLabel = degreeMeta?.functionName
+        ? `, ${degreeMeta.functionName}${degreeMeta.shorthand ? ` (${degreeMeta.shorthand})` : ''}`
+        : '';
       return `
         <button class="scaleboard__pad${voiceClass}${degreeClass} ${this.isEditingLayout ? 'is-editing' : ''}"${degreeStyle} data-index="${i}" data-midi="${midi}"
-                aria-label="${isRootMode ? `${noteInfo.display} plus nearest ${this.rootNote}, ${rootInfo.display}` : `Scale degree ${degree}, ${noteInfo.display}`}${voiceLabel ? ', sings ' + voiceLabel : ''}">
+                aria-label="${isRootMode ? `${noteInfo.display} plus nearest ${this.rootNote}, ${rootInfo.display}` : `Scale degree ${degree}, ${noteInfo.display}`}${theoryLabel}${voiceLabel ? ', sings ' + voiceLabel : ''}">
           <span class="scaleboard__pad-degree">${isRootMode ? noteInfo.name : degree}</span>
           <span class="scaleboard__pad-note">${noteInfo.display}</span>
           ${degreeLabel ? `<span class="scaleboard__pad-degree-name">${this._escapeHtml(degreeLabel)}</span>` : ''}
@@ -321,7 +400,8 @@ export class ScaleBoard {
       color: degree.colors[meta.interval],
       colorEnabled: degree.enabled,
       intensityPercent: `${Math.round((degree.intensity ?? 0.22) * 100)}%`,
-      label: degree.showLabels ? meta.label : ''
+      functionName: degree.showLabels ? (meta.functionName || meta.name || meta.label) : '',
+      shorthand: meta.label || ''
     };
   }
 
@@ -428,8 +508,13 @@ export class ScaleBoard {
   }
 
   _refreshPads() {
+    if (this.padMode === 'compass') {
+      this._refreshLayout();
+      return;
+    }
     this._updateNotes();
     const padsContainer = this.el.querySelector('#sb-pads');
+    if (!padsContainer) return;
     padsContainer.style.gridTemplateColumns = this._gridColumns();
     padsContainer.innerHTML = this._renderPads();
     this._bindPadEvents();
@@ -461,6 +546,8 @@ export class ScaleBoard {
         showToast('Tap "Edit Layout" to set each pad to Note or Chord');
       } else if (this.padMode === 'root') {
         showToast('Root Mode: each note also plays the nearest root');
+      } else if (this.padMode === 'compass') {
+        showToast('Compass: major chords outside, relative minors inside');
       } else if (this.padMode === 'voices') {
         showToast('Voice Sketch: experimental robot voice tokens');
       }
@@ -491,7 +578,30 @@ export class ScaleBoard {
     });
 
     this._bindVoiceEvents();
+    this._bindCompassEvents();
     this._bindPadEvents();
+  }
+
+  _bindCompassEvents() {
+    if (this.padMode !== 'compass') return;
+    const segments = this.el.querySelectorAll('.tonal-compass__segment');
+    segments.forEach(segment => {
+      const id = segment.dataset.compassId;
+      const index = parseInt(segment.dataset.compassIndex, 10);
+      const quality = segment.dataset.compassQuality;
+      segment.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        segment.setPointerCapture(e.pointerId);
+        this.pressCompassSegment(id, index, quality);
+      });
+      const release = (e) => {
+        e.preventDefault();
+        this.releaseCompassSegment(id);
+      };
+      segment.addEventListener('pointerup', release);
+      segment.addEventListener('pointercancel', release);
+      segment.addEventListener('pointerleave', release);
+    });
   }
 
   _bindVoiceEvents() {
@@ -601,6 +711,34 @@ export class ScaleBoard {
       // Pointer cancel/leave → note off
       pad.addEventListener('pointercancel', handleRelease);
     });
+  }
+
+  pressCompassSegment(id, index, quality) {
+    if (!id || this._activeCompassChords.has(id)) return;
+    const segment = this.el?.querySelector(`.tonal-compass__segment[data-compass-id="${id}"]`);
+    const roots = this._circleRoots();
+    const rootName = roots[index];
+    if (!segment || !rootName) return;
+
+    const rootMidi = quality === 'minor'
+      ? noteNameToMidi(NOTE_NAMES[(NOTE_NAMES.indexOf(rootName) + 9) % 12], this.octave)
+      : noteNameToMidi(rootName, this.octave);
+    const midis = quality === 'minor'
+      ? [rootMidi, rootMidi + 3, rootMidi + 7]
+      : [rootMidi, rootMidi + 4, rootMidi + 7];
+
+    segment.classList.add('is-active');
+    this._activeCompassChords.set(id, midis);
+    midis.forEach(midi => this._noteOn(midi));
+  }
+
+  releaseCompassSegment(id) {
+    if (!id || !this._activeCompassChords.has(id)) return;
+    const segment = this.el?.querySelector(`.tonal-compass__segment[data-compass-id="${id}"]`);
+    if (segment) segment.classList.remove('is-active');
+    const midis = this._activeCompassChords.get(id) || [];
+    midis.forEach(midi => this._noteOff(midi));
+    this._activeCompassChords.delete(id);
   }
 
   pressPad(index) {
@@ -723,6 +861,7 @@ export class ScaleBoard {
 
   releaseAllPads() {
     [...this._activePadIndexes].forEach(index => this.releasePad(index));
+    [...this._activeCompassChords.keys()].forEach(id => this.releaseCompassSegment(id));
     if (this.voiceEngine) {
       // Defensive: stop anything still ringing in voice engine.
       this.voiceEngine.releaseAll();

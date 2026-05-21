@@ -8,6 +8,9 @@ export const MIDDLE_C = 60;
 /** All 12 note names */
 export const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
+/** Circle of fifths order, each step clockwise is +7 semitones. */
+export const CIRCLE_OF_FIFTHS = ['C', 'G', 'D', 'A', 'E', 'B', 'F#', 'C#', 'G#', 'D#', 'A#', 'F'];
+
 /** Scale interval patterns (semitones from root) */
 export const SCALES = {
   major:       { name: 'Major',       intervals: [0, 2, 4, 5, 7, 9, 11] },
@@ -77,6 +80,28 @@ export const INTERVAL_NAMES = {
   11: '7th'
 };
 
+/**
+ * Classical function names keyed by chromatic interval from the project root.
+ *
+ * Pads use these because they explain what the played note is doing in the key.
+ * Piano keeps the compact INTERVAL_LABELS shorthand because it has much less
+ * visual room and players often want quick interval symbols there.
+ */
+export const CLASSICAL_FUNCTION_NAMES = {
+  0: 'Tonic',
+  1: 'Lowered Supertonic',
+  2: 'Supertonic',
+  3: 'Mediant',
+  4: 'Mediant',
+  5: 'Subdominant',
+  6: 'Tritone',
+  7: 'Dominant',
+  8: 'Submediant',
+  9: 'Submediant',
+  10: 'Subtonic',
+  11: 'Leading Tone'
+};
+
 export function normalizeMusicalContext(context = {}) {
   const root = NOTE_NAMES.includes(context?.root) ? context.root : DEFAULT_MUSICAL_CONTEXT.root;
   const scale = SCALES[context?.scale] ? context.scale : DEFAULT_MUSICAL_CONTEXT.scale;
@@ -108,7 +133,8 @@ export function degreeForMidi(midi, context = DEFAULT_MUSICAL_CONTEXT) {
   return {
     interval,
     label: INTERVAL_LABELS[interval] || String(interval),
-    name: INTERVAL_NAMES[interval] || `Interval ${interval}`
+    name: INTERVAL_NAMES[interval] || `Interval ${interval}`,
+    functionName: CLASSICAL_FUNCTION_NAMES[interval] || ''
   };
 }
 
@@ -164,17 +190,4 @@ export function getScaleNotes(scaleName, rootNote, octave = 4, count = 32) {
     currentOctaveOffset += 12;
   }
   return notes;
-}
-
-/**
- * Get scale degree label (1–7) for display.
- * @param {number} index - 0-indexed scale degree
- * @param {object} scale - Scale definition from SCALES
- * @returns {string}
- */
-export function getScaleDegreeLabel(index, scaleName) {
-  const scale = SCALES[scaleName];
-  if (!scale) return String(index + 1);
-  const labels = ['1', '2', '3', '4', '5', '6', '7'];
-  return labels[index % labels.length] || String(index + 1);
 }
