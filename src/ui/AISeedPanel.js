@@ -132,10 +132,10 @@ export class AISeedPanel {
     let detail;
     if (reason === 'voices-mode') {
       message = 'Unavailable in Voice Sketch mode';
-      detail = 'AI generates standard MIDI/drum snippets — not vocal phrases. Switch the Scale Board\'s Pad Mode dropdown to Single, Chords, or Custom to use AI seed here.';
+      detail = 'AI generates standard MIDI/drum snippets, not vocal phrases. Switch Pads mode to Single, Chords, or Custom to use AI seed here.';
     } else if (reason === 'unsupported-instrument') {
       message = 'Unavailable on this instrument';
-      detail = 'AI seed works on Scale Board, Micro Piano, and Sketch Kit. Pick one of those to generate a snippet.';
+      detail = 'AI seed works on Pads, Micro Piano, and Sketch Kit. Pick one of those to generate a snippet.';
     } else {
       message = 'AI seed is currently unavailable';
       detail = 'Check the active instrument and try again.';

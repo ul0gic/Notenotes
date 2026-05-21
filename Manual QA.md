@@ -30,7 +30,7 @@ Steps:
 
 1. Fresh-load the app.
 2. Do not tap Audio In.
-3. Go to Scale.
+3. Go to Pads.
 4. Tap a visible pad.
 5. Go to Piano and tap a visible key.
 6. Go to Kit and tap a drum pad.
@@ -46,7 +46,7 @@ Expected:
 Steps:
 
 1. Reload the page.
-2. Tap a Scale pad.
+2. Tap a Pads pad.
 3. Tap Play on the transport.
 4. Stop playback.
 
@@ -329,7 +329,7 @@ Expected:
 
 Steps:
 
-1. Go to Scale or Piano.
+1. Go to Pads or Piano.
 2. Open Tone.
 3. Move one or more Tone sliders.
 4. Save a preset.
@@ -391,7 +391,7 @@ Expected:
 
 Steps:
 
-1. Set Scale pad mode to Chord.
+1. Set Pads mode to Chord.
 2. Assign a Trigger Note.
 3. Hold the trigger.
 4. Strike a chord pad.

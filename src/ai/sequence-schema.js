@@ -23,7 +23,7 @@ export const TICKS_PER_BEAT = 480;
 export const AI_INSTRUMENTS = Object.freeze({
   scaleboard: {
     id: 'scaleboard',
-    label: 'Scale Board',
+    label: 'Pads',
     eventType: 'padPress',
     description: 'Scale-locked pads. Pad indexes are positions in the current scale (0 = root, 1 = next scale degree, etc.). Cannot play out-of-key notes.',
   },
@@ -82,7 +82,7 @@ export function getSequenceSchemaForInstrument(instrumentId) {
       required: ['beat', 'type', 'padIndex'],
       properties: {
         beat: { type: 'number', description: 'Beat position from sequence start. 0 = first beat of bar 1. A 4/4, 4-bar sequence runs from beat 0 to beat 15.999.', minimum: 0 },
-        type: { const: 'padPress', description: 'Always "padPress" for the Scale Board.' },
+        type: { const: 'padPress', description: 'Always "padPress" for Pads.' },
         padIndex: {
           type: 'integer',
           description: 'Index into the current scale\'s pad layout. 0 = root, 1 = scale degree 2, etc. Bounded by the user\'s active scale (typically 7 pads for major/minor; 5 for pentatonic).',

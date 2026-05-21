@@ -370,7 +370,7 @@ export class CreativeMode {
     switcher.className = 'instrument-switcher';
     switcher.id = 'instrument-switcher';
     const tabs = [
-      { id: INSTRUMENTS.SCALEBOARD, icon: '🎹', label: 'Scale' },
+      { id: INSTRUMENTS.SCALEBOARD, icon: '🎹', label: 'Pads' },
       { id: INSTRUMENTS.CONTROLLER, icon: '🎮', label: 'Ctrl' },
       { id: INSTRUMENTS.PIANO, icon: '🎵', label: 'Piano' },
       { id: INSTRUMENTS.KIT, icon: '🥁', label: 'Kit' },
@@ -1331,7 +1331,7 @@ export class CreativeMode {
       layoutBtn.textContent = 'Layout';
       layoutBtn.disabled = !(isScale || isPiano);
       layoutBtn.setAttribute('aria-disabled', String(layoutBtn.disabled));
-      layoutBtn.title = isScale ? 'Pad layout and degree colors' : (isPiano ? 'Keyboard layout and degree colors' : 'Layout controls are available on Scale and Piano');
+      layoutBtn.title = isScale ? 'Pad layout and degree colors' : (isPiano ? 'Keyboard layout and degree colors' : 'Layout controls are available on Pads and Piano');
       if (!isScale) this._closePadsPopover();
       if (!isPiano) this._closeKeysPopover();
     }
@@ -1595,7 +1595,7 @@ export class CreativeMode {
         <p class="controller-map__status" id="controller-map-status">
           Currently holding: ${info ? `<strong>${this._escapeHtml(info.label)}</strong> (${this._escapeHtml(info.detail)})` : 'None'}
         </p>
-        <p class="controller-map__hint">${learning ? `${this._escapeHtml(learning.label)} is waiting for a sound target. The next Scale, Piano, or Kit press will bind instead of play.` : 'Triggers and analog sticks stay reserved for Tone, trigger notes, pitch, and modulation.'}</p>
+        <p class="controller-map__hint">${learning ? `${this._escapeHtml(learning.label)} is waiting for a sound target. The next Pads, Piano, or Kit press will bind instead of play.` : 'Triggers and analog sticks stay reserved for Tone, trigger notes, pitch, and modulation.'}</p>
         <div class="controller-map__actions">
           <button class="btn btn--primary controller-map__set" id="controller-map-set" type="button" ${held === null ? 'disabled' : ''}>Set</button>
           <button class="btn btn--ghost" id="controller-map-list" type="button">List Current Bindings</button>
@@ -1821,7 +1821,7 @@ export class CreativeMode {
         <span class="create-control-popover__value" id="pads-count-value">${count}</span>
         <input class="tone-row__slider" id="pads-count-slider" type="range" min="1" max="16" value="${count}" aria-label="Custom pad count">
       </label>
-      <p class="create-control-popover__hint">Used by Scale Board Custom mode.</p>
+      <p class="create-control-popover__hint">Used by Pads Custom mode.</p>
       ` : `<p class="create-control-popover__hint">Custom pad count appears here in Custom mode.</p>`}
       ${this._renderDegreeControls()}
     `;

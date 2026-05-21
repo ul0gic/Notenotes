@@ -6,7 +6,7 @@
 
 [**Try it now**](https://zeidalidiez.github.io/Notenotes/) | [Report an idea](https://github.com/zeidalidiez/Notenotes/issues/new) | [Contribute](#-contributing)
 
-![Notenotes - Scale Board view](labels.png)
+![Notenotes - Pads view](labels.png)
 
 </div>
 
@@ -46,7 +46,7 @@ It's a Progressive Web App. In Chrome, use the three-dot menu, then Cast, save, 
 
 ### Create - the jam space
 
-![Create mode - Scale Board with numbered, scale-locked pads](scale.gif)
+![Create mode - Pads with numbered, scale-locked pads](scale.gif)
 
 Pick a scale. Mash the pads. Switch instruments mid-loop. Press record, jam, press stop - your loop becomes a snippet.
 
@@ -78,7 +78,7 @@ Open any snippet in a piano roll for fine edits. Click to add notes, drag to mov
 
 | Instrument | What it is |
 |---|---|
-| **Scale Board** | Pads locked to the project key and scale (Major, Minor, Pentatonic, Blues, Dorian, Mixolydian, Chromatic). Pad count follows the scale, Extensions can continue it into the next octave, or go fully custom. |
+| **Pads** | Pads locked to the project key and scale (Major, Minor, Pentatonic, Blues, Dorian, Mixolydian, Chromatic). Pad count follows the scale, Extensions can continue it into the next octave, go fully custom, or grow into other pad-based surfaces. |
 | **Controller** | Gamepad-as-instrument via the Web Gamepad API. The Controller button near AI opens a learnable mapper, while the Controller screen shows connection state, trigger assignments, live highlights, and current bindings. |
 | **Micro Piano** | Configurable chromatic keyboard (1 or 2 stacked, 10–32 keys each) with octave shifting. Optional degree colors can mark which keys belong to the project key. |
 | **Sketch Kit** | 10-pad synthesized drum kit. Four kit presets (Classic, 808, Electronic, Acoustic), with the same Tone controls as the synth side. |
@@ -89,9 +89,9 @@ Plus: **16 synth presets** split into Chip and Modern families, **Tone** control
 ### For someone who wants a different perspective into the world of music.
 
 - **Scale-locked pads** - every press is in key. You can't pick a wrong note. Turn on **Extensions** to keep the scale going into the next octave without turning it into a theory quiz.
-- **Project key and scale** - set the shared root and scale in the top bar. Scale Board, Controller fallback, AI context, and the optional Piano/Pad degree colors all read from the same place instead of each feature guessing on its own. The old duplicate Root/Scale controls are intentionally gone from Scale and Ctrl.
+- **Project key and scale** - set the shared root and scale in the top bar. Pads, Controller fallback, AI context, and the optional Piano/Pad degree colors all read from the same place instead of each feature guessing on its own. The old duplicate Root/Scale controls are intentionally gone from Pads and Ctrl.
 - **Beat colors** - set a different color for each beat. The background pulses in time so you can *see* the meter.
-- **Degree colors** - the Layout panel can turn on shared degree highlighting, adjust color intensity, or show degree labels without the colored outlines. It is off by default, but when you want it, the same colors follow both Scale Board pads and Piano keys.
+- **Degree colors** - the Layout panel can turn on shared degree highlighting, adjust color intensity, or show degree labels without the colored outlines. It is off by default, but when you want it, the same colors follow both Pads and Piano keys.
 - **Hold & arpeggio modes** - latch notes, auto-arpeggiate chords across **10 chord types**, **4 patterns**, and **4 rates**. Or sustain a drone while you explore.
 - **Tone** - simple sliders for Crush, Echo, Space, Wobble, Drive, and Noise. They work on synths and the drum kit, can be saved as presets, reset back to zero, and are meant to be fast and playful rather than a wall of studio knobs. Echo and Space have been tightened so live playback and WAV export are chasing the same sound instead of two separate guesses.
 - **Controller triggers as sound switches or note switches** - assign LT and RT to Tone, or use them to reach related notes like 7ths and 9ths by holding the trigger before you strike the pad. Regular controller buttons can also be learned to exact MIDI notes or drum sounds. Triggers and sticks stay reserved for expression.
@@ -115,7 +115,7 @@ Inspect also lets you make a blank MIDI or drum clip directly, so you do not hav
 - **PWA.** Installable, works offline, lives on your home screen.
 - **Auto-save history is adjustable** - keep 5, 10, 25, or 50 versions, restore from history when you need to, and delete individual entries or clear the list when it gets in your way.
 - **Milestones and backups.** Save named checkpoints in the app, load them later, delete the ones you no longer need, export a full workspace JSON backup, or export just your snippet library so browser storage is not the only copy. Backup files include the app version that created them. Older backups can move forward into newer Notenotes versions, but newer backups are blocked from importing into older builds.
-- **Customizable everywhere.** 2/4, 3/4, 4/4, and 5/4 time signatures for now. Custom beat colors for the background visualizer. The top bar has the shared project key and scale, and the Create toolbar has a stable Layout button for Scale and Piano layout controls. Both edit the same optional degree colors. Drum count still lives in Settings for now.
+- **Customizable everywhere.** 2/4, 3/4, 4/4, and 5/4 time signatures for now. Custom beat colors for the background visualizer. The top bar has the shared project key and scale, and the Create toolbar has a stable Layout button for Pads and Piano layout controls. Both edit the same optional degree colors. Drum count still lives in Settings for now.
 - **AI seed is optional and direct.** The AI panel can run in Mock mode without a key, or use your own provider key for the current browser session. Clicking the provider name in the AI panel opens Settings right to the provider controls.
 - **Snippets are nameable** - and auto-named ones update themselves as you edit. Deleting a snippet asks first, because it also clears that snippet from the Canvas. You can arm recording before you play, then the first note or drum hit starts the recording instead of making you race the record button.
 - **Exports.** Sheet music as **SVG** or **ABC**, with a **percussion clef** for drum snippets. Export the whole Canvas or individual snippets as **MIDI** or **WAV**. Canvas WAV export now respects the MIDI track's synth patch instead of turning every preset into the same generic tone. New MIDI snippets also remember the patch they were recorded with, so a standalone snippet WAV has a sane sound even before you put it on the Canvas. WAV export renders Tone; MIDI export keeps the notes and timing but not the Notenotes-specific sound shaping. Empty or unavailable exports now fail clearly instead of handing you a misleading silent or tempo-only file. MP3 is still on the [roadmap](#future-vision).
@@ -163,7 +163,7 @@ These are the ideas that drive the project. Some are coded, some are sketches, s
 
 ###  Sound and color
 - [x] **Per-beat colors** in the background visualizer.
-- [ ] **Per-pad colors** - paint the Scale Board however helps you remember.
+- [ ] **Per-pad colors** - paint Pads however helps you remember.
 - [ ] **Color-blind safe palettes** as a first-class option.
 - [ ] **Synesthesia mode** - clips on the Canvas glow their note color as they play.
 - [ ] **Color-strip notation** as an alternative to the piano roll.
@@ -244,10 +244,10 @@ For a deeper reference - including a synthesized drum sound built from oscillato
 | `R` | Toggle recording |
 | `M` | Toggle metronome |
 | `Ctrl+Z` / `Ctrl+Shift+Z` | Undo / Redo |
-| Scale `1`–`9`, `0` | Hold visible scale pads |
+| Pads `1`–`9`, `0` | Hold visible pads |
 | Kit `1`–`9`, `0` | Trigger drum pads |
 | Piano `` ` ``–`=` | Hold piano keys left to right |
-| `ArrowUp` / `ArrowDown` | Octave shift (Scale Board, Micro Piano, Controller) |
+| `ArrowUp` / `ArrowDown` | Octave shift (Pads, Micro Piano, Controller) |
 | `Delete` / `Backspace` | Delete selected note or clip |
 | `Ctrl+click` | Delete a note (Inspect) or clip (Canvas) |
 | `Alt+drag` | Resize note (Inspect) or clip (Canvas, shrink) |
@@ -284,7 +284,7 @@ Notenotes/
     ├── main.js                # App bootstrap
     ├── style.css              # Design system
     ├── engine/                # Audio core (transport, scheduler, theory, recording)
-    ├── instruments/           # Sound generators (Scale Board, Piano, Kit, Mic, Synth)
+    ├── instruments/           # Sound generators (Pads/ScaleBoard, Piano, Kit, Mic, Synth)
     ├── modes/                 # Create, Canvas, Inspect views
     ├── ui/                    # Transport bar, tabs, settings drawer, snippet tray
     ├── data/                  # IndexedDB persistence + undo manager

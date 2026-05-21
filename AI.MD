@@ -2191,3 +2191,14 @@ project.settings.degreeHighlighting = {
   - old clamp: `2..6`
   - new clamp: `1..6`
 - There was no hard audio limitation behind the old C2-ish floor. It was an old guardrail. C1 is allowed now; C0 remains avoided because it is mostly sub-bass rumble on normal speakers and is less useful for this app's default playing surface.
+
+## Pads Naming Pass 0.1.18
+
+- User-facing Create tab label changed from `Scale` to `Pads`.
+- This is intentionally not a class/id/storage refactor:
+  - `INSTRUMENTS.SCALEBOARD` remains `scaleboard`.
+  - `ScaleBoard.js` remains the implementation file.
+  - AI sequence schemas still use the stable machine id `scaleboard`.
+- Reason: the surface is no longer only a scale instrument. It is becoming the family for pad-based playing modes: Single, Chords, Root, Voice Sketch, Custom, and the planned Tonal Compass.
+- README, Manual QA, keyboard help, AI Seed user-facing copy, and the AI instrument display label were updated to say `Pads` where the user sees the instrument name.
+- Keep the word `scale` anywhere it means the actual musical scale selected in the project key/scale controls.
