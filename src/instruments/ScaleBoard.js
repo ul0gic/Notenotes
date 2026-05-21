@@ -17,7 +17,16 @@
  * a low and a high voice singing "ah" both sound like "ah."
  */
 
-import { getScaleNotes, midiToNoteName, noteNameToMidi, SCALES, NOTE_NAMES } from '../engine/MusicTheory.js';
+import {
+  degreeForMidi,
+  getScaleNotes,
+  midiToNoteName,
+  normalizeDegreeHighlighting,
+  normalizeMusicalContext,
+  noteNameToMidi,
+  SCALES,
+  NOTE_NAMES
+} from '../engine/MusicTheory.js';
 import { showToast } from '../ui/Toast.js';
 import { syllabify, extractPlayableSyllables, sanitizePhraseInput } from './voice/syllabify.js';
 
@@ -51,6 +60,7 @@ export class ScaleBoard {
     this.onVoicePhraseChanged = null;
     this.onPadModeChange = null;
     this.onExtensionsChanged = null;
+    this.onProjectKeyChanged = null;
 
     this._notes = [];
     this._fullScaleNotes = [];
@@ -89,6 +99,9 @@ export class ScaleBoard {
 
   set project(p) {
     this._project = p;
+    const context = normalizeMusicalContext(p?.musicalContext);
+    this.rootNote = context.root;
+    this.scaleName = context.scale;
     this.extensionsEnabled = !!p?.settings?.scaleExtensionsEnabled;
     this._updateNotes();
     this._loadVoiceStateFromProject();
@@ -100,6 +113,19 @@ export class ScaleBoard {
 
   get project() {
     return this._project;
+  }
+
+  setProjectKey(context) {
+    const next = normalizeMusicalContext(context);
+    if (this.rootNote === next.root && this.scaleName === next.scale) {
+      if (this.el) this._refreshPads();
+      return;
+    }
+    this.releaseAllPads();
+    this.rootNote = next.root;
+    this.scaleName = next.scale;
+    if (this.el) this._refreshLayout();
+    else this._updateNotes();
   }
 
   /**
@@ -282,16 +308,34 @@ export class ScaleBoard {
       const isVoice = this.padMode === 'voices';
       const voiceLabel = isVoice ? this._previewSyllableForPad(i) : null;
       const voiceClass = isVoice ? ' scaleboard__pad--voice' : '';
+      const degreeMeta = this._degreeMetaForMidi(midi);
+      const degreeClass = degreeMeta ? ' scaleboard__pad--degree' : '';
+      const degreeStyle = degreeMeta ? ` style="--degree-color: ${this._escapeAttr(degreeMeta.color)};"` : '';
+      const degreeLabel = degreeMeta?.label || '';
       return `
-        <button class="scaleboard__pad${voiceClass} ${this.isEditingLayout ? 'is-editing' : ''}" data-index="${i}" data-midi="${midi}"
+        <button class="scaleboard__pad${voiceClass}${degreeClass} ${this.isEditingLayout ? 'is-editing' : ''}"${degreeStyle} data-index="${i}" data-midi="${midi}"
                 aria-label="${isRootMode ? `${noteInfo.display} plus nearest ${this.rootNote}, ${rootInfo.display}` : `Scale degree ${degree}, ${noteInfo.display}`}${voiceLabel ? ', sings ' + voiceLabel : ''}">
           <span class="scaleboard__pad-degree">${isRootMode ? noteInfo.name : degree}</span>
           <span class="scaleboard__pad-note">${noteInfo.display}</span>
+          ${degreeLabel ? `<span class="scaleboard__pad-degree-name">${this._escapeHtml(degreeLabel)}</span>` : ''}
           ${(this.padMode === 'custom' || isRootMode) ? `<span class="scaleboard__pad-type">${typeLabel}</span>` : ''}
           ${isVoice && voiceLabel ? `<span class="scaleboard__pad-syllable">${this._escapeHtml(voiceLabel)}</span>` : ''}
         </button>
       `;
     }).join('');
+  }
+
+  _degreeMetaForMidi(midi) {
+    if (this.padMode === 'voices') return null;
+    const degree = normalizeDegreeHighlighting(this.project?.settings?.degreeHighlighting);
+    if (!degree.enabled && !degree.showLabels) return null;
+    const context = normalizeMusicalContext(this.project?.musicalContext || { root: this.rootNote, scale: this.scaleName });
+    const meta = degreeForMidi(midi, context);
+    if (!meta) return null;
+    return {
+      color: degree.colors[meta.interval],
+      label: degree.showLabels ? meta.label : ''
+    };
   }
 
   _renderVoiceRow() {
@@ -409,12 +453,14 @@ export class ScaleBoard {
     this.el.querySelector('#sb-root').addEventListener('change', (e) => {
       this.rootNote = e.target.value;
       this._refreshPads();
+      if (this.onProjectKeyChanged) this.onProjectKeyChanged({ root: this.rootNote, scale: this.scaleName });
     });
 
     // Scale selector
     this.el.querySelector('#sb-scale')?.addEventListener('change', (e) => {
       this.scaleName = e.target.value;
       this._refreshPads();
+      if (this.onProjectKeyChanged) this.onProjectKeyChanged({ root: this.rootNote, scale: this.scaleName });
     });
 
     // Octave controls

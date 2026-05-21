@@ -4,7 +4,7 @@
  * Supports pad modes: single and chords. Records modulation.
  */
 
-import { getScaleNotes, midiToNoteName, SCALES, NOTE_NAMES } from '../engine/MusicTheory.js';
+import { getScaleNotes, midiToNoteName, normalizeMusicalContext, SCALES, NOTE_NAMES } from '../engine/MusicTheory.js';
 import { SOUND_TRAITS, normalizeSoundTraits } from './WebAudioSynth.js';
 import { gamepadButtonInfo } from '../engine/GamepadInputManager.js';
 
@@ -33,6 +33,7 @@ export class ControllerMode {
     this._onBeforeNoteOn = null;
     this.onToneAssignmentChanged = null;
     this.onToneOverrideChanged = null;
+    this.onProjectKeyChanged = null;
 
     this.scaleName = 'major';
     this.rootNote = 'C';
@@ -55,12 +56,27 @@ export class ControllerMode {
 
   set project(p) {
     this._project = p;
+    this.setProjectKey(p?.musicalContext);
     this._controllerToneAssignments();
     this._syncTriggerAssignmentSelects();
     this._updateTriggerHelp();
     this._updateTriggerStatus();
   }
   get project() { return this._project; }
+
+  setProjectKey(context) {
+    const next = normalizeMusicalContext(context);
+    this.rootNote = next.root;
+    this.scaleName = next.scale;
+    this._updateNotes();
+    if (this.el) {
+      const root = this.el.querySelector('#ct-p-root');
+      const scale = this.el.querySelector('#ct-p-scale');
+      if (root) root.value = this.rootNote;
+      if (scale) scale.value = this.scaleName;
+      this._refreshPads();
+    }
+  }
 
   setNoteCallbacks(onNoteOn, onNoteOff) {
     this._onNoteOn = onNoteOn;
@@ -210,19 +226,26 @@ export class ControllerMode {
       </div>`;
     }).join('');
 
-    return `
-      <div class="ctrlmode__binding-head">
-        <span>Controller bindings</span>
-        <span>${entries.length ? `${entries.length} set` : 'Fallback scale'}</span>
-      </div>
-      ${entries.length ? entries.map(([index, binding]) => {
+    const bindingRows = entries.map(([index, binding]) => {
         const info = gamepadButtonInfo(Number(index));
         return `<div class="ctrlmode__binding-row">
           <span class="ctrlmode__binding-button">${info.short}</span>
           <span class="ctrlmode__binding-target">${this._escapeHtml(binding.label || this._bindingLabel(binding))}</span>
         </div>`;
-      }).join('') : fallback}
-      <p class="ctrlmode__binding-note">Use the Controller button near AI to learn or clear bindings. Unbound buttons use the fallback scale layout.</p>
+      }).join('');
+
+    return `
+      <div class="ctrlmode__binding-head">
+        <span>Custom bindings</span>
+        <span>${entries.length ? `${entries.length} set` : 'None set'}</span>
+      </div>
+      ${entries.length ? bindingRows : '<p class="ctrlmode__binding-empty">No custom bindings yet.</p>'}
+      <div class="ctrlmode__binding-head ctrlmode__binding-head--secondary">
+        <span>Fallback scale</span>
+        <span>Unbound buttons</span>
+      </div>
+      ${fallback}
+      <p class="ctrlmode__binding-note">Use the Controller button near AI to learn or clear custom bindings. Buttons without a custom binding use the fallback scale layout.</p>
     `;
   }
 
@@ -243,11 +266,13 @@ export class ControllerMode {
       this.rootNote = e.target.value;
       this._updateNotes();
       this._refreshPads();
+      if (this.onProjectKeyChanged) this.onProjectKeyChanged({ root: this.rootNote, scale: this.scaleName });
     });
     this.el.querySelector('#ct-p-scale')?.addEventListener('change', (e) => {
       this.scaleName = e.target.value;
       this._updateNotes();
       this._refreshPads();
+      if (this.onProjectKeyChanged) this.onProjectKeyChanged({ root: this.rootNote, scale: this.scaleName });
     });
     this.el.querySelector('#ct-p-mode')?.addEventListener('change', (e) => {
       this.padMode = e.target.value;

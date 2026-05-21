@@ -6,7 +6,14 @@
 
 import '../modes/creative.css';
 import { WebAudioSynth, PRESETS, SOUND_TRAITS, normalizeSoundTraits } from '../instruments/WebAudioSynth.js';
-import { midiToNoteName } from '../engine/MusicTheory.js';
+import {
+  DEFAULT_DEGREE_COLORS,
+  degreeForMidi,
+  midiToNoteName,
+  normalizeDegreeHighlighting,
+  normalizeMusicalContext,
+  SCALES
+} from '../engine/MusicTheory.js';
 import { ScaleBoard } from '../instruments/ScaleBoard.js';
 import { MicroPiano } from '../instruments/MicroPiano.js';
 import { SketchKit } from '../instruments/SketchKit.js';
@@ -65,6 +72,7 @@ export class CreativeMode {
     this.scaleBoard = new ScaleBoard(this.synth, this.project, this.voiceEngine);
     this.scaleBoard.onVoicePhraseChanged = () => this.store?.scheduleAutoSave(this.project);
     this.scaleBoard.onExtensionsChanged = () => this.store?.scheduleAutoSave(this.project);
+    this.scaleBoard.onProjectKeyChanged = (context) => this._emitProjectKeyChange(context);
     // When Scale Board switches into/out of Voice Sketch mode, refresh any
     // open AI Seed popover. AI can't generate voice phrases, so the panel
     // disables itself with "Unavailable in Voice Sketch mode" instead of
@@ -85,6 +93,7 @@ export class CreativeMode {
     this.micRecorder = new MicRecorder();
     this.controllerMode = new ControllerMode(this.synth, this.project, modManager, this.gamepadInput);
     this.controllerMode.onToneAssignmentChanged = () => this.store?.scheduleAutoSave(this.project);
+    this.controllerMode.onProjectKeyChanged = (context) => this._emitProjectKeyChange(context);
     this.controllerMode.onToneOverrideChanged = (traits, labels = []) => {
       this._setLiveSoundTraits(traits);
       this._updateToneTriggerIndicator(labels);
@@ -139,6 +148,7 @@ export class CreativeMode {
     this.onRecordArmChanged = null;
     this._activePatchId = 'chip_lead';
     this._currentToneTraits = this._currentToneTraits || null;
+    this.onProjectKeyChange = null;
   }
 
   set project(p) {
@@ -150,6 +160,7 @@ export class CreativeMode {
     if (this.arpManager) this.arpManager.project = p;
     if (this.loopProgress) this.loopProgress.project = p;
     this._currentToneTraits = this._normalizeProjectSoundTraits(p);
+    this._ensureDegreeHighlighting();
     if (this.synth) this._setLiveSoundTraits(this._currentToneTraits);
     this.refreshProjectBoundUi();
   }
@@ -498,8 +509,53 @@ export class CreativeMode {
   refreshProjectBoundUi() {
     if (!this.el) return;
     this._refreshPatchSelector();
+    this.scaleBoard?.setProjectKey?.(this._ensureMusicalContext());
+    this.microPiano?.refreshDegreeHighlights?.();
     this.sketchKit?.refreshKitSelector?.();
     this.snippetTray?._renderSnippets?.();
+  }
+
+  _ensureMusicalContext() {
+    if (!this.project) return normalizeMusicalContext();
+    const context = normalizeMusicalContext(this.project.musicalContext);
+    this.project.musicalContext = context;
+    return context;
+  }
+
+  applyProjectMusicalContext(context) {
+    if (!this.project) return;
+    const next = normalizeMusicalContext(context);
+    this.project.musicalContext = next;
+    this.scaleBoard?.setProjectKey?.(next);
+    this.controllerMode?.setProjectKey?.(next);
+    this.microPiano?.refreshDegreeHighlights?.();
+    this._aiSeedPanelInstance?.refresh?.();
+  }
+
+  _emitProjectKeyChange(context) {
+    const next = normalizeMusicalContext(context);
+    if (this.onProjectKeyChange) {
+      this.onProjectKeyChange(next);
+      return;
+    }
+    if (this.project) {
+      this.project.musicalContext = next;
+      this.store?.scheduleAutoSave(this.project);
+      this.applyProjectMusicalContext(next);
+      window.dispatchEvent(new CustomEvent('project-musical-context-changed', { detail: next }));
+    }
+  }
+
+  _ensureDegreeHighlighting() {
+    if (!this.project) return normalizeDegreeHighlighting();
+    this.project.settings ||= {};
+    this.project.settings.degreeHighlighting = normalizeDegreeHighlighting(this.project.settings.degreeHighlighting);
+    return this.project.settings.degreeHighlighting;
+  }
+
+  _activeScaleIntervals() {
+    const context = this._ensureMusicalContext();
+    return SCALES[context.scale]?.intervals || SCALES.major.intervals;
   }
 
   _syncInstrumentButtons() {
@@ -1268,8 +1324,7 @@ export class CreativeMode {
     const padsBtn = this.el?.querySelector('#pads-button');
     const keysBtn = this.el?.querySelector('#keys-button');
     if (padsBtn) {
-      const showPads = this.activeInstrument === INSTRUMENTS.SCALEBOARD
-        && this.scaleBoard?.padMode === 'custom';
+      const showPads = this.activeInstrument === INSTRUMENTS.SCALEBOARD;
       padsBtn.style.display = showPads ? '' : 'none';
       if (!showPads) this._closePadsPopover();
     }
@@ -1749,6 +1804,7 @@ export class CreativeMode {
     this._closeControllerMapperPopover();
 
     const count = this.project?.settings?.scalePadsCount || 7;
+    const showCustomCount = this.scaleBoard?.padMode === 'custom';
     const popover = document.createElement('div');
     popover.className = 'tone-popover create-control-popover';
     popover.id = 'pads-popover';
@@ -1756,12 +1812,15 @@ export class CreativeMode {
       <div class="tone-popover__header">
         <span>Pads</span>
       </div>
+      ${showCustomCount ? `
       <label class="create-control-popover__row create-control-popover__row--slider">
         <span>Custom pad count</span>
         <span class="create-control-popover__value" id="pads-count-value">${count}</span>
         <input class="tone-row__slider" id="pads-count-slider" type="range" min="1" max="16" value="${count}" aria-label="Custom pad count">
       </label>
       <p class="create-control-popover__hint">Used by Scale Board Custom mode.</p>
+      ` : `<p class="create-control-popover__hint">Custom pad count appears here in Custom mode.</p>`}
+      ${this._renderDegreeControls()}
     `;
 
     anchor.appendChild(popover);
@@ -1777,6 +1836,7 @@ export class CreativeMode {
       this.store?.scheduleAutoSave(this.project);
       window.dispatchEvent(new CustomEvent('settings-pads-changed', { detail: { count: value } }));
     });
+    this._bindDegreeControls(popover);
 
     const handleOutside = (e) => {
       if (!this._padsPopover) return;
@@ -1818,6 +1878,7 @@ export class CreativeMode {
         <span class="create-control-popover__value" id="keys-count-value">${keys}</span>
         <input class="tone-row__slider" id="keys-count-slider" type="range" min="10" max="32" value="${keys}" aria-label="Piano key count">
       </label>
+      ${this._renderDegreeControls()}
     `;
 
     anchor.appendChild(popover);
@@ -1838,6 +1899,7 @@ export class CreativeMode {
       this.store?.scheduleAutoSave(this.project);
       window.dispatchEvent(new CustomEvent('settings-piano-changed'));
     });
+    this._bindDegreeControls(popover);
 
     const handleOutside = (e) => {
       if (!this._keysPopover) return;
@@ -1847,6 +1909,83 @@ export class CreativeMode {
     };
     queueMicrotask(() => document.addEventListener('pointerdown', handleOutside, true));
     this._keysClickOutsideHandler = handleOutside;
+  }
+
+  _renderDegreeControls() {
+    const degree = this._ensureDegreeHighlighting();
+    const intervals = this._activeScaleIntervals();
+    const context = this._ensureMusicalContext();
+    return `
+      <div class="degree-controls" data-degree-controls>
+        <div class="degree-controls__head">
+          <span>Degree colors</span>
+          <button class="btn btn--ghost btn--sm" type="button" data-degree-reset>Reset</button>
+        </div>
+        <label class="degree-controls__check">
+          <input type="checkbox" data-degree-enabled ${degree.enabled ? 'checked' : ''}>
+          <span>Highlight scale degrees</span>
+        </label>
+        <label class="degree-controls__check">
+          <input type="checkbox" data-degree-labels ${degree.showLabels ? 'checked' : ''}>
+          <span>Show degree labels</span>
+        </label>
+        <div class="degree-controls__swatches" aria-label="Degree colors for ${context.root} ${SCALES[context.scale]?.name || 'Major'}">
+          ${intervals.map(interval => {
+            const meta = degreeForMidi(60 + interval, { root: 'C', scale: 'chromatic' });
+            const label = meta?.label || String(interval);
+            const name = meta?.name || `Interval ${interval}`;
+            const color = degree.colors[interval] || DEFAULT_DEGREE_COLORS[interval];
+            return `
+              <label class="degree-controls__swatch" title="${this._escapeAttr(name)}">
+                <span>${this._escapeHtml(label)}</span>
+                <input type="color" value="${this._escapeAttr(color)}" data-degree-color="${interval}" aria-label="${this._escapeAttr(name)} color">
+              </label>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  _bindDegreeControls(popover) {
+    if (!popover) return;
+    const notify = () => {
+      this.store?.scheduleAutoSave(this.project);
+      this.scaleBoard?._refreshPads?.();
+      this.microPiano?.refreshDegreeHighlights?.();
+      window.dispatchEvent(new CustomEvent('project-degree-highlighting-changed'));
+    };
+    popover.querySelector('[data-degree-enabled]')?.addEventListener('change', (event) => {
+      this._ensureDegreeHighlighting().enabled = !!event.target.checked;
+      notify();
+    });
+    popover.querySelector('[data-degree-labels]')?.addEventListener('change', (event) => {
+      this._ensureDegreeHighlighting().showLabels = !!event.target.checked;
+      notify();
+    });
+    popover.querySelectorAll('[data-degree-color]').forEach(input => {
+      input.addEventListener('input', (event) => {
+        const interval = Number(event.target.dataset.degreeColor);
+        const degree = this._ensureDegreeHighlighting();
+        degree.colors[interval] = event.target.value;
+        notify();
+      });
+    });
+    popover.querySelector('[data-degree-reset]')?.addEventListener('pointerdown', (event) => {
+      event.preventDefault();
+      const degree = this._ensureDegreeHighlighting();
+      degree.colors = { ...DEFAULT_DEGREE_COLORS };
+      notify();
+      const parent = popover.parentElement;
+      const isPads = popover.id === 'pads-popover';
+      if (isPads) {
+        this._closePadsPopover();
+        this._togglePadsPopover(parent, parent?.querySelector('#pads-button'));
+      } else {
+        this._closeKeysPopover();
+        this._toggleKeysPopover(parent, parent?.querySelector('#keys-button'));
+      }
+    });
   }
 
   _bindTonePresetControls() {

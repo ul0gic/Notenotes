@@ -22,6 +22,7 @@ import { EditMode } from './modes/EditMode.js';
 import { SettingsPanel } from './ui/SettingsPanel.js';
 import { PlaybackEngine } from './engine/PlaybackEngine.js';
 import { ModulationManager } from './engine/ModulationManager.js';
+import { normalizeMusicalContext } from './engine/MusicTheory.js';
 
 if (import.meta.env.DEV && typeof window !== 'undefined') {
   import('./dev/AudioParityHarness.js').then((harness) => {
@@ -74,7 +75,9 @@ class App {
     await this._loadOrCreateProject();
 
     // Pass project reference to creative mode
+    this._ensureProjectMusicalContext();
     this.creativeMode.project = this.project;
+    this.transportBar.setProjectKey(this.project.musicalContext);
 
     // Create and render Canvas Mode (needs project)
     this.canvasMode = new CanvasMode(this.transport, this.project, this.undoManager, this.store);
@@ -180,6 +183,12 @@ class App {
     this.transportBar.onArmRecordClick = (armed) => {
       this.creativeMode?.setRecordArmed?.(armed);
     };
+    this.transportBar.onProjectKeyChange = (context) => {
+      this._setProjectMusicalContext(context, { source: 'transport' });
+    };
+    this.creativeMode.onProjectKeyChange = (context) => {
+      this._setProjectMusicalContext(context, { source: 'creative' });
+    };
     this.creativeMode.onRecordArmChanged = (armed) => {
       this.transportBar.setRecordArmed(armed);
     };
@@ -194,6 +203,10 @@ class App {
 
     window.addEventListener('project-sound-traits-changed', () => {
       this.canvasMode?.refresh();
+    });
+
+    window.addEventListener('project-degree-highlighting-changed', () => {
+      this.creativeMode?.refreshProjectBoundUi?.();
     });
 
     window.addEventListener('project-snippets-changed', () => {
@@ -211,6 +224,25 @@ class App {
     this._setupAudioInit();
 
     console.log('[App] Notenotes ready.');
+  }
+
+  _ensureProjectMusicalContext() {
+    if (!this.project) return normalizeMusicalContext();
+    const context = normalizeMusicalContext(this.project.musicalContext);
+    this.project.musicalContext = context;
+    return context;
+  }
+
+  _setProjectMusicalContext(context, options = {}) {
+    if (!this.project) return;
+    const next = normalizeMusicalContext(context);
+    const prev = normalizeMusicalContext(this.project.musicalContext);
+    if (prev.root === next.root && prev.scale === next.scale) return;
+    this.project.musicalContext = next;
+    this.transportBar.setProjectKey(next);
+    this.creativeMode?.applyProjectMusicalContext?.(next, { source: options.source });
+    this.store?.scheduleAutoSave(this.project);
+    window.dispatchEvent(new CustomEvent('project-musical-context-changed', { detail: next }));
   }
 
   _setupInstallPrompt() {

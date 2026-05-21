@@ -4,6 +4,7 @@
  */
 
 import { openDB } from 'idb';
+import { DEFAULT_DEGREE_HIGHLIGHTING, DEFAULT_MUSICAL_CONTEXT } from '../engine/MusicTheory.js';
 
 const DB_NAME = 'notenotes';
 const DB_VERSION = 3;
@@ -32,6 +33,7 @@ export function createProject(name = 'Untitled Sketch') {
     name,
     bpm: 120,
     timeSignature: { beats: 4, subdivision: 4 },
+    musicalContext: { ...DEFAULT_MUSICAL_CONTEXT },
     createdAt: Date.now(),
     updatedAt: Date.now(),
     tracks: [],
@@ -57,6 +59,11 @@ export function createProject(name = 'Untitled Sketch') {
         rightTrigger: 'none'
       },
       controllerBindings: {},
+      degreeHighlighting: {
+        enabled: DEFAULT_DEGREE_HIGHLIGHTING.enabled,
+        showLabels: DEFAULT_DEGREE_HIGHLIGHTING.showLabels,
+        colors: { ...DEFAULT_DEGREE_HIGHLIGHTING.colors }
+      },
       versionHistoryLimit: DEFAULT_VERSION_HISTORY_LIMIT,
       backupContents: 'current',
       debugLogging: false,

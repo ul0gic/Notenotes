@@ -20,6 +20,95 @@ export const SCALES = {
   chromatic:   { name: 'Chromatic',    intervals: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] }
 };
 
+export const DEFAULT_MUSICAL_CONTEXT = {
+  root: 'C',
+  scale: 'major'
+};
+
+export const DEFAULT_DEGREE_COLORS = {
+  0: '#ff6b6b',
+  1: '#ff8a5c',
+  2: '#f7b267',
+  3: '#d16fcb',
+  4: '#7bd88f',
+  5: '#5bd6d6',
+  6: '#6fb4ff',
+  7: '#7d8cff',
+  8: '#a884ff',
+  9: '#d783ff',
+  10: '#ff77c8',
+  11: '#f05d8e'
+};
+
+export const DEFAULT_DEGREE_HIGHLIGHTING = {
+  enabled: false,
+  showLabels: false,
+  colors: DEFAULT_DEGREE_COLORS
+};
+
+export const INTERVAL_LABELS = {
+  0: 'Root',
+  1: 'b2',
+  2: '2',
+  3: 'b3',
+  4: '3',
+  5: '4',
+  6: 'b5',
+  7: '5',
+  8: 'b6',
+  9: '6',
+  10: 'b7',
+  11: '7'
+};
+
+export const INTERVAL_NAMES = {
+  0: 'Root',
+  1: 'Flat 2',
+  2: '2nd',
+  3: 'Flat 3',
+  4: '3rd',
+  5: '4th',
+  6: 'Flat 5',
+  7: '5th',
+  8: 'Flat 6',
+  9: '6th',
+  10: 'Flat 7',
+  11: '7th'
+};
+
+export function normalizeMusicalContext(context = {}) {
+  const root = NOTE_NAMES.includes(context?.root) ? context.root : DEFAULT_MUSICAL_CONTEXT.root;
+  const scale = SCALES[context?.scale] ? context.scale : DEFAULT_MUSICAL_CONTEXT.scale;
+  return { root, scale };
+}
+
+export function normalizeDegreeHighlighting(value = {}) {
+  const colors = { ...DEFAULT_DEGREE_COLORS, ...(value?.colors || {}) };
+  return {
+    enabled: !!value?.enabled,
+    showLabels: !!value?.showLabels,
+    colors
+  };
+}
+
+export function intervalFromRoot(midi, rootNote) {
+  const root = noteNameToMidi(rootNote, Math.floor(midi / 12) - 1);
+  return ((midi - root) % 12 + 12) % 12;
+}
+
+export function degreeForMidi(midi, context = DEFAULT_MUSICAL_CONTEXT) {
+  const normalized = normalizeMusicalContext(context);
+  const scale = SCALES[normalized.scale];
+  if (!scale) return null;
+  const interval = intervalFromRoot(midi, normalized.root);
+  if (!scale.intervals.includes(interval)) return null;
+  return {
+    interval,
+    label: INTERVAL_LABELS[interval] || String(interval),
+    name: INTERVAL_NAMES[interval] || `Interval ${interval}`
+  };
+}
+
 /**
  * Convert a MIDI note number to a frequency in Hz.
  * @param {number} midi - MIDI note number (0–127)

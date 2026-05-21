@@ -2020,3 +2020,99 @@ When the mapper is waiting for a target:
   - Kit: visible-pad mapping
   - Controller: old Controller Mode scale/chord fallback via `handleFallbackButtonDown/Up`
 - Canvas has no controller mapper or controller playback in this version by design.
+
+## Project Key / Scale And Degree Highlighting Milestone 0.1.14
+
+This build introduces a shared project-level musical context so Scale, Piano, Controller fallback, AI context, and theory coloring stop drifting away from each other.
+
+### Project musical context
+
+- New projects now include:
+
+```js
+project.musicalContext = {
+  root: "C",
+  scale: "major"
+}
+```
+
+- `MusicTheory.normalizeMusicalContext(context)` is the canonical normalizer. It falls back to `C major` if a loaded project is missing the field or contains an unknown root/scale.
+- `App._ensureProjectMusicalContext()` normalizes older projects after load.
+- `TransportBar` owns only the UI controls and exposes `onProjectKeyChange`. It does not own project state.
+- `App._setProjectMusicalContext(context)` is the central write path:
+  - normalizes the root/scale
+  - writes `project.musicalContext`
+  - syncs the top-bar selects
+  - calls `CreativeMode.applyProjectMusicalContext()`
+  - schedules autosave
+  - dispatches `project-musical-context-changed`
+- `ScaleBoard` and `ControllerMode` still show their local Root/Scale selects, but changing either now routes through CreativeMode and updates the shared project context.
+- `MicroPiano` remains chromatic. It does not change its notes when project scale changes, but it can color keys by the shared scale.
+
+### Transport UI
+
+- The top transport bar now has compact `Key` controls between BPM and the overflow/menu area.
+- On narrow/mobile layouts the key controls wrap to a second row instead of crowding the Stop/Play/Record controls.
+
+### Degree highlighting settings
+
+New projects now include:
+
+```js
+project.settings.degreeHighlighting = {
+  enabled: false,
+  showLabels: false,
+  colors: {
+    0: "#ff6b6b",
+    1: "#ff8a5c",
+    2: "#f7b267",
+    3: "#d16fcb",
+    4: "#7bd88f",
+    5: "#5bd6d6",
+    6: "#6fb4ff",
+    7: "#7d8cff",
+    8: "#a884ff",
+    9: "#d783ff",
+    10: "#ff77c8",
+    11: "#f05d8e"
+  }
+}
+```
+
+- `MusicTheory.normalizeDegreeHighlighting(value)` is the canonical normalizer.
+- Colors are keyed by semitone interval from root, not by a hardcoded 1-7 degree index. This matters for minor, pentatonic, blues, Dorian, and Mixolydian.
+- `MusicTheory.degreeForMidi(midi, context)` returns `null` when the MIDI note is outside the current project scale. It returns `{ interval, label, name }` when the note belongs to the scale.
+- Labels intentionally use compact interval names:
+  - `Root`, `b2`, `2`, `b3`, `3`, `4`, `b5`, `5`, `b6`, `6`, `b7`, `7`
+  - This avoids telling users a minor third is a "Major 3rd" or a Mixolydian seventh is a "Major 7th".
+
+### Pads and Keys panels
+
+- The `Pads` button is now visible whenever Scale Board is active, not only in Custom mode.
+- In Custom mode, Pads still shows the custom pad-count slider.
+- Outside Custom mode, Pads shows a short hint instead of the count slider, then the shared Degree Colors controls.
+- The Piano `Keys` panel now includes the same Degree Colors controls under the existing piano count/key count controls.
+- Degree settings include:
+  - `Highlight scale degrees`
+  - `Show degree labels`
+  - current-scale color swatches
+  - `Reset`
+- The swatch list follows the current project scale. Major shows seven colors, pentatonic shows five, blues shows six, etc.
+
+### Rendering behavior
+
+- Scale Board pads:
+  - use `degreeForMidi()` against `project.musicalContext`
+  - tint the pad when highlighting is enabled
+  - optionally show compact interval labels when `showLabels` is enabled
+  - do not apply degree labels/colors in Voice Sketch mode, because voice syllable labels already compete for that space
+- MicroPiano:
+  - stays chromatic
+  - colors only keys that belong to the current project scale
+  - optionally shows compact interval labels above matching keys
+
+### Controller screen cleanup
+
+- The Controller tab no longer labels fallback rows as if they were saved bindings.
+- When no custom bindings exist it now says `Custom bindings / None set`, shows `No custom bindings yet`, then shows the fallback scale rows under a separate `Fallback scale` heading.
+- Controller fallback root/scale now syncs to `project.musicalContext`.

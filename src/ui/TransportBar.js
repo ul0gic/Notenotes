@@ -5,6 +5,7 @@
 
 import { TransportState } from '../engine/Transport.js';
 import { ARP_MODES } from '../engine/ArpeggioManager.js';
+import { NOTE_NAMES, SCALES, normalizeMusicalContext } from '../engine/MusicTheory.js';
 
 export class TransportBar {
   /**
@@ -22,10 +23,12 @@ export class TransportBar {
     this.onModResetClick = null;
     this.onPanicClick = null;
     this.onArmRecordClick = null;
+    this.onProjectKeyChange = null;
     this.onMoreOpen = null;
     this._lastMoreToggle = 0;
     this._lastStopPress = 0;
     this._recordArmed = false;
+    this._projectKey = normalizeMusicalContext();
   }
 
   /**
@@ -60,6 +63,18 @@ export class TransportBar {
       <div class="transport-bar__bpm">
         <input type="number" id="bpm-input" value="${this.transport.bpm}" min="40" max="240" aria-label="BPM" style="width:56px;" />
         <span>BPM</span>
+      </div>
+
+      <div class="transport-bar__project-key" aria-label="Project key and scale">
+        <span class="transport-bar__project-key-label">Key</span>
+        <select id="project-root-select" aria-label="Project root note">
+          ${NOTE_NAMES.map(note => `<option value="${note}" ${note === this._projectKey.root ? 'selected' : ''}>${note}</option>`).join('')}
+        </select>
+        <select id="project-scale-select" aria-label="Project scale">
+          ${Object.entries(SCALES).filter(([key]) => key !== 'chromatic').map(([key, scale]) =>
+            `<option value="${key}" ${key === this._projectKey.scale ? 'selected' : ''}>${scale.name}</option>`
+          ).join('')}
+        </select>
       </div>
 
       <div class="transport-bar__spacer"></div>
@@ -145,6 +160,9 @@ export class TransportBar {
       this.transport.bpm = parseInt(bpmInput.value, 10) || 120;
       bpmInput.value = this.transport.bpm;
     });
+
+    this.el.querySelector('#project-root-select')?.addEventListener('change', () => this._emitProjectKeyChange());
+    this.el.querySelector('#project-scale-select')?.addEventListener('change', () => this._emitProjectKeyChange());
 
     // Metronome toggle
     this.el.querySelector('#btn-metronome').addEventListener('pointerdown', (e) => {
@@ -256,6 +274,21 @@ export class TransportBar {
     btn.title = this._recordArmed
       ? 'Armed. Recording starts on the first note or drum hit.'
       : 'Arm recording. Recording starts on the first note or drum hit.';
+  }
+
+  setProjectKey(context = {}) {
+    this._projectKey = normalizeMusicalContext(context);
+    const root = this.el?.querySelector('#project-root-select');
+    const scale = this.el?.querySelector('#project-scale-select');
+    if (root) root.value = this._projectKey.root;
+    if (scale) scale.value = this._projectKey.scale;
+  }
+
+  _emitProjectKeyChange() {
+    const root = this.el?.querySelector('#project-root-select')?.value;
+    const scale = this.el?.querySelector('#project-scale-select')?.value;
+    this.setProjectKey({ root, scale });
+    if (this.onProjectKeyChange) this.onProjectKeyChange({ ...this._projectKey });
   }
 
   syncFromTransport() {

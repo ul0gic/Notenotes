@@ -3,6 +3,8 @@
  * Supports 1 or 2 stacked keyboards with configurable key count via Settings.
  */
 
+import { degreeForMidi, normalizeDegreeHighlighting, normalizeMusicalContext } from '../engine/MusicTheory.js';
+
 export class MicroPiano {
   constructor(synth, project) {
     this.synth = synth;
@@ -123,12 +125,37 @@ export class MicroPiano {
       const label = (key.name === 'C' && this._pianoKeys > 12)
         ? `C${oct}`
         : key.name;
-      html += `<button class="micropiano__key ${cls}" data-midi="${midi}"
+      const degreeMeta = this._degreeMetaForMidi(midi);
+      const degreeClass = degreeMeta ? ' micropiano__key--degree' : '';
+      const degreeStyle = degreeMeta ? ` style="--degree-color: ${this._escapeAttr(degreeMeta.color)};"` : '';
+      html += `<button class="micropiano__key ${cls}${degreeClass}"${degreeStyle} data-midi="${midi}"
                 aria-label="${key.name}${oct}">
                 <span class="micropiano__key-label">${label}</span>
+                ${degreeMeta?.label ? `<span class="micropiano__degree-label">${this._escapeHtml(degreeMeta.label)}</span>` : ''}
               </button>`;
     }
     return html;
+  }
+
+  _degreeMetaForMidi(midi) {
+    const degree = normalizeDegreeHighlighting(this.project?.settings?.degreeHighlighting);
+    if (!degree.enabled && !degree.showLabels) return null;
+    const meta = degreeForMidi(midi, normalizeMusicalContext(this.project?.musicalContext));
+    if (!meta) return null;
+    return {
+      color: degree.colors[meta.interval],
+      label: degree.showLabels ? meta.label : ''
+    };
+  }
+
+  _escapeHtml(value = '') {
+    return String(value).replace(/[&<>"']/g, (c) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[c]));
+  }
+
+  _escapeAttr(value = '') {
+    return this._escapeHtml(value);
   }
 
   _refreshKeys() {
@@ -141,6 +168,10 @@ export class MicroPiano {
     const display = this.el.querySelector('#mp-oct-display');
     if (display) display.textContent = this._octaveDisplay();
     this._refreshKeys();
+  }
+
+  refreshDegreeHighlights() {
+    if (this.el) this._refreshKeys();
   }
 
   _maxBaseOctave() {

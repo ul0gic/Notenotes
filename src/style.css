@@ -321,6 +321,32 @@ input, textarea, select, [contenteditable] {
   box-shadow: var(--shadow-glow);
 }
 
+.transport-bar__project-key {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding-left: var(--space-xs);
+  color: var(--text-tertiary);
+  font-size: var(--font-size-xs);
+}
+
+.transport-bar__project-key-label {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.transport-bar__project-key select {
+  min-height: 30px;
+  max-width: 128px;
+  border: var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+  color: var(--text-primary);
+  font-family: var(--font-family);
+  font-size: var(--font-size-sm);
+  padding: 0 var(--space-xs);
+}
+
 .arp-toggle {
   transition: all var(--duration-fast) var(--ease-out);
 }
@@ -363,6 +389,19 @@ input, textarea, select, [contenteditable] {
 @media (max-width: 560px) {
   .transport-bar {
     padding-right: var(--space-sm);
+    gap: var(--space-sm);
+    flex-wrap: wrap;
+  }
+
+  .transport-bar__project-key {
+    order: 3;
+    flex: 1 1 100%;
+    padding-left: 0;
+  }
+
+  .transport-bar__project-key select {
+    flex: 1;
+    max-width: none;
   }
 
   .transport-bar__more {
