@@ -2116,3 +2116,38 @@ project.settings.degreeHighlighting = {
 - The Controller tab no longer labels fallback rows as if they were saved bindings.
 - When no custom bindings exist it now says `Custom bindings / None set`, shows `No custom bindings yet`, then shows the fallback scale rows under a separate `Fallback scale` heading.
 - Controller fallback root/scale now syncs to `project.musicalContext`.
+
+## Toolbar Cleanup Milestone 0.1.15
+
+This is a UI correction pass after the shared project key/scale landed.
+
+### Project key is the only key selector
+
+- Removed the duplicate Root/Scale controls from `ScaleBoard`.
+- Removed the duplicate Root/Scale controls from `ControllerMode`.
+- Scale Board and Controller fallback still read `project.musicalContext`; they just no longer present local controls that imply they can diverge from the project key.
+- Root Mode on Scale Board now uses the top-bar project root. If future UX needs a temporary per-instrument root, it should be designed as an explicit override rather than quietly reintroducing a second root selector.
+
+### Stable Layout button
+
+- The Create toolbar now uses one stable `Layout` button instead of separately showing/hiding `Pads` and `Keys`.
+- On Scale Board it is labeled `Pads` and opens the Pads layout / Degree Colors popover.
+- On MicroPiano it is labeled `Keys` and opens the Keys layout / Degree Colors popover.
+- On Controller and other unsupported surfaces it remains visible as `Layout` but is disabled. This keeps the toolbar from visually jumping between instruments.
+
+### AI button on Controller
+
+- The patch toolbar now keeps the `AI` button visible on the Controller tab, but disabled.
+- Clicking disabled AI does nothing.
+- The disabled tooltip explains that AI Seed is not available from Controller setup.
+- This follows the agreed pattern: keep toolbar affordances visible where they help orientation, but disable them when the active surface cannot use them.
+
+### Controller helper copy
+
+- Controller fallback text no longer says `near AI`.
+- It now says to use the Controller button in the upper app toolbar. This avoids referencing another button that may be disabled or unavailable in that context.
+
+### Kit toolbar row
+
+- `SketchKit`'s selector row now uses the same surface background and bottom border treatment as the synth toolbar row.
+- This keeps Kit from looking like its kit dropdown / Tone / AI / Controller controls are floating loose under the tab bar.

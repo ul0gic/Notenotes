@@ -4,7 +4,7 @@
  * Supports pad modes: single and chords. Records modulation.
  */
 
-import { getScaleNotes, midiToNoteName, normalizeMusicalContext, SCALES, NOTE_NAMES } from '../engine/MusicTheory.js';
+import { getScaleNotes, midiToNoteName, normalizeMusicalContext, SCALES } from '../engine/MusicTheory.js';
 import { SOUND_TRAITS, normalizeSoundTraits } from './WebAudioSynth.js';
 import { gamepadButtonInfo } from '../engine/GamepadInputManager.js';
 
@@ -33,7 +33,6 @@ export class ControllerMode {
     this._onBeforeNoteOn = null;
     this.onToneAssignmentChanged = null;
     this.onToneOverrideChanged = null;
-    this.onProjectKeyChanged = null;
 
     this.scaleName = 'major';
     this.rootNote = 'C';
@@ -70,10 +69,6 @@ export class ControllerMode {
     this.scaleName = next.scale;
     this._updateNotes();
     if (this.el) {
-      const root = this.el.querySelector('#ct-p-root');
-      const scale = this.el.querySelector('#ct-p-scale');
-      if (root) root.value = this.rootNote;
-      if (scale) scale.value = this.scaleName;
       this._refreshPads();
     }
   }
@@ -129,20 +124,6 @@ export class ControllerMode {
 
     this.el.innerHTML = `
       <div class="ctrlmode__controls">
-        <div class="ctrlmode__control-group">
-          <label class="ctrlmode__label">Root</label>
-          <select class="ctrlmode__select" id="ct-p-root" aria-label="Root note">
-            ${NOTE_NAMES.map(n => `<option value="${n}" ${n === this.rootNote ? 'selected' : ''}>${n}</option>`).join('')}
-          </select>
-        </div>
-        <div class="ctrlmode__control-group">
-          <label class="ctrlmode__label">Scale</label>
-          <select class="ctrlmode__select" id="ct-p-scale" aria-label="Scale">
-            ${Object.entries(SCALES).filter(([k]) => k !== 'chromatic').map(([key, s]) =>
-              `<option value="${key}" ${key === this.scaleName ? 'selected' : ''}>${s.name}</option>`
-            ).join('')}
-          </select>
-        </div>
         <div class="ctrlmode__control-group">
           <label class="ctrlmode__label">Pad Mode</label>
           <select class="ctrlmode__select" id="ct-p-mode" aria-label="Pad mode">
@@ -245,7 +226,7 @@ export class ControllerMode {
         <span>Unbound buttons</span>
       </div>
       ${fallback}
-      <p class="ctrlmode__binding-note">Use the Controller button near AI to learn or clear custom bindings. Buttons without a custom binding use the fallback scale layout.</p>
+      <p class="ctrlmode__binding-note">Use the Controller button in the upper app toolbar to learn or clear custom bindings. Buttons without a custom binding use the fallback scale layout.</p>
     `;
   }
 
@@ -262,18 +243,6 @@ export class ControllerMode {
   }
 
   _bindEvents() {
-    this.el.querySelector('#ct-p-root')?.addEventListener('change', (e) => {
-      this.rootNote = e.target.value;
-      this._updateNotes();
-      this._refreshPads();
-      if (this.onProjectKeyChanged) this.onProjectKeyChanged({ root: this.rootNote, scale: this.scaleName });
-    });
-    this.el.querySelector('#ct-p-scale')?.addEventListener('change', (e) => {
-      this.scaleName = e.target.value;
-      this._updateNotes();
-      this._refreshPads();
-      if (this.onProjectKeyChanged) this.onProjectKeyChanged({ root: this.rootNote, scale: this.scaleName });
-    });
     this.el.querySelector('#ct-p-mode')?.addEventListener('change', (e) => {
       this.padMode = e.target.value;
     });

@@ -60,7 +60,6 @@ export class ScaleBoard {
     this.onVoicePhraseChanged = null;
     this.onPadModeChange = null;
     this.onExtensionsChanged = null;
-    this.onProjectKeyChanged = null;
 
     this._notes = [];
     this._fullScaleNotes = [];
@@ -218,22 +217,6 @@ export class ScaleBoard {
 
     this.el.innerHTML = `
       <div class="scaleboard__controls">
-        <div class="scaleboard__control-group">
-          <label class="scaleboard__label">${this.padMode === 'root' ? 'Root Note' : 'Root'}</label>
-          <select class="scaleboard__select" id="sb-root" aria-label="Root note">
-            ${NOTE_NAMES.map(n => `<option value="${n}" ${n === this.rootNote ? 'selected' : ''}>${n}</option>`).join('')}
-          </select>
-        </div>
-        ${this.padMode !== 'root' ? `
-        <div class="scaleboard__control-group">
-          <label class="scaleboard__label">Scale</label>
-          <select class="scaleboard__select" id="sb-scale" aria-label="Scale type">
-            ${Object.entries(SCALES).filter(([k]) => k !== 'chromatic').map(([key, s]) =>
-              `<option value="${key}" ${key === this.scaleName ? 'selected' : ''}>${s.name}</option>`
-            ).join('')}
-          </select>
-        </div>
-        ` : ''}
         <div class="scaleboard__control-group">
           <label class="scaleboard__label">Pad Mode</label>
           <select class="scaleboard__select" id="sb-pad-mode" aria-label="Pad mode">
@@ -449,20 +432,6 @@ export class ScaleBoard {
   }
 
   _bindEvents() {
-    // Root note selector
-    this.el.querySelector('#sb-root').addEventListener('change', (e) => {
-      this.rootNote = e.target.value;
-      this._refreshPads();
-      if (this.onProjectKeyChanged) this.onProjectKeyChanged({ root: this.rootNote, scale: this.scaleName });
-    });
-
-    // Scale selector
-    this.el.querySelector('#sb-scale')?.addEventListener('change', (e) => {
-      this.scaleName = e.target.value;
-      this._refreshPads();
-      if (this.onProjectKeyChanged) this.onProjectKeyChanged({ root: this.rootNote, scale: this.scaleName });
-    });
-
     // Octave controls
     this.el.querySelector('#sb-oct-down').addEventListener('pointerdown', (e) => {
       e.preventDefault();

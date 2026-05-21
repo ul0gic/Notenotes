@@ -72,7 +72,6 @@ export class CreativeMode {
     this.scaleBoard = new ScaleBoard(this.synth, this.project, this.voiceEngine);
     this.scaleBoard.onVoicePhraseChanged = () => this.store?.scheduleAutoSave(this.project);
     this.scaleBoard.onExtensionsChanged = () => this.store?.scheduleAutoSave(this.project);
-    this.scaleBoard.onProjectKeyChanged = (context) => this._emitProjectKeyChange(context);
     // When Scale Board switches into/out of Voice Sketch mode, refresh any
     // open AI Seed popover. AI can't generate voice phrases, so the panel
     // disables itself with "Unavailable in Voice Sketch mode" instead of
@@ -93,7 +92,6 @@ export class CreativeMode {
     this.micRecorder = new MicRecorder();
     this.controllerMode = new ControllerMode(this.synth, this.project, modManager, this.gamepadInput);
     this.controllerMode.onToneAssignmentChanged = () => this.store?.scheduleAutoSave(this.project);
-    this.controllerMode.onProjectKeyChanged = (context) => this._emitProjectKeyChange(context);
     this.controllerMode.onToneOverrideChanged = (traits, labels = []) => {
       this._setLiveSoundTraits(traits);
       this._updateToneTriggerIndicator(labels);
@@ -396,7 +394,7 @@ export class CreativeMode {
     patchSel.className = 'patch-selector';
     patchSel.id = 'patch-selector';
     patchSel.innerHTML = `
-      <span class="patch-selector__label">Patch</span>
+      <span class="patch-selector__label" id="patch-selector-label">Patch</span>
       <select id="patch-select" aria-label="Synth patch">
         ${this._renderPatchOptions()}
       </select>
@@ -405,8 +403,7 @@ export class CreativeMode {
       <button class="tone-button" id="tone-button" type="button" aria-expanded="false" aria-controls="tone-popover">Tone</button>
       <button class="tone-button ai-seed-button" id="ai-seed-button" type="button" aria-expanded="false" aria-controls="ai-seed-popover" title="Seed a snippet with AI">AI</button>
       <button class="tone-button controller-map-button" id="controller-map-button" type="button" aria-expanded="false" aria-controls="controller-map-popover" title="Learn gamepad bindings">Controller</button>
-      <button class="tone-button" id="pads-button" type="button" aria-expanded="false" aria-controls="pads-popover">Pads</button>
-      <button class="tone-button" id="keys-button" type="button" aria-expanded="false" aria-controls="keys-popover">Keys</button>
+      <button class="tone-button" id="layout-button" type="button" aria-expanded="false" aria-controls="layout-popover">Layout</button>
       <span class="tone-trigger-indicator" id="tone-trigger-indicator" aria-live="polite"></span>
     `;
     patchSel.querySelector('#patch-select').addEventListener('change', async (e) => {
@@ -433,13 +430,11 @@ export class CreativeMode {
       e.preventDefault();
       this._toggleControllerMapperPopover(patchSel, patchSel.querySelector('#controller-map-button'));
     });
-    patchSel.querySelector('#pads-button').addEventListener('pointerdown', (e) => {
+    patchSel.querySelector('#layout-button').addEventListener('pointerdown', (e) => {
       e.preventDefault();
-      this._togglePadsPopover(patchSel, patchSel.querySelector('#pads-button'));
-    });
-    patchSel.querySelector('#keys-button').addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      this._toggleKeysPopover(patchSel, patchSel.querySelector('#keys-button'));
+      if (e.currentTarget.disabled) return;
+      if (this.activeInstrument === INSTRUMENTS.SCALEBOARD) this._togglePadsPopover(patchSel, e.currentTarget);
+      else if (this.activeInstrument === INSTRUMENTS.PIANO) this._toggleKeysPopover(patchSel, e.currentTarget);
     });
     this.el.appendChild(patchSel);
     this._syncInstrumentButtons();
@@ -562,6 +557,13 @@ export class CreativeMode {
     const isCustom = this._activePatchId?.startsWith('custom:');
     const createBtn = this.el?.querySelector('#create-instrument-button');
     const deleteBtn = this.el?.querySelector('#delete-instrument-button');
+    const patchLabel = this.el?.querySelector('#patch-selector-label');
+    const patchSelect = this.el?.querySelector('#patch-select');
+    const toneBtn = this.el?.querySelector('#tone-button');
+    const isKit = this.activeInstrument === INSTRUMENTS.KIT;
+    if (patchLabel) patchLabel.hidden = isKit;
+    if (patchSelect) patchSelect.hidden = isKit;
+    if (toneBtn) toneBtn.hidden = isKit;
     if (createBtn) createBtn.textContent = isCustom ? 'Edit Instrument' : 'Create Instrument';
     if (deleteBtn) deleteBtn.hidden = !isCustom;
   }
@@ -1267,14 +1269,15 @@ export class CreativeMode {
     });
 
     const patchSel = this.el.querySelector('#patch-selector');
-    const isSynth = id === INSTRUMENTS.SCALEBOARD || id === INSTRUMENTS.PIANO || id === INSTRUMENTS.CONTROLLER;
-    patchSel.style.display = isSynth ? 'flex' : 'none';
-    if (!isSynth) {
+    const showToolbar = id === INSTRUMENTS.SCALEBOARD || id === INSTRUMENTS.PIANO || id === INSTRUMENTS.CONTROLLER;
+    patchSel.style.display = showToolbar ? 'flex' : 'none';
+    if (!showToolbar) {
       this._closeTonePopover();
       this._closePadsPopover();
       this._closeKeysPopover();
     }
     this._closeControllerMapperPopover();
+    this._syncInstrumentButtons();
 
     // AI Seed: visible only on Scale Board / Piano / Sketch Kit. Close the
     // popover when leaving a supported instrument so it doesn't linger over
@@ -1308,30 +1311,29 @@ export class CreativeMode {
     const btn = this.el?.querySelector('#ai-seed-button');
     if (!btn) return;
     const id = this.activeInstrument;
-    // AI Seed is hidden on Controller (deliberately scoped out per user)
-    // and Mic (AI doesn't generate audio recordings). It IS shown in Scale
-    // Board's Voice Sketch mode — but the panel renders a disabled state
-    // explaining "Unavailable in Voice Sketch mode" so the user can see
-    // the option exists without being able to misuse it.
     const showInPatchSelector =
-      id === INSTRUMENTS.SCALEBOARD || id === INSTRUMENTS.PIANO;
+      id === INSTRUMENTS.SCALEBOARD || id === INSTRUMENTS.PIANO || id === INSTRUMENTS.CONTROLLER;
+    const disabled = id === INSTRUMENTS.CONTROLLER;
     btn.style.display = showInPatchSelector ? '' : 'none';
+    btn.disabled = disabled;
+    btn.title = disabled ? 'AI Seed is not available from Controller setup' : 'Seed a snippet with AI';
+    btn.setAttribute('aria-disabled', String(disabled));
   }
 
   _syncCreateToolbarButtons() {
     this._syncAISeedButtonVisibility();
     this._syncControllerMapperButtonVisibility();
-    const padsBtn = this.el?.querySelector('#pads-button');
-    const keysBtn = this.el?.querySelector('#keys-button');
-    if (padsBtn) {
-      const showPads = this.activeInstrument === INSTRUMENTS.SCALEBOARD;
-      padsBtn.style.display = showPads ? '' : 'none';
-      if (!showPads) this._closePadsPopover();
-    }
-    if (keysBtn) {
-      const showKeys = this.activeInstrument === INSTRUMENTS.PIANO;
-      keysBtn.style.display = showKeys ? '' : 'none';
-      if (!showKeys) this._closeKeysPopover();
+    const layoutBtn = this.el?.querySelector('#layout-button');
+    if (layoutBtn) {
+      const isScale = this.activeInstrument === INSTRUMENTS.SCALEBOARD;
+      const isPiano = this.activeInstrument === INSTRUMENTS.PIANO;
+      layoutBtn.style.display = '';
+      layoutBtn.textContent = isScale ? 'Pads' : (isPiano ? 'Keys' : 'Layout');
+      layoutBtn.disabled = !(isScale || isPiano);
+      layoutBtn.setAttribute('aria-disabled', String(layoutBtn.disabled));
+      layoutBtn.title = isScale ? 'Pad layout and degree colors' : (isPiano ? 'Keyboard layout and degree colors' : 'Layout controls are available on Scale and Piano');
+      if (!isScale) this._closePadsPopover();
+      if (!isPiano) this._closeKeysPopover();
     }
   }
 
@@ -1398,6 +1400,7 @@ export class CreativeMode {
    *   handler when re-clicking the button itself.
    */
   _toggleAISeedPopover(anchor, buttonEl = null) {
+    if (buttonEl?.disabled) return;
     if (this._aiSeedPopover) {
       this._closeAISeedPopover();
       return;
@@ -1980,10 +1983,10 @@ export class CreativeMode {
       const isPads = popover.id === 'pads-popover';
       if (isPads) {
         this._closePadsPopover();
-        this._togglePadsPopover(parent, parent?.querySelector('#pads-button'));
+        this._togglePadsPopover(parent, parent?.querySelector('#layout-button'));
       } else {
         this._closeKeysPopover();
-        this._toggleKeysPopover(parent, parent?.querySelector('#keys-button'));
+        this._toggleKeysPopover(parent, parent?.querySelector('#layout-button'));
       }
     });
   }
@@ -2156,7 +2159,7 @@ export class CreativeMode {
     }
     this._padsPopover?.remove();
     this._padsPopover = null;
-    this.el?.querySelector('#pads-button')?.setAttribute('aria-expanded', 'false');
+    this.el?.querySelector('#layout-button')?.setAttribute('aria-expanded', 'false');
   }
 
   _closeKeysPopover() {
@@ -2166,6 +2169,6 @@ export class CreativeMode {
     }
     this._keysPopover?.remove();
     this._keysPopover = null;
-    this.el?.querySelector('#keys-button')?.setAttribute('aria-expanded', 'false');
+    this.el?.querySelector('#layout-button')?.setAttribute('aria-expanded', 'false');
   }
 }

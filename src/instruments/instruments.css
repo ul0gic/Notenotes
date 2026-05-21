@@ -91,6 +91,15 @@
   background: var(--surface-4);
 }
 
+.tone-button:disabled,
+.tone-button[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: not-allowed;
+  color: var(--text-tertiary);
+  border-color: var(--surface-3);
+  background: var(--surface-2);
+}
+
 .tone-trigger-indicator {
   color: #42d782;
   font-size: var(--font-size-xs);
@@ -711,7 +720,10 @@
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  padding: 0 var(--space-xs);
+  padding: var(--space-xs) var(--space-md);
+  margin: calc(var(--space-md) * -1) calc(var(--space-md) * -1) var(--space-sm);
+  background: var(--surface-1);
+  border-bottom: var(--border-subtle);
   flex-shrink: 0;
   position: relative;
 }
