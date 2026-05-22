@@ -1183,8 +1183,9 @@ export class CreativeMode {
     if (binding.type === 'scalePad' && Number.isFinite(binding.padIndex)) {
       if (this.scaleBoard?.padMode === 'voices') return;
       if (this._heldControllerPads.has(index)) return;
-      this.scaleBoard.pressPad(binding.padIndex);
-      this._heldControllerPads.set(index, binding.padIndex);
+      const bindingKey = `controller-${index}`;
+      this.scaleBoard.pressControllerPadBinding(bindingKey, binding);
+      this._heldControllerPads.set(index, bindingKey);
       return;
     }
     if (binding.type === 'midi' && Number.isFinite(binding.midi)) {
@@ -1198,8 +1199,8 @@ export class CreativeMode {
 
   _releaseControllerBinding(index) {
     if (this._heldControllerPads.has(index)) {
-      const padIndex = this._heldControllerPads.get(index);
-      this.scaleBoard.releasePad(padIndex);
+      const bindingKey = this._heldControllerPads.get(index);
+      this.scaleBoard.releaseControllerPadBinding(bindingKey);
       this._heldControllerPads.delete(index);
       return;
     }
@@ -1740,6 +1741,7 @@ export class CreativeMode {
         padIndex,
         midi: Number.isFinite(target.midi) ? Number(target.midi) : null,
         padMode: target.padMode || null,
+        padAction: target.padAction || null,
         label: target.label || `Pad ${padIndex + 1}`,
         source: 'scale',
       };

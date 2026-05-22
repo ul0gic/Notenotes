@@ -491,6 +491,7 @@ Expected:
 
 - The mapper stays open after Set long enough for the next Pads/Piano/Kit click to bind.
 - Pads bindings show as Pads/Chord/Root targets, not just fixed note names.
+- Pads bindings keep the learned action. A button learned from Single stays a single note after switching Pads to Chords.
 - A learned Custom chord pad plays as a chord from the controller.
 - Piano bindings still play exact notes.
 - Kit bindings still play exact drum sounds.

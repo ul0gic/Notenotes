@@ -68,6 +68,7 @@ export class ScaleBoard {
     this._activeChords = new Map(); // padIndex -> array of midis
     this._activeRootDyads = new Map(); // padIndex -> [pad midi, nearest root midi]
     this._activeCompassChords = new Map(); // segmentId -> array of midis
+    this._activeControllerPadBindings = new Map(); // bindingKey -> { index, midis }
     this._activePadIndexes = new Set();
 
     // Callbacks for note recording
@@ -773,20 +774,69 @@ export class ScaleBoard {
     }
   }
 
+  pressControllerPadBinding(bindingKey, binding = {}) {
+    if (!bindingKey || this._activeControllerPadBindings.has(bindingKey)) return;
+    if (this.padMode === 'voices') return;
+    const index = Number(binding.padIndex);
+    const pad = this.el?.querySelector(`.scaleboard__pad[data-index="${index}"]`);
+    const midi = this._notes[index];
+    if (!pad || midi === undefined) return;
+
+    const action = binding.padAction || this._padActionFromMode(binding.padMode);
+    let midis;
+    if (action === 'chord') {
+      midis = this._getChordMidis(index);
+    } else if (action === 'root') {
+      const rootMidi = this._rootMidiNear(midi);
+      midis = rootMidi === midi ? [midi] : [midi, rootMidi];
+    } else {
+      midis = [midi];
+    }
+
+    pad.classList.add('is-active');
+    this._activeControllerPadBindings.set(bindingKey, { index, midis });
+    midis.forEach(m => this._noteOn(m));
+  }
+
+  releaseControllerPadBinding(bindingKey) {
+    const active = this._activeControllerPadBindings.get(bindingKey);
+    if (!active) return;
+    active.midis.forEach(m => this._noteOff(m));
+    this._activeControllerPadBindings.delete(bindingKey);
+    if (!this._activePadIndexes.has(active.index) && !this._hasActiveControllerPadIndex(active.index)) {
+      this.el?.querySelector(`.scaleboard__pad[data-index="${active.index}"]`)?.classList.remove('is-active');
+    }
+  }
+
   _controllerLearnTargetForPad(index, midi) {
     if (this.padMode === 'voices') return null;
     const info = midiToNoteName(midi);
     const isChord = this.padMode === 'chords' || (this.padMode === 'custom' && this.customPadTypes[index] === 'chord');
     const isRootMode = this.padMode === 'root';
+    const padAction = isChord ? 'chord' : isRootMode ? 'root' : 'single';
     const kind = isChord ? 'Chord' : isRootMode ? 'Root' : 'Pad';
     return {
       type: 'scalePad',
       padIndex: index,
       midi,
       padMode: this.padMode,
+      padAction,
       label: `${kind} ${index + 1}: ${info.display}`,
       source: 'scale',
     };
+  }
+
+  _padActionFromMode(mode) {
+    if (mode === 'chords') return 'chord';
+    if (mode === 'root') return 'root';
+    return 'single';
+  }
+
+  _hasActiveControllerPadIndex(index) {
+    for (const active of this._activeControllerPadBindings.values()) {
+      if (active.index === index) return true;
+    }
+    return false;
   }
 
   releasePad(index) {

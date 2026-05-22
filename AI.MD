@@ -2302,3 +2302,13 @@ project.settings.degreeHighlighting = {
 - Kit targets still use `type: "drum"` with `padId` because users expect a learned controller button to keep firing that drum sound regardless of the current visible instrument.
 - The controller mapper no longer closes itself while a button is waiting for a target. The old capture-phase outside-click handler could remove the popover before the target pad/key handler ran, causing the panel to close with no binding saved.
 - Controller screen binding labels now understand `scalePad` records in addition to `midi` and `drum`.
+
+## Controller Pad Action Lock 0.1.24
+
+- `scalePad` controller bindings now preserve the learned pad action as `padAction`.
+  - `single`: play the current note at that learned Pads slot.
+  - `chord`: play the current chord rooted at that learned Pads slot.
+  - `root`: play the current Root-mode dyad for that learned Pads slot.
+- This fixes the issue where a button learned from a Single pad would later become a chord whenever the visible Pads screen was switched to Chords mode.
+- ScaleBoard exposes `pressControllerPadBinding(bindingKey, binding)` and `releaseControllerPadBinding(bindingKey)` so controller playback can reuse ScaleBoard note callbacks and recording behavior without relying on the current `padMode`.
+- The learned `midi` value remains display/debug metadata only. Playback resolves the current project key/scale/octave for the stored `padIndex` plus stored `padAction`.
