@@ -13,6 +13,9 @@ import { midiToNoteName } from '../engine/MusicTheory.js';
  * C, D, etc. for octave 3, C,, for octave 2
  */
 function midiToABC(midi) {
+  const value = Number(midi);
+  if (!Number.isFinite(value)) return null;
+  midi = Math.max(0, Math.min(127, Math.round(value)));
   const noteNames = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
   const accidentals = [0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0]; // which are sharps
   const noteIdx = midi % 12;
@@ -52,6 +55,22 @@ function midiToABC(midi) {
   // octave 4 = uppercase, no modifier (default)
 
   return note;
+}
+
+function notePitch(note) {
+  const value = note?.pitch ?? note?.midi ?? note?.note;
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.max(0, Math.min(127, Math.round(number))) : null;
+}
+
+function noteStartTick(note) {
+  const value = Number(note?.startTick ?? note?.tick ?? note?.timeTick ?? 0);
+  return Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
+}
+
+function noteDurationTick(note, ticksPerBeat = 480) {
+  const value = Number(note?.durationTick ?? note?.durationTicks ?? note?.duration ?? ticksPerBeat);
+  return Number.isFinite(value) ? Math.max(1, Math.round(value)) : ticksPerBeat;
 }
 
 /**
@@ -94,7 +113,14 @@ export function snippetToABC(snippet, options = {}) {
     return _drumSnippetToABC(snippet, title, bpm, timeSig, ticksPerBeat);
   }
 
-  const notes = [...(snippet.notes || [])].sort((a, b) => a.startTick - b.startTick);
+  const notes = [...(snippet.notes || [])]
+    .map(note => ({
+      pitch: notePitch(note),
+      startTick: noteStartTick(note),
+      durationTick: noteDurationTick(note, ticksPerBeat),
+    }))
+    .filter(note => note.pitch !== null)
+    .sort((a, b) => a.startTick - b.startTick);
 
   if (notes.length === 0) {
     return `X:1\nT:${title}\nM:${timeSig.beats}/${timeSig.subdivision}\nL:1/8\nQ:1/4=${bpm}\nK:C\nz8 |\n`;
@@ -116,6 +142,7 @@ export function snippetToABC(snippet, options = {}) {
 
     // Convert note
     const abcNote = midiToABC(note.pitch);
+    if (!abcNote) continue;
     const abcDur = ticksToABCDuration(note.durationTick, ticksPerBeat);
     body += `${abcNote}${abcDur} `;
 

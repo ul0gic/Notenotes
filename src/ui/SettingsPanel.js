@@ -24,6 +24,7 @@ import { OpenAIProvider } from '../ai/OpenAIProvider.js';
 import { AnthropicProvider } from '../ai/AnthropicProvider.js';
 import { GeminiProvider } from '../ai/GeminiProvider.js';
 import { showToast } from './Toast.js';
+import { formatRelativeTime, workspaceBackupStatus } from '../utils/BackupStatus.js';
 
 const TIME_SIGNATURE_OPTIONS = [
   { beats: 2, subdivision: 4, label: '2/4' },
@@ -55,25 +56,6 @@ function formatBytes(bytes = 0) {
   }
   const digits = value >= 100 || unit === 0 ? 0 : value >= 10 ? 1 : 2;
   return `${value.toFixed(digits)} ${units[unit]}`;
-}
-
-function formatRelativeTime(timestamp) {
-  if (!timestamp) return 'Never';
-  const diff = Math.max(0, Date.now() - Number(timestamp));
-  const minute = 60 * 1000;
-  const hour = 60 * minute;
-  const day = 24 * hour;
-  if (diff < minute) return 'Just now';
-  if (diff < hour) {
-    const mins = Math.round(diff / minute);
-    return `${mins} min${mins === 1 ? '' : 's'} ago`;
-  }
-  if (diff < day) {
-    const hours = Math.round(diff / hour);
-    return `${hours} hour${hours === 1 ? '' : 's'} ago`;
-  }
-  const days = Math.round(diff / day);
-  return `${days} day${days === 1 ? '' : 's'} ago`;
 }
 
 function percent(value, total) {
@@ -533,30 +515,7 @@ export class SettingsPanel {
   }
 
   _workspaceBackupStatus() {
-    const settings = this.project?.settings || {};
-    const lastEditAt = Number(settings.lastEditAt || this.project?.updatedAt || 0);
-    const lastBackupAt = Number(settings.lastWorkspaceBackupAt || 0);
-    if (!lastBackupAt) {
-      return {
-        state: 'danger',
-        label: 'No workspace backup yet',
-        advice: 'Browser storage is not a backup. Save a workspace backup outside the browser for anything important.'
-      };
-    }
-    if (!lastEditAt || lastBackupAt >= lastEditAt) {
-      return {
-        state: 'ok',
-        label: `Backed up ${formatRelativeTime(lastBackupAt)}`,
-        advice: 'Your latest tracked workspace edit has a workspace backup file outside browser storage.'
-      };
-    }
-    const age = Date.now() - lastBackupAt;
-    const state = age > 24 * 60 * 60 * 1000 ? 'danger' : age > 18 * 60 * 60 * 1000 ? 'warning' : 'warning';
-    return {
-      state,
-      label: `Edited since backup (${formatRelativeTime(lastBackupAt)})`,
-      advice: `This workspace changed after the last backup. Save a fresh workspace backup to protect the latest work.`
-    };
+    return workspaceBackupStatus(this.project);
   }
 
   _bindEvents() {

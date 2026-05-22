@@ -23,6 +23,7 @@ import { SettingsPanel } from './ui/SettingsPanel.js';
 import { PlaybackEngine } from './engine/PlaybackEngine.js';
 import { ModulationManager } from './engine/ModulationManager.js';
 import { normalizeMusicalContext } from './engine/MusicTheory.js';
+import { workspaceBackupStatus } from './utils/BackupStatus.js';
 
 if (import.meta.env.DEV && typeof window !== 'undefined') {
   import('./dev/AudioParityHarness.js').then((harness) => {
@@ -149,11 +150,14 @@ class App {
 
     // Wire metronome button to also show settings on long-press
     this.transportBar.onSettingsClick = () => this.settingsPanel.toggle();
+    this.transportBar.onBackupClick = () => this.settingsPanel.openTo('history');
     this.transportBar.onMoreOpen = () => this.settingsPanel.close();
     window.addEventListener('notenotes-open-settings', (event) => {
       this.transportBar.closeMore?.();
       this.settingsPanel.openTo(event.detail?.section || 'settings', event.detail || {});
     });
+    window.addEventListener('notenotes-backup-status-changed', () => this._syncBackupStatus());
+    this._syncBackupStatus();
 
     // Wire modulation manager to creative mode synth (after synth init)
     this.modManager._synth = this.creativeMode.synth;
@@ -240,6 +244,11 @@ class App {
     };
     window.addEventListener('pointerdown', request, { once: true, capture: true });
     window.addEventListener('keydown', request, { once: true, capture: true });
+  }
+
+  _syncBackupStatus() {
+    if (!this.project || !this.transportBar) return;
+    this.transportBar.setBackupStatus(workspaceBackupStatus(this.project));
   }
 
   _ensureProjectMusicalContext() {

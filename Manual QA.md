@@ -251,6 +251,21 @@ Expected:
 - Muted tracks are not exported.
 - When a track is soloed, only soloed tracks are exported.
 
+### 4.4 Sheet Music Preview Has No Parser Errors
+
+Steps:
+
+1. Create or load a MIDI snippet.
+2. Open Settings, then Export.
+3. Select the snippet in Sheet Music.
+4. Export SVG and ABC.
+
+Expected:
+
+- The preview renders notation instead of red parser text such as `pitch is undefined`.
+- SVG export does not include parser error text.
+- ABC export contains note/rest text only, not abcjs error output.
+
 ## 5. Time Signatures
 
 Run these tests in `2/4`, `3/4`, `4/4`, and `5/4`.
@@ -301,8 +316,11 @@ Expected:
 
 - Browser storage shows Persistent, Best effort, Unknown, or an honest failure state.
 - Workspace backup status says there is no workspace backup before the first backup.
+- The top backup status shortcut opens Settings directly to the Save tab.
 - After saving a workspace backup, the status shows the latest backup time.
+- The top backup status shortcut changes to the backed-up state after saving a workspace backup.
 - After a later edit, the status says the workspace changed since the last backup.
+- The top backup status shortcut changes to a due/no-backup state after a later edit.
 - The advice text does not imply browser storage is the same thing as an external backup file.
 
 ### 6.1 Workspace Backup

@@ -2267,3 +2267,23 @@ project.settings.degreeHighlighting = {
   6. refresh storage status
 - Backup status is intentionally tied to workspace backups only. Snippet backups are still useful, but they do not prove the current workspace layout/milestones/version history are protected.
 - Future local-folder backup work should reuse this metadata instead of creating a second backup-status system.
+
+## Sheet Music Pitch Guard / Backup Status 0.1.22
+
+- `ABCConverter.snippetToABC()` now normalizes note fields before handing text to abcjs.
+- Accepted note pitch fields, in order: `pitch`, `midi`, `note`.
+- Invalid/non-numeric pitches are skipped instead of producing malformed ABC that abcjs renders as red parser text such as `pitch is undefined`.
+- Start/duration fields are also normalized with safe fallbacks:
+  - start: `startTick`, `tick`, `timeTick`, fallback `0`
+  - duration: `durationTick`, `durationTicks`, `duration`, fallback one beat
+- This is a defensive exporter fix. The canonical internal note shape is still `{ pitch, startTick, durationTick, velocity }`; new code should continue writing that shape.
+- Backup status logic is now shared in `src/utils/BackupStatus.js`.
+  - `workspaceBackupStatus(project)` is the single source for `ok`, `warning`, and `danger` workspace-backup states.
+  - `SettingsPanel` and `TransportBar` both consume this helper so the Save tab and top control cannot drift into different interpretations of "backed up."
+- `TransportBar` now includes a small backup-status button in the right-side/more controls:
+  - `No backup` when no workspace backup has been saved
+  - `Backup due` when the project changed after the last workspace backup
+  - `Backed up` when `lastWorkspaceBackupAt >= lastEditAt`
+- Clicking the backup-status control opens Settings directly to the Save tab. It does not itself write a backup because the existing Save tab still lets the user choose Current workspace, Workspace + milestones, or Full archive.
+- `ProjectStore.save()` dispatches `notenotes-backup-status-changed` after IndexedDB writes so the top status can refresh after normal autosaves and backup timestamp saves.
+- This is still a status affordance, not automatic backup. Local-folder and Google Drive backup remain future work.

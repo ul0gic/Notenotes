@@ -18,6 +18,7 @@ export class TransportBar {
     this.el = null;
     this._beatDots = [];
     this.onSettingsClick = null;
+    this.onBackupClick = null;
     this.onArpClick = null;
     this.onKeysClick = null;
     this.onModResetClick = null;
@@ -102,6 +103,10 @@ export class TransportBar {
         <button class="btn btn--icon btn--ghost" id="btn-keys" title="Keyboard shortcuts" aria-label="Show keyboard shortcuts">
           <span class="transport-bar__menu-icon">⌨</span>
           <span class="transport-bar__menu-label">Keyboard Controls</span>
+        </button>
+        <button class="btn btn--ghost backup-status is-unknown" id="btn-backup-status" title="Open backup status" aria-label="Open backup status">
+          <span class="transport-bar__menu-icon" id="backup-status-label">Backup</span>
+          <span class="transport-bar__menu-label">Backup Status</span>
         </button>
         <button class="btn btn--icon btn--ghost" id="btn-settings" title="Settings" aria-label="Open settings">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -196,6 +201,12 @@ export class TransportBar {
       if (this.onSettingsClick) this.onSettingsClick();
     });
 
+    this.el.querySelector('#btn-backup-status')?.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      this.closeMore();
+      if (this.onBackupClick) this.onBackupClick();
+    });
+
     // Hold/Arp toggle
     this.el.querySelector('#btn-arp')?.addEventListener('pointerdown', (e) => {
       e.preventDefault();
@@ -256,6 +267,19 @@ export class TransportBar {
     const btn = this.el?.querySelector('#tb-more-btn');
     btn?.classList.remove('is-active');
     btn?.setAttribute('aria-expanded', 'false');
+  }
+
+  setBackupStatus(status = {}) {
+    const btn = this.el?.querySelector('#btn-backup-status');
+    if (!btn) return;
+    const state = status.state || 'unknown';
+    btn.classList.remove('is-ok', 'is-warning', 'is-danger', 'is-unknown');
+    btn.classList.add(`is-${state}`);
+    const label = btn.querySelector('#backup-status-label');
+    if (label) label.textContent = status.shortLabel || status.label || 'Backup';
+    const title = status.advice || status.label || 'Open backup status';
+    btn.title = title;
+    btn.setAttribute('aria-label', title);
   }
 
   setModDisplay(pitch, mod) {

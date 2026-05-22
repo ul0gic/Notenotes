@@ -353,6 +353,11 @@ export class ProjectStore {
     if (markEdit) project.settings.lastEditAt = now;
     await this.migrateProjectAudioAssets(project);
     await this._db.put(STORE_PROJECTS, this._sanitizeProjectForStorage(project));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('notenotes-backup-status-changed', {
+        detail: { projectId: project.id, markEdit }
+      }));
+    }
   }
 
   /**
