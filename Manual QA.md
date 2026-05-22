@@ -476,6 +476,25 @@ Expected:
 
 ## 8. Controller Triggers
 
+### 8.0 Controller Mapper Bindings
+
+Steps:
+
+1. Open the Controller mapper.
+2. Hold a bindable gamepad button and press Set.
+3. Click a Pads target.
+4. Open List Current Bindings.
+5. Switch Pads to Custom, set one pad to Chord, and bind that pad too.
+6. Bind one Piano key and one Kit pad.
+
+Expected:
+
+- The mapper stays open after Set long enough for the next Pads/Piano/Kit click to bind.
+- Pads bindings show as Pads/Chord/Root targets, not just fixed note names.
+- A learned Custom chord pad plays as a chord from the controller.
+- Piano bindings still play exact notes.
+- Kit bindings still play exact drum sounds.
+
 ### 8.1 Trigger Notes In Single Mode
 
 Steps:

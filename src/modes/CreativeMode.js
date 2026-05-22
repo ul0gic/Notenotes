@@ -142,6 +142,7 @@ export class CreativeMode {
     this._controllerMapperView = 'learn';
     this._controllerLearningButton = null;
     this._heldControllerMidis = new Map();
+    this._heldControllerPads = new Map();
     this._heldControllerFallback = new Map();
     this._recordArmed = false;
     this.onRecordArmChanged = null;
@@ -1179,6 +1180,13 @@ export class CreativeMode {
       this.sketchKit.triggerPad(binding.padId);
       return;
     }
+    if (binding.type === 'scalePad' && Number.isFinite(binding.padIndex)) {
+      if (this.scaleBoard?.padMode === 'voices') return;
+      if (this._heldControllerPads.has(index)) return;
+      this.scaleBoard.pressPad(binding.padIndex);
+      this._heldControllerPads.set(index, binding.padIndex);
+      return;
+    }
     if (binding.type === 'midi' && Number.isFinite(binding.midi)) {
       if (this._heldControllerMidis.has(index)) return;
       this._beginArmedRecordingIfNeeded();
@@ -1189,6 +1197,12 @@ export class CreativeMode {
   }
 
   _releaseControllerBinding(index) {
+    if (this._heldControllerPads.has(index)) {
+      const padIndex = this._heldControllerPads.get(index);
+      this.scaleBoard.releasePad(padIndex);
+      this._heldControllerPads.delete(index);
+      return;
+    }
     if (!this._heldControllerMidis.has(index)) return;
     const midi = this._heldControllerMidis.get(index);
     this.synth.noteOff(midi);
@@ -1476,6 +1490,7 @@ export class CreativeMode {
     this._heldScaleKeyPads.clear();
     this._heldPianoKeyIndexes.clear();
     for (const index of [...this._heldControllerMidis.keys()]) this._releaseControllerBinding(index);
+    for (const index of [...this._heldControllerPads.keys()]) this._releaseControllerBinding(index);
     for (const index of [...this._heldControllerFallback.keys()]) this._playControllerFallbackUp(index);
   }
 
@@ -1576,6 +1591,7 @@ export class CreativeMode {
       if (!this._controllerMapperPopover) return;
       if (this._controllerMapperPopover.contains(e.target)) return;
       if (buttonEl && buttonEl.contains(e.target)) return;
+      if (this._controllerLearningButton !== null) return;
       this._closeControllerMapperPopover();
     };
     queueMicrotask(() => document.addEventListener('pointerdown', handleOutside, true));
@@ -1717,6 +1733,17 @@ export class CreativeMode {
         source: target.source || 'kit',
       };
     }
+    if (target.type === 'scalePad') {
+      const padIndex = Number(target.padIndex);
+      return {
+        type: 'scalePad',
+        padIndex,
+        midi: Number.isFinite(target.midi) ? Number(target.midi) : null,
+        padMode: target.padMode || null,
+        label: target.label || `Pad ${padIndex + 1}`,
+        source: 'scale',
+      };
+    }
     return {
       type: 'midi',
       midi: Number(target.midi),
@@ -1727,6 +1754,7 @@ export class CreativeMode {
 
   _controllerTargetLabel(binding) {
     if (binding?.type === 'drum') return binding.padId || 'Drum';
+    if (binding?.type === 'scalePad' && Number.isFinite(binding.padIndex)) return binding.label || `Pad ${binding.padIndex + 1}`;
     if (binding?.type === 'midi' && Number.isFinite(binding.midi)) return midiToNoteName(binding.midi).display;
     return 'Unknown';
   }

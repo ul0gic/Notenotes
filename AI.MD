@@ -2287,3 +2287,18 @@ project.settings.degreeHighlighting = {
 - Clicking the backup-status control opens Settings directly to the Save tab. It does not itself write a backup because the existing Save tab still lets the user choose Current workspace, Workspace + milestones, or Full archive.
 - `ProjectStore.save()` dispatches `notenotes-backup-status-changed` after IndexedDB writes so the top status can refresh after normal autosaves and backup timestamp saves.
 - This is still a status affordance, not automatic backup. Local-folder and Google Drive backup remain future work.
+
+## Controller Pad Bindings 0.1.23
+
+- Learned controller bindings now distinguish between exact notes and Pads slots.
+- Pads targets store:
+  - `type: "scalePad"`
+  - `padIndex`
+  - `midi` as the pitch seen at learn time for display/debugging
+  - `padMode` as the mode seen at learn time for context
+  - `label`, such as `Pad 1: C4`, `Chord 3: E4`, or `Root 2: C#4`
+- Playback for `scalePad` calls `ScaleBoard.pressPad(padIndex)` and `ScaleBoard.releasePad(padIndex)` instead of playing a stored MIDI number directly. This means learned Pads buttons can trigger whatever that Pads slot currently means, including Single, Chords, Root, and Custom note/chord slots. Voice Sketch remains excluded.
+- Piano targets still use `type: "midi"` because those are exact visible keys.
+- Kit targets still use `type: "drum"` with `padId` because users expect a learned controller button to keep firing that drum sound regardless of the current visible instrument.
+- The controller mapper no longer closes itself while a button is waiting for a target. The old capture-phase outside-click handler could remove the popover before the target pad/key handler ran, causing the panel to close with no binding saved.
+- Controller screen binding labels now understand `scalePad` records in addition to `midi` and `drum`.

@@ -776,12 +776,16 @@ export class ScaleBoard {
   _controllerLearnTargetForPad(index, midi) {
     if (this.padMode === 'voices') return null;
     const info = midiToNoteName(midi);
+    const isChord = this.padMode === 'chords' || (this.padMode === 'custom' && this.customPadTypes[index] === 'chord');
+    const isRootMode = this.padMode === 'root';
+    const kind = isChord ? 'Chord' : isRootMode ? 'Root' : 'Pad';
     return {
-      type: 'midi',
-      midi,
-      label: info.display,
-      source: 'scale',
+      type: 'scalePad',
       padIndex: index,
+      midi,
+      padMode: this.padMode,
+      label: `${kind} ${index + 1}: ${info.display}`,
+      source: 'scale',
     };
   }
 
