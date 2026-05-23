@@ -502,48 +502,7 @@
   align-items: center;
   justify-content: center;
   height: 100%;
-  gap: var(--space-lg);
   color: var(--text-primary);
-}
-
-.edit-audio__header {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: var(--space-sm);
-  font-size: var(--font-size-md);
-  font-weight: var(--font-weight-semibold);
-}
-
-.edit-audio__name-input {
-  width: min(320px, 80vw);
-  padding: var(--space-sm) var(--space-md);
-  border: 1px solid var(--surface-4);
-  border-radius: var(--radius-sm);
-  background: var(--surface-2);
-  color: var(--text-primary);
-  font: inherit;
-  font-weight: var(--font-weight-semibold);
-  text-align: center;
-}
-
-.edit-audio__header .edit-toolbar__select--clip {
-  width: min(240px, 80vw);
-  max-width: 80vw;
-}
-
-.edit-audio__actions {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-xs);
-  flex-wrap: wrap;
-}
-
-.edit-audio__name-input:focus {
-  outline: 1px solid var(--accent);
-  border-color: var(--accent);
 }
 
 .edit-audio__body {

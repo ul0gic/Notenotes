@@ -2449,3 +2449,13 @@ project.settings.degreeHighlighting = {
 - This replaces the heavier live-transport diagnostic idea for now.
   - Avoid diagnostic tests that use the real transport as a metronome unless they are explicitly isolated; otherwise the measuring tool can become the source of jitter or can disturb user playback state.
   - If future QA needs a live scheduling probe, build it as a separate opt-in tool and make clear that it measures scheduler/runtime behavior, not just meter math.
+
+## Inspect Audio Toolbar Alignment 0.1.32
+
+- Audio snippets in Inspect now render the same `.edit-toolbar` used by MIDI and drum Inspect instead of the old audio-only `.edit-audio__header` layout.
+- `EditMode._renderAudioPlayer()` appends the shared toolbar first, then keeps the preview-only audio player body beneath it. This keeps Load, rename, New MIDI, and New Drum in the same visual and spatial positions regardless of loaded clip type.
+- `EditMode._buildAudioToolbarHTML()` mirrors the MIDI/drum toolbar order: Load, clip name, length/count area, New MIDI/New Drum, Grid/Shadow, Velocity, Split, Quantize all, and Delete.
+- Audio-inapplicable controls are present but disabled. This follows the app's existing disabled-control language instead of hiding controls or moving them into a special audio screen.
+- Audio rename now uses the shared `#edit-snippet-name` input class and audio-specific save/toast logic, so the visual design is common while the preview-only behavior remains scoped.
+- Audio preview creation buttons now use the shared toolbar ids `#edit-new-midi-toolbar` and `#edit-new-drum-toolbar`, calling the same `_createBlankSnippet(type)` path as the empty state and MIDI/drum Inspect.
+- The obsolete audio header/name/action CSS was removed from `src/modes/edit.css`; `.edit-audio` now only owns the centered preview body.

@@ -429,6 +429,8 @@ Steps:
 
 Expected:
 
+- Audio Inspect uses the same toolbar order and styling as MIDI/drum Inspect.
+- Audio-only unavailable tools such as Grid, Shadow, Velocity, Split, Quantize all, and Delete are visible but disabled.
 - New MIDI creates a blank MIDI clip and loads it in Inspect.
 - New Drum creates a blank drum clip and loads it in Inspect.
 - The original audio recording remains available in the Load dropdown.
