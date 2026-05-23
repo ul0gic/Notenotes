@@ -701,15 +701,30 @@ Expected:
 
 Steps:
 
-1. Set Meter to `6/8` and BPM to `120`.
+1. Set Meter to `4/4` and BPM to `120`.
 2. Turn on the metronome and press Play.
-3. Open Canvas.
-4. Repeat with `9/8` and `12/8`.
+3. Use a stopwatch or phone timer. Count 4 bars by ear.
+4. Stop playback.
+5. Set Meter to `6/8`, keep BPM at `120`, and press Play.
+6. Count 4 bars by ear.
+7. Repeat for `9/8` and `12/8`.
 
 Expected:
 
-- `6/8` clicks two felt pulses per bar.
-- `9/8` clicks three felt pulses per bar.
-- `12/8` clicks four felt pulses per bar.
+- `4/4`: 4 bars take about 8.0 seconds.
+- `6/8`: 4 bars take about 4.0 seconds, with two felt-pulse clicks per bar.
+- `9/8`: 4 bars take about 6.0 seconds, with three felt-pulse clicks per bar.
+- `12/8`: 4 bars take about 8.0 seconds, with four felt-pulse clicks per bar.
 - Canvas ruler and lane grid show the big pulses with faint sub-beat divisions.
 - Beat dots match the felt pulse count for each meter.
+
+Cross-check:
+
+1. In `6/8` at `120 BPM`, record an 8-bar MIDI snippet.
+2. Export that snippet as MIDI and WAV.
+3. Compare the live playback duration to both exports.
+
+Expected:
+
+- MIDI and WAV export duration match live playback closely enough that no tempo difference is audible.
+- If either export plays noticeably faster or slower than live playback, compound meter tempo parity is broken.

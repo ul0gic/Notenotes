@@ -2416,3 +2416,16 @@ project.settings.degreeHighlighting = {
 - AI sequence generation now treats `beatsPerBar` as felt pulses.
   - The prompt tells providers that event `beat` positions are based on felt beats, not raw numerator counts.
   - In `6/8`, a 1-bar AI sequence uses beat positions `0..2` rather than `0..6`.
+
+## Compound Meter Tempo Fix 0.1.30
+
+- Phase 2 moved `Transport.secondsPerTick` to felt-pulse timing, but `_rawTickAtTime()` still converted audio time back into ticks with the old quarter-note assumption.
+  - Old path: `(bpm / 60) * ticksPerBeat`.
+  - Correct path: `1 / this.secondsPerTick`.
+- The two functions must stay mathematical inverses. If they disagree, the scheduler, playhead, recording positions, loop boundaries, and export durations can drift apart.
+- The bug only showed up in meters where the felt pulse is not a quarter note.
+  - `2/4`, `3/4`, `4/4`, and `5/4` were unaffected because `ticksPerPulse === ticksPerBeat`.
+  - `6/8`, `9/8`, and `12/8` were live-playing too slowly because their dotted-quarter pulse is `720` ticks while the old raw-tick conversion still used `480`.
+- `src/engine/Transport.js` now derives `_rawTickAtTime()` from `1 / this.secondsPerTick`, so live playback and the exporter-side pulse math agree again.
+- `Manual QA.md` section `12.3` now includes stopwatch checks for bar duration and a live-vs-MIDI/WAV export duration cross-check. The previous QA only counted clicks per bar, which proved grouping but not tempo rate.
+- Phase 3 asymmetric meters are still intentionally not exposed. Unequal pulse groups require a fresh timing decision before shipping; do not assume the equal compound-meter shortcut is enough for `5/8` or `7/8`.

@@ -239,7 +239,7 @@ export class Transport {
 
   _rawTickAtTime(audioTime) {
     const elapsed = audioTime - this._startTime;
-    const ticksPerSecond = (this._bpm / 60) * this.ticksPerBeat;
+    const ticksPerSecond = 1 / this.secondsPerTick;
     return this._startTick + Math.floor(elapsed * ticksPerSecond);
   }
 
