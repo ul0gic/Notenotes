@@ -107,7 +107,7 @@ Plus: **16 synth presets** split into Chip and Modern families, **Tone** control
 
 You never have to leave Create to make a song. The other modes are there when you want them.
 
-Inspect also lets you make a blank MIDI or drum clip directly, so you do not have to record live just to start writing notes.
+Inspect also lets you make a blank MIDI or drum clip directly, even while you are previewing an audio recording, so you do not have to leave the editor or record live just to start writing notes.
 
 ### Local, fast, free.
 

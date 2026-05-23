@@ -417,6 +417,23 @@ Expected:
 - Import is rejected with a clear message that a newer Notenotes version is needed.
 - Existing project data is not changed.
 
+### 6.7 Inspect Audio Creation Flow
+
+Steps:
+
+1. Create or load an audio recording.
+2. Open it in Inspect.
+3. Click New MIDI.
+4. Return to the audio recording in the Load dropdown.
+5. Click New Drum.
+
+Expected:
+
+- New MIDI creates a blank MIDI clip and loads it in Inspect.
+- New Drum creates a blank drum clip and loads it in Inspect.
+- The original audio recording remains available in the Load dropdown.
+- The snippet tray updates without needing a reload.
+
 ## 7. Tone Presets And Clip Tone
 
 ### 7.1 Synth Tone Preset

@@ -2351,3 +2351,10 @@ project.settings.degreeHighlighting = {
   - `Disconnect` only forgets the stored directory handle. It never deletes backup files already written to disk.
 - Unsupported browsers show Local folder backup as unavailable and keep the regular Save Backup download flow as the fallback.
 - `BackupExporter.saveJsonToDirectory(data, filename, directoryHandle)` is the small write helper for folder saves. Keep it JSON-only and explicit; do not use it for audio exports or arbitrary file writes.
+
+## Inspect Audio Clip Creation 0.1.27
+
+- Audio snippets in Inspect now expose `New MIDI` and `New Drum` actions in the audio preview header.
+- These buttons call the same `EditMode._createBlankSnippet(type)` path used by the empty Inspect state and the MIDI/drum editor toolbar.
+- Creating a blank clip from an audio preview immediately loads the new editable MIDI/drum clip in Inspect, dispatches `project-snippets-changed`, and keeps the existing `onSnippetCreated` callback behavior.
+- This is a workflow-only change. Audio snippets remain preview/rename/load surfaces, not piano-roll editable clips.

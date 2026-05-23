@@ -533,6 +533,14 @@
   max-width: 80vw;
 }
 
+.edit-audio__actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
+}
+
 .edit-audio__name-input:focus {
   outline: 1px solid var(--accent);
   border-color: var(--accent);

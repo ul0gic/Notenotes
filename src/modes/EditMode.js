@@ -119,6 +119,10 @@ export class EditMode {
           <select class="edit-toolbar__select edit-toolbar__select--clip" id="edit-load-clip-select" aria-label="Load clip">
             ${this._renderClipOptions()}
           </select>
+          <div class="edit-audio__actions" aria-label="Create editable clips">
+            <button class="btn btn--ghost edit-toolbar__btn" id="edit-audio-new-midi" type="button">New MIDI</button>
+            <button class="btn btn--ghost edit-toolbar__btn" id="edit-audio-new-drum" type="button">New Drum</button>
+          </div>
         </div>
         <div class="edit-audio__body">
           <audio class="edit-audio__player" controls src="${immediateSource}"></audio>
@@ -155,6 +159,14 @@ export class EditMode {
     }
     this.el.querySelector('#edit-load-clip-select')?.addEventListener('change', (e) => {
       this._loadSnippetById(e.target.value);
+    });
+    this.el.querySelector('#edit-audio-new-midi')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      this._createBlankSnippet('midi');
+    });
+    this.el.querySelector('#edit-audio-new-drum')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      this._createBlankSnippet('drum');
     });
   }
 
