@@ -9,7 +9,7 @@
  */
 
 import { AudioEngine } from './AudioEngine.js';
-import { meterToTimeSignature, normalizeMeter } from './Meter.js';
+import { meterToTimeSignature, normalizeMeter, pulseForTick, pulseTicksForMeter, ticksPerBarForMeter } from './Meter.js';
 
 /** Transport states */
 export const TransportState = {
@@ -79,7 +79,19 @@ export class Transport {
 
   /** Ticks per bar based on current time signature */
   get ticksPerBar() {
-    return this.ticksPerBeat * this._timeSignature.beats;
+    return ticksPerBarForMeter(this._meter, this.ticksPerBeat);
+  }
+
+  get pulseCount() {
+    return pulseTicksForMeter(this._meter, this.ticksPerBeat).length;
+  }
+
+  get pulseTicks() {
+    return pulseTicksForMeter(this._meter, this.ticksPerBeat);
+  }
+
+  get ticksPerPulse() {
+    return this.pulseTicks[0] || this.ticksPerBeat;
   }
 
   /** Current tick position */
@@ -96,7 +108,7 @@ export class Transport {
 
   /** Current beat (0-indexed within bar) */
   get currentBeat() {
-    return Math.floor((this.currentTick % this.ticksPerBar) / this.ticksPerBeat);
+    return pulseForTick(this._meter, this.currentTick, this.ticksPerBeat);
   }
 
   /** Current bar (0-indexed) */
@@ -116,12 +128,12 @@ export class Transport {
 
   /** Seconds per tick */
   get secondsPerTick() {
-    return 60 / (this._bpm * this.ticksPerBeat);
+    return 60 / (this._bpm * this.ticksPerPulse);
   }
 
   /** Maximum bars (derived from 10-minute limit) */
   get maxBars() {
-    const secondsPerBar = this.secondsPerBeat * this._timeSignature.beats;
+    const secondsPerBar = this.secondsPerTick * this.ticksPerBar;
     return Math.floor(this._maxDurationSeconds / secondsPerBar);
   }
 
@@ -289,9 +301,16 @@ export class Transport {
       // Fire tick callbacks
       this._emit(this._onTick, tick, this._nextTickTime);
 
-      // Check for beat boundary
-      if (tick % this.ticksPerBeat === 0) {
-        const beat = Math.floor((tick % this.ticksPerBar) / this.ticksPerBeat);
+      // Check for pulse boundary
+      const barRelativeTick = ((tick % this.ticksPerBar) + this.ticksPerBar) % this.ticksPerBar;
+      const pulseStarts = [];
+      let pulseCursor = 0;
+      for (const pulseTicks of this.pulseTicks) {
+        pulseStarts.push(pulseCursor);
+        pulseCursor += pulseTicks;
+      }
+      if (pulseStarts.includes(barRelativeTick)) {
+        const beat = pulseStarts.indexOf(barRelativeTick);
         this._emit(this._onBeat, beat, this._nextTickTime);
 
         // Check for bar boundary

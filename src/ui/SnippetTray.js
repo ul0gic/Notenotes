@@ -4,6 +4,7 @@
  */
 
 import { AudioEngine } from '../engine/AudioEngine.js';
+import { ticksPerBarForMeter } from '../engine/Meter.js';
 
 export class SnippetTray {
   constructor() {
@@ -94,7 +95,7 @@ export class SnippetTray {
     list.innerHTML = this.snippets.map((s, i) => {
       const noteCount = (s.notes?.length || 0) + (s.hits?.length || 0);
       const typeIcon = s.type === 'drum' ? 'DRUM' : s.type === 'audio' ? 'LINE' : 'MIDI';
-      const bars = Math.ceil(s.durationTicks / (480 * (s.timeSignature?.beats || 4)));
+      const bars = Math.ceil(s.durationTicks / ticksPerBarForMeter(s.meter || s.timeSignature, 480));
       const autoMeta = s.type === 'audio' ? 'Audio' : `${noteCount} notes · ${bars} bar${bars > 1 ? 's' : ''}`;
       const displayName = s.name || autoMeta;
       const usage = this._snippetUsageProvider?.(s.id);

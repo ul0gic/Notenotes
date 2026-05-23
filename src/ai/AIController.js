@@ -168,7 +168,7 @@ export class AIController {
     const validatorContext = {
       instrument: effectiveInstrument,
       lengthBars: effectiveLength,
-      beatsPerBar: this.transport.timeSignature?.beats || 4,
+      beatsPerBar: this.transport.pulseCount || this.transport.timeSignature?.beats || 4,
       padCount: inst.padCount,
     };
     const v = validateSequence(result.arguments, validatorContext);
@@ -202,6 +202,8 @@ export class AIController {
       instrument: inst.instrument || 'scaleboard',
       lengthBars: settings.defaultLengthBars || 4,
       bpm: this.transport.bpm,
+      meter: { ...this.transport.meter },
+      beatsPerBar: this.transport.pulseCount || this.transport.timeSignature?.beats || 4,
       timeSignature: { ...this.transport.timeSignature },
       scaleName: inst.scaleName,
       rootNote: inst.rootNote,

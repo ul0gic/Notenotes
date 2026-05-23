@@ -177,8 +177,8 @@ These are the ideas that drive the project. Some are coded, some are sketches, s
 ### Rhythm and meter
 - [x] **Meter belongs with key and scale** - the top bar now holds the project meter as a first-class project setting.
 - [x] **Simple project meters** - 2/4, 3/4, 4/4, and 5/4 are supported as project-level timing.
-- [ ] **Compound meter presets** - 6/8, 9/8, and 12/8 are planned, but only once the app can show their grouping honestly instead of pretending they are just longer 4/4.
-- [ ] **Clear pulse labels** - meters like 2/2 and 9/8 need the app to explain what the beat means, because BPM can mean different felt pulses depending on the meter.
+- [x] **Compound meter presets** - 6/8, 9/8, and 12/8 are supported with felt pulses, grouped canvas lines, matching beat dots, and export timing that does not pretend they are just longer 4/4.
+- [x] **Clear pulse behavior** - in compound meters, BPM means the big felt pulse. 6/8 at 120 BPM means two dotted-quarter pulses per bar, not six frantic eighth-note clicks.
 - [ ] **No random time-signature soup** - I do not want a giant custom meter box that technically works but teaches the wrong idea. Fewer choices that feel right beats a dropdown full of confusing math.
 - [ ] **Meter maps later** - one Canvas has one project timing for now. Changing meter mid-song is a real feature, but it needs a proper design instead of a rushed checkbox.
 

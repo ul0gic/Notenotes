@@ -6,7 +6,7 @@
 import { TransportState } from '../engine/Transport.js';
 import { ARP_MODES } from '../engine/ArpeggioManager.js';
 import { NOTE_NAMES, SCALES, normalizeMusicalContext } from '../engine/MusicTheory.js';
-import { METER_PRESETS, PHASE1_METER_IDS, meterLabel, normalizeMeter } from '../engine/Meter.js';
+import { METER_PICKER_IDS, METER_PRESETS, meterLabel, normalizeMeter, pulseCountForMeter } from '../engine/Meter.js';
 
 export class TransportBar {
   /**
@@ -81,7 +81,7 @@ export class TransportBar {
         </select>
         <span class="transport-bar__project-key-label">Meter</span>
         <select id="project-meter-select" aria-label="Project meter">
-          ${PHASE1_METER_IDS.map(id => {
+          ${METER_PICKER_IDS.map(id => {
             const meter = METER_PRESETS[id];
             return `<option value="${id}" ${id === this._projectMeter.id ? 'selected' : ''}>${meterLabel(meter)}</option>`;
           }).join('')}
@@ -355,7 +355,7 @@ export class TransportBar {
   }
 
   _renderBeatDots() {
-    const beats = Math.max(1, this.transport?.timeSignature?.beats || 4);
+    const beats = Math.max(1, pulseCountForMeter(this.transport?.meter || this.transport?.timeSignature));
     return Array.from({ length: beats }, (_, i) =>
       `<div class="beat-indicator__dot" data-beat="${i}"></div>`
     ).join('');

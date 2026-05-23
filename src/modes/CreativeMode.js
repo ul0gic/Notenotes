@@ -271,6 +271,7 @@ export class CreativeMode {
           hits: [],
           durationTicks,
           bpm: this.transport.bpm,
+          meter: { ...this.transport.meter },
           timeSignature: { ...this.transport.timeSignature },
           audioAssetId: record?.audioAssetId || null,
           audioUrl: url,

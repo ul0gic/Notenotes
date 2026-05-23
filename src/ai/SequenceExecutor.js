@@ -18,6 +18,7 @@
 
 import { TICKS_PER_BEAT } from './sequence-schema.js';
 import { getScaleNotes } from '../engine/MusicTheory.js';
+import { pulseCountForMeter, ticksPerBarForMeter } from '../engine/Meter.js';
 
 const DEFAULT_PAD_DURATION_BEATS = 0.5;
 const DEFAULT_NOTE_VELOCITY = 0.85;
@@ -41,8 +42,8 @@ export function buildSnippetFromSequence(sequence, context) {
     throw new Error('buildSnippetFromSequence requires sequence and context.transport.');
   }
   const transport = context.transport;
-  const beatsPerBar = transport.timeSignature?.beats || 4;
-  const ticksPerBar = TICKS_PER_BEAT * beatsPerBar;
+  const beatsPerBar = transport.pulseCount || pulseCountForMeter(transport.meter || transport.timeSignature) || transport.timeSignature?.beats || 4;
+  const ticksPerBar = transport.ticksPerBar || ticksPerBarForMeter(transport.meter || transport.timeSignature, TICKS_PER_BEAT);
 
   const notes = [];
   const hits = [];
@@ -118,6 +119,7 @@ export function buildSnippetFromSequence(sequence, context) {
     modulation: [],
     durationTicks,
     bpm: transport.bpm,
+    meter: { ...(transport.meter || {}) },
     timeSignature: { ...(transport.timeSignature || { beats: 4, subdivision: 4 }) },
     aiSeeded: true,
     aiPrompt: typeof context.prompt === 'string' ? context.prompt.slice(0, 240) : '',

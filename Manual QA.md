@@ -663,3 +663,53 @@ Expected:
 - No audio becomes unavailable.
 - Export succeeds.
 - App remains usable after reload.
+
+## 12. Meter And Settings
+
+### 12.1 Settings Beat Colors Stay In Sync
+
+Steps:
+
+1. Open Settings.
+2. Leave Settings open on the Settings tab.
+3. Change the top-bar Meter dropdown to `6/8`.
+4. Look at Time Signature Visualizer -> Beat Colors.
+5. Change Meter to `9/8`, then `12/8`, then back to `4/4`.
+
+Expected:
+
+- `6/8` shows 2 beat color pickers.
+- `9/8` shows 3 beat color pickers.
+- `12/8` shows 4 beat color pickers.
+- `4/4` shows 4 beat color pickers.
+- Settings does not need to be closed and reopened for this to update.
+
+### 12.2 Settings No Longer Owns Transport Controls
+
+Steps:
+
+1. Open Settings.
+2. Review the Project, Metronome, Master, and Time Signature Visualizer sections.
+
+Expected:
+
+- BPM is not editable in Settings. BPM lives in the top transport bar.
+- Drum pad count is not editable in Settings. Drum layout controls live in the Create layout panel.
+- Time signature is not editable in Settings. Meter lives in the top transport bar.
+
+### 12.3 Compound Meter Pulse Behavior
+
+Steps:
+
+1. Set Meter to `6/8` and BPM to `120`.
+2. Turn on the metronome and press Play.
+3. Open Canvas.
+4. Repeat with `9/8` and `12/8`.
+
+Expected:
+
+- `6/8` clicks two felt pulses per bar.
+- `9/8` clicks three felt pulses per bar.
+- `12/8` clicks four felt pulses per bar.
+- Canvas ruler and lane grid show the big pulses with faint sub-beat divisions.
+- Beat dots match the felt pulse count for each meter.

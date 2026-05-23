@@ -23,7 +23,7 @@ import { SettingsPanel } from './ui/SettingsPanel.js';
 import { PlaybackEngine } from './engine/PlaybackEngine.js';
 import { ModulationManager } from './engine/ModulationManager.js';
 import { normalizeMusicalContext } from './engine/MusicTheory.js';
-import { meterToTimeSignature, normalizeMeter } from './engine/Meter.js';
+import { meterToTimeSignature, normalizeMeter, pulseCountForMeter } from './engine/Meter.js';
 import { workspaceBackupStatus } from './utils/BackupStatus.js';
 
 if (import.meta.env.DEV && typeof window !== 'undefined') {
@@ -311,11 +311,11 @@ class App {
 
     for (const item of clipPositions) {
       item.clip.startBar = item.startTick / newTicksPerBar;
-      item.clip.durationBars = Math.max(1 / (this.project.timeSignature.beats || 4), item.durationTicks / newTicksPerBar);
+      item.clip.durationBars = Math.max(1 / pulseCountForMeter(next), item.durationTicks / newTicksPerBar);
     }
 
     this.project.settings ||= {};
-    this.project.settings.beatColors = this._beatColorsForBeats(this.project.timeSignature.beats);
+    this.project.settings.beatColors = this._beatColorsForBeats(pulseCountForMeter(next));
     this.transportBar.setProjectMeter(next);
     this.canvasMode?.refresh();
     if (this.editMode?._snippet) {

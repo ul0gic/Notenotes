@@ -7,6 +7,7 @@
 
 import './edit.css';
 import { NOTE_NAMES, midiToNoteName } from '../engine/MusicTheory.js';
+import { pulseCountForMeter, pulseTicksForMeter, ticksPerBarForMeter } from '../engine/Meter.js';
 import { showToast } from '../ui/Toast.js';
 
 const TICK_WIDTH = 0.15;
@@ -250,6 +251,7 @@ export class EditMode {
       hits: [],
       durationTicks: this.transport?.ticksPerBar || ((this.transport?.ticksPerBeat || 480) * (this.transport?.timeSignature?.beats || 4)),
       bpm: this.transport?.bpm || this.project.bpm || 120,
+      meter: { ...(this.transport?.meter || this.project.meter || { type: 'metered', id: '4/4', numerator: 4, denominator: 4, pulse: 'quarter', pulseCount: 4, grouping: [1, 1, 1, 1], feelName: 'Standard' }) },
       timeSignature: { ...(this.transport?.timeSignature || this.project.timeSignature || { beats: 4, subdivision: 4 }) },
     };
     this.project.snippets.push(snippet);
@@ -516,16 +518,20 @@ export class EditMode {
     el.style.width = `${width}px`;
     el.style.minWidth = '100%';
 
-    const ticksPerBeat = 480;
-    const beatsPerBar = this._beatsPerBar();
+    const ticksPerBar = this._ticksPerBar();
+    const pulses = pulseTicksForMeter(this._meterSource(), this.transport?.ticksPerBeat || 480);
     let html = '';
-    for (let tick = 0; tick < duration; tick += ticksPerBeat) {
-      const x = tick * TICK_WIDTH;
-      const beat = tick / ticksPerBeat;
-      const bar = Math.floor(beat / beatsPerBar) + 1;
-      const beatInBar = (beat % beatsPerBar) + 1;
-      const label = beatInBar === 1 ? `${bar}` : `${bar}.${beatInBar}`;
-      html += `<span class="piano-roll__ruler-label" style="left:${x}px">${label}</span>`;
+    for (let barStart = 0; barStart < duration; barStart += ticksPerBar) {
+      const bar = Math.floor(barStart / ticksPerBar) + 1;
+      let cursor = 0;
+      for (let pulse = 0; pulse < pulses.length; pulse += 1) {
+        const tick = barStart + cursor;
+        if (tick >= duration) break;
+        const x = tick * TICK_WIDTH;
+        const label = pulse === 0 ? `${bar}` : `${bar}.${pulse + 1}`;
+        html += `<span class="piano-roll__ruler-label" style="left:${x}px">${label}</span>`;
+        cursor += pulses[pulse];
+      }
     }
     el.innerHTML = html;
     return el;
@@ -533,19 +539,21 @@ export class EditMode {
 
   _displayDurationTicks() {
     const ticksPerBeat = this.transport?.ticksPerBeat || 480;
-    const beatsPerBar = this._beatsPerBar();
-    const minimumTicks = ticksPerBeat * beatsPerBar * 4;
-    return Math.max(this._snippet?.durationTicks || ticksPerBeat * beatsPerBar, minimumTicks);
+    const ticksPerBar = this._ticksPerBar();
+    const minimumTicks = ticksPerBar * 4;
+    return Math.max(this._snippet?.durationTicks || ticksPerBar, minimumTicks);
   }
 
   _beatsPerBar() {
-    return Math.max(
-      1,
-      this._snippet?.timeSignature?.beats ||
-      this.transport?.timeSignature?.beats ||
-      this.project?.timeSignature?.beats ||
-      4
-    );
+    return Math.max(1, pulseCountForMeter(this._meterSource()));
+  }
+
+  _ticksPerBar() {
+    return ticksPerBarForMeter(this._meterSource(), this.transport?.ticksPerBeat || 480);
+  }
+
+  _meterSource() {
+    return this._snippet?.meter || this.transport?.meter || this.project?.meter || this._snippet?.timeSignature || this.transport?.timeSignature || this.project?.timeSignature;
   }
 
   _renderGridForRange(pitchMin, pitchMax, paneId) {
@@ -586,7 +594,7 @@ export class EditMode {
     grid.appendChild(bgEl);
 
     const ticksPerBeat = 480;
-    const ticksPerBar = ticksPerBeat * this._beatsPerBar();
+    const ticksPerBar = this._ticksPerBar();
     for (let tick = 0; tick <= duration; tick += this._gridSize) {
       const x = tick * TICK_WIDTH;
       const line = document.createElement('div');

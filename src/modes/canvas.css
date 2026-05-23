@@ -396,6 +396,21 @@
   pointer-events: none;
 }
 
+.canvas-lane__content::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent calc(var(--subbeat-width, var(--beat-width)) - 1px),
+      rgba(255,255,255,0.012) calc(var(--subbeat-width, var(--beat-width)) - 1px),
+      rgba(255,255,255,0.012) var(--subbeat-width, var(--beat-width))
+    );
+  pointer-events: none;
+}
+
 /* --- Clip Block --- */
 .canvas-clip {
   position: absolute;

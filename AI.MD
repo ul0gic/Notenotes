@@ -2364,7 +2364,7 @@ project.settings.degreeHighlighting = {
 - `src/engine/Meter.js` introduces the project meter abstraction as a discriminated union.
   - Metered presets include `id`, `numerator`, `denominator`, `pulse`, `pulseCount`, `grouping`, and `feelName`.
   - `free` exists in the preset table for future work, but Phase 1 does not expose it in the UI.
-  - `PHASE1_METER_IDS` intentionally limits the live picker to `2/4`, `3/4`, `4/4`, and `5/4`.
+  - At launch, the live picker was limited to `2/4`, `3/4`, `4/4`, and `5/4`. As of `0.1.29`, use the later Compound Meter notes for the current picker list.
   - `5/4` uses the display name `Odd 5`; avoid song-title labels for meter presets.
 - `project.meter` is now a top-level project field. `project.timeSignature` remains as a mirrored legacy field.
   - `ProjectStore.createProject()` writes both fields.
@@ -2379,3 +2379,40 @@ project.settings.degreeHighlighting = {
   - Settings no longer renders the duplicate Time Signature control.
   - `App._setProjectMeter()` preserves Canvas clip absolute tick positions through meter changes using the same old/new ticks-per-bar conversion that Settings used before this move.
 - Phase 1 is a foundation/refactor step. Do not expose `6/8`, `9/8`, `12/8`, `5/8`, `7/8`, or Free until Canvas ruler grouping, metronome pulse behavior, exports, beat colors, and QA are updated together.
+
+## Compound Meter Phase 2 / Settings Cleanup 0.1.29
+
+- The live meter picker now exposes `6/8`, `9/8`, and `12/8`.
+  - `METER_PICKER_IDS` is now the live top-bar list for supported meters.
+  - `6/8`, `9/8`, and `12/8` use dotted-quarter felt pulses, with groupings `[3,3]`, `[3,3,3]`, and `[3,3,3,3]`.
+  - `5/8`, `7/8`, and `free` remain in `METER_PRESETS` for future phases but are still not exposed.
+- BPM now means the meter's felt pulse in the transport timing path.
+  - `Transport.secondsPerTick` derives from `ticksPerPulse`, not always `ticksPerBeat`.
+  - For `6/8` at `120 BPM`, the app schedules two dotted-quarter pulses per bar, not six eighth-note clicks.
+  - `Transport.onBeat` now fires on pulse starts. `onBar` still fires at bar starts.
+  - `Transport.ticksPerBar` uses `ticksPerBarForMeter()`, so denominator-aware bars are correct (`6/8` = 1440 ticks at 480 PPQ).
+- Canvas now renders compound meters as grouped pulse grids.
+  - `CanvasMode._beatsPerBar()` returns `pulseCountForMeter()`.
+  - Lane backgrounds use `--beat-width` for felt pulses and `--subbeat-width` for the faint inner divisions.
+  - The ruler labels the big pulses (`1`, `1.2`, etc.). Compound sub-beats are visible as grid lines, not as full ruler labels.
+  - This Phase 2 path assumes equal grouping sizes (`3+3`, `3+3+3`, `3+3+3+3`). Asymmetric meters will need proportional ruler/seek spacing in a later phase.
+- Beat-color surfaces now follow felt pulses.
+  - Transport beat dots use `pulseCountForMeter()`.
+  - `LoopProgress` resolves the active visualizer color using `pulseForTick()`.
+  - Settings beat color inputs use `pulseCountForMeter()`.
+  - Settings listens for `project-time-signature-changed` and re-renders the Settings tab if it is open, so changing the top-bar meter updates beat colors immediately.
+- Settings no longer owns duplicated transport/layout controls.
+  - BPM has been removed from Settings. The top transport bar is the only BPM editor.
+  - Drum pad count has been removed from Settings. Drum layout belongs in the Create/layout flow.
+  - The old duplicate Settings time-signature mutation helper was removed; meter changes should route through `App._setProjectMeter()`.
+- New snippets now preserve the project meter at creation time.
+  - `RecordingManager`, `CreativeMode` Audio In snippets, `EditMode` blank snippets, and AI-generated snippets all write `snippet.meter` alongside the legacy `snippet.timeSignature`.
+  - Keep writing `timeSignature` for now because sheet/backup/older import paths still expect the legacy shape.
+- Export timing has been moved onto meter helpers.
+  - `WavExporter` uses `secondsPerTickForMeter()` and `ticksPerBarForMeter()` so compound meters render at the same felt-pulse speed as live playback.
+  - Snippet WAV export uses the snippet's own meter. Canvas WAV export uses the project meter for clip placement and the snippet meter for the snippet's internal note offsets.
+  - `MidiExporter` uses `quarterBpmForMeter()` so MIDI tempo events convert compound felt-pulse BPM into the quarter-note tempo expected by MIDI readers.
+  - `ABCConverter` and snippet tray bar estimates use `ticksPerBarForMeter()`.
+- AI sequence generation now treats `beatsPerBar` as felt pulses.
+  - The prompt tells providers that event `beat` positions are based on felt beats, not raw numerator counts.
+  - In `6/8`, a 1-bar AI sequence uses beat positions `0..2` rather than `0..6`.

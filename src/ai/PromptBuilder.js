@@ -28,7 +28,9 @@ import {
  * @property {string} instrument        - 'scaleboard' | 'piano' | 'kit'
  * @property {number} lengthBars        - 1, 2, 4, or 8
  * @property {number} bpm
- * @property {object} timeSignature     - { beats, subdivision }
+ * @property {object} [meter]           - normalized project meter
+ * @property {object} timeSignature     - legacy { beats, subdivision }
+ * @property {number} [beatsPerBar]     - felt pulses per bar
  * @property {string} [scaleName]       - 'major', 'minor', etc. (scaleboard only)
  * @property {string} [rootNote]
  * @property {number} [padCount]        - number of pads in active scale
@@ -46,9 +48,14 @@ export function buildSystemPrompt(ctx) {
   const inst = AI_INSTRUMENTS[ctx.instrument];
   if (!inst) throw new Error(`Unknown instrument: ${ctx.instrument}`);
 
-  const beatsPerBar = ctx.timeSignature?.beats || 4;
+  const beatsPerBar = ctx.beatsPerBar || ctx.meter?.pulseCount || ctx.timeSignature?.beats || 4;
   const totalBeats = (ctx.lengthBars || 4) * beatsPerBar;
   const meter = `${ctx.timeSignature?.beats || 4}/${ctx.timeSignature?.subdivision || 4}`;
+  const pulseText = ctx.meter?.pulse === 'dotted-quarter'
+    ? 'BPM counts dotted-quarter pulses'
+    : ctx.meter?.pulse === 'eighth'
+      ? 'BPM counts eighth-note pulses'
+      : 'BPM counts quarter-note pulses';
 
   const lines = [];
   lines.push(`You are a sequencing assistant inside Notenotes, a free, open-source pre-DAW musical sketchpad.`);
@@ -62,8 +69,8 @@ export function buildSystemPrompt(ctx) {
   lines.push('');
   lines.push(`Current musical context:`);
   lines.push(`- Active instrument: ${inst.label} (${inst.id}). ${inst.description}`);
-  lines.push(`- Time signature: ${meter}. ${beatsPerBar} beats per bar.`);
-  lines.push(`- Tempo: ${ctx.bpm || 120} BPM.`);
+  lines.push(`- Time signature: ${meter}. Use ${beatsPerBar} felt beat${beatsPerBar === 1 ? '' : 's'} per bar for event beat positions.`);
+  lines.push(`- Tempo: ${ctx.bpm || 120} BPM (${pulseText}).`);
   if (ctx.instrument === 'scaleboard') {
     lines.push(`- Scale: ${ctx.scaleName || 'major'} in ${ctx.rootNote || 'C'}. ${ctx.padCount || 7} pads available (padIndex 0..${(ctx.padCount || 7) - 1}). The pads are scale-locked; you cannot play out-of-key notes.`);
   } else if (ctx.instrument === 'piano') {

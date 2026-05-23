@@ -105,7 +105,7 @@ export const METER_PRESETS = {
   },
 };
 
-export const PHASE1_METER_IDS = ['2/4', '3/4', '4/4', '5/4'];
+export const METER_PICKER_IDS = ['2/4', '3/4', '4/4', '5/4', '6/8', '9/8', '12/8'];
 
 export const ALLOWED_GROUPINGS = {
   '5/8': [[2, 3], [3, 2]],
@@ -158,6 +158,48 @@ export function meterToTimeSignature(input) {
   return { beats: meter.numerator, subdivision: meter.denominator };
 }
 
+export function beatUnitTicks(input, ticksPerQuarter = 480) {
+  const meter = normalizeMeter(input);
+  if (meter.type === 'free') return ticksPerQuarter;
+  return ticksPerQuarter * (4 / meter.denominator);
+}
+
+export function ticksPerBarForMeter(input, ticksPerQuarter = 480) {
+  const meter = normalizeMeter(input);
+  if (meter.type === 'free') return ticksPerQuarter * 4;
+  return beatUnitTicks(meter, ticksPerQuarter) * meter.numerator;
+}
+
+export function pulseTicksForMeter(input, ticksPerQuarter = 480) {
+  const meter = normalizeMeter(input);
+  if (meter.type === 'free') return ticksPerQuarter;
+  if (!Array.isArray(meter.grouping) || !meter.grouping.length) {
+    return beatUnitTicks(meter, ticksPerQuarter);
+  }
+  return meter.grouping.map(group => beatUnitTicks(meter, ticksPerQuarter) * group);
+}
+
+export function pulseCountForMeter(input) {
+  const meter = normalizeMeter(input);
+  if (meter.type === 'free') return 0;
+  return Math.max(1, meter.pulseCount || meter.grouping?.length || meter.numerator || 4);
+}
+
+export function pulseForTick(input, tick, ticksPerQuarter = 480) {
+  const meter = normalizeMeter(input);
+  if (meter.type === 'free') return 0;
+  const barTicks = ticksPerBarForMeter(meter, ticksPerQuarter);
+  const relative = ((tick % barTicks) + barTicks) % barTicks;
+  const pulses = pulseTicksForMeter(meter, ticksPerQuarter);
+  let cursor = 0;
+  for (let i = 0; i < pulses.length; i += 1) {
+    const next = cursor + pulses[i];
+    if (relative >= cursor && relative < next) return i;
+    cursor = next;
+  }
+  return Math.max(0, pulses.length - 1);
+}
+
 export function meterLabel(input) {
   const meter = normalizeMeter(input);
   if (meter.type === 'free') return 'Free';
@@ -167,7 +209,19 @@ export function meterLabel(input) {
 export function barDurationSeconds(input, bpm = 120) {
   const meter = normalizeMeter(input);
   if (meter.type === 'free') return null;
-  return (60 / Math.max(1, bpm)) * meter.pulseCount;
+  return (60 / Math.max(1, bpm)) * pulseCountForMeter(meter);
+}
+
+export function secondsPerTickForMeter(input, bpm = 120, ticksPerQuarter = 480) {
+  const pulseTicks = pulseTicksForMeter(input, ticksPerQuarter)[0] || ticksPerQuarter;
+  return 60 / Math.max(1, bpm) / pulseTicks;
+}
+
+export function quarterBpmForMeter(input, bpm = 120) {
+  const meter = normalizeMeter(input);
+  if (meter.type === 'free') return bpm;
+  const pulseTicks = pulseTicksForMeter(meter, 480)[0] || 480;
+  return Math.max(1, bpm) * (pulseTicks / 480);
 }
 
 export function subBeatsForPulse(input, pulseIndex = 0) {

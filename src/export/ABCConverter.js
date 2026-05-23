@@ -5,6 +5,7 @@
  */
 
 import { midiToNoteName } from '../engine/MusicTheory.js';
+import { ticksPerBarForMeter } from '../engine/Meter.js';
 
 /**
  * ABC note name mapping from MIDI.
@@ -129,7 +130,7 @@ export function snippetToABC(snippet, options = {}) {
   // Build ABC body
   let body = '';
   let currentTick = 0;
-  const ticksPerBar = ticksPerBeat * timeSig.beats;
+  const ticksPerBar = ticksPerBarForMeter(snippet.meter || snippet.timeSignature, ticksPerBeat);
   let noteInBar = 0;
 
   for (const note of notes) {
@@ -201,7 +202,7 @@ function _drumSnippetToABC(snippet, title, bpm, timeSig, ticksPerBeat) {
 
   let body = '';
   let currentTick = 0;
-  const ticksPerBar = ticksPerBeat * timeSig.beats;
+  const ticksPerBar = ticksPerBarForMeter(snippet.meter || snippet.timeSignature, ticksPerBeat);
 
   for (const hit of hits) {
     if (hit.startTick > currentTick) {

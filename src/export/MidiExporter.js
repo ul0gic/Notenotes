@@ -1,4 +1,5 @@
 import { DRUM_KITS } from '../instruments/SketchKit.js';
+import { meterToTimeSignature, quarterBpmForMeter, ticksPerBarForMeter } from '../engine/Meter.js';
 
 const PPQ = 480;
 const DRUM_MIDI = {
@@ -80,9 +81,9 @@ function addDrumHitEvents(events, hit, startTick, exportStats) {
 }
 
 function tempoEvents(project) {
-  const bpm = Math.max(40, Math.min(240, Math.round(project?.bpm || 120)));
+  const bpm = Math.max(1, Math.round(quarterBpmForMeter(project?.meter || project?.timeSignature, project?.bpm || 120)));
   const micros = Math.round(60000000 / bpm);
-  const ts = project?.timeSignature || { beats: 4, subdivision: 4 };
+  const ts = meterToTimeSignature(project?.meter || project?.timeSignature);
   const denominatorPower = Math.max(0, Math.round(Math.log2(ts.subdivision || 4)));
   return [
     { tick: 0, order: -3, bytes: [0xff, 0x51, 0x03, (micros >> 16) & 0xff, (micros >> 8) & 0xff, micros & 0xff] },
@@ -93,7 +94,7 @@ function tempoEvents(project) {
 export function projectToMidiBlob(project, options = {}) {
   const exportStats = stats(options);
   const events = [...tempoEvents(project)];
-  const ticksPerBar = PPQ * (project?.timeSignature?.beats || 4);
+  const ticksPerBar = ticksPerBarForMeter(project?.meter || project?.timeSignature, PPQ);
   const hasSolo = (project?.tracks || []).some(track => track.solo);
   const audibleTracks = (project?.tracks || []).filter(track => !track.muted && (!hasSolo || track.solo));
 
@@ -127,7 +128,12 @@ export function projectToMidiBlob(project, options = {}) {
 export function snippetToMidiBlob(snippet, project, options = {}) {
   const exportStats = stats(options);
   const channel = snippet?.type === 'drum' ? 9 : 0;
-  const events = [...tempoEvents(project)];
+  const events = [...tempoEvents({
+    ...(project || {}),
+    bpm: snippet?.bpm || project?.bpm || 120,
+    meter: snippet?.meter || project?.meter,
+    timeSignature: snippet?.timeSignature || project?.timeSignature,
+  })];
   for (const note of (snippet?.notes || [])) {
     addMidiNoteEvents(events, note, 0, channel, exportStats);
   }

@@ -4,6 +4,7 @@
  */
 
 import { TransportState } from '../engine/Transport.js';
+import { pulseForTick, pulseCountForMeter } from '../engine/Meter.js';
 
 export class LoopProgress {
   /**
@@ -76,10 +77,10 @@ export class LoopProgress {
       // Time signature visualizer
       const settings = this.project?.settings || {};
       if (settings.visualizerEnabled) {
-        const ticksPerBeat = this.transport.ticksPerBeat || 480;
-        const currentBeat = Math.floor(relative / ticksPerBeat) % (this.transport.timeSignature.beats || 4);
+        const currentBeat = pulseForTick(this.transport.meter || this.transport.timeSignature, relative, this.transport.ticksPerBeat || 480);
+        const pulseCount = pulseCountForMeter(this.transport.meter || this.transport.timeSignature) || 4;
         const colors = settings.beatColors || ['#1e1e2e', '#2a2a3e', '#1e1e2e', '#2a2a3e'];
-        const color = colors[currentBeat] || colors[0] || '';
+        const color = colors[currentBeat % pulseCount] || colors[0] || '';
         document.documentElement.style.setProperty('--surface-0', color);
       } else {
         document.documentElement.style.removeProperty('--surface-0');

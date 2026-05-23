@@ -239,6 +239,7 @@ export class RecordingManager {
       modulation: [...this._capturedMod],
       durationTicks: contentTicks,
       bpm: this.transport.bpm,
+      meter: { ...this.transport.meter },
       timeSignature: { ...this.transport.timeSignature },
     };
     if (snippet.type === 'midi' && this._toneProvider) {

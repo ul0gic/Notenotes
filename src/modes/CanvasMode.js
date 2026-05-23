@@ -9,6 +9,7 @@ import { TransportState } from '../engine/Transport.js';
 import { TRACK_INSTRUMENTS } from '../engine/PlaybackEngine.js';
 import { DRUM_KITS } from '../instruments/SketchKit.js';
 import { PRESETS, normalizeSoundTraits } from '../instruments/WebAudioSynth.js';
+import { normalizeMeter, pulseCountForMeter, subBeatsForPulse } from '../engine/Meter.js';
 import { showToast } from '../ui/Toast.js';
 
 /** Pixels per bar at default zoom */
@@ -55,16 +56,22 @@ export class CanvasMode {
   }
 
   _beatsPerBar() {
-    return Math.max(1, this.transport?.timeSignature?.beats || 4);
+    return Math.max(1, pulseCountForMeter(this.transport?.meter || this.transport?.timeSignature));
+  }
+
+  _meter() {
+    return normalizeMeter(this.transport?.meter || this.project?.meter || this.transport?.timeSignature || this.project?.timeSignature);
   }
 
   _syncTimelineMetrics() {
     this.barWidth = DEFAULT_BAR_WIDTH * this._zoomLevel;
     this.beatWidth = this.barWidth / this._beatsPerBar();
+    const subBeatWidth = this.beatWidth / Math.max(1, subBeatsForPulse(this._meter(), 0) || 1);
 
     if (this.el) {
       this.el.style.setProperty('--bar-width', `${this.barWidth}px`);
       this.el.style.setProperty('--beat-width', `${this.beatWidth}px`);
+      this.el.style.setProperty('--subbeat-width', `${subBeatWidth}px`);
     }
   }
 
@@ -314,16 +321,22 @@ export class CanvasMode {
   _renderRuler() {
     if (!this._rulerEl) return;
     const totalBars = Math.min(this.transport.maxBars, 80);
-    const beatsPerBar = this._beatsPerBar();
-    const totalBeats = totalBars * beatsPerBar;
+    const meter = this._meter();
+    const groups = meter.type === 'metered' && Array.isArray(meter.grouping) && meter.grouping.length
+      ? meter.grouping
+      : Array.from({ length: this._beatsPerBar() }, () => 1);
     let html = '';
     html += `<div class="canvas-ruler__bar" style="width:140px;flex-shrink:0;border-right:1px solid var(--surface-4);"></div>`;
-    for (let beat = 0; beat < totalBeats; beat++) {
-      const bar = Math.floor(beat / beatsPerBar) + 1;
-      const beatInBar = (beat % beatsPerBar) + 1;
-      const label = beatInBar === 1 ? `${bar}` : `${bar}.${beatInBar}`;
-      const isBar = beatInBar === 1;
-      html += `<div class="canvas-ruler__beat" data-seek-bar="${(beat / beatsPerBar).toFixed(6)}" title="Move playhead to ${label}" style="width:${this.beatWidth}px;${isBar ? 'font-weight:var(--font-weight-semibold);color:var(--accent-light);' : ''}">${label}</div>`;
+    for (let bar = 0; bar < totalBars; bar += 1) {
+      for (let pulse = 0; pulse < groups.length; pulse += 1) {
+        const label = pulse === 0 ? `${bar + 1}` : `${bar + 1}.${pulse + 1}`;
+        const seek = bar + (pulse / groups.length);
+        const isBar = pulse === 0;
+        const title = groups[pulse] > 1
+          ? `Move playhead to ${label} (${groups[pulse]} sub-beats)`
+          : `Move playhead to ${label}`;
+        html += `<div class="canvas-ruler__beat" data-seek-bar="${seek.toFixed(6)}" title="${title}" style="width:${this.beatWidth}px;${isBar ? 'font-weight:var(--font-weight-semibold);color:var(--accent-light);' : ''}">${label}</div>`;
+      }
     }
     this._rulerEl.innerHTML = html;
   }
