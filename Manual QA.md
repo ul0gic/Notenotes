@@ -699,22 +699,39 @@ Expected:
 
 ### 12.3 Compound Meter Pulse Behavior
 
+Use a phone stopwatch or wall clock with second precision. Tolerance: +/-0.3 seconds for a 4-bar run. Anything +/-0.5 seconds or more is real drift.
+
 Steps:
 
-1. Set Meter to `4/4` and BPM to `120`.
-2. Turn on the metronome and press Play.
-3. Use a stopwatch or phone timer. Count 4 bars by ear.
-4. Stop playback.
-5. Set Meter to `6/8`, keep BPM at `120`, and press Play.
-6. Count 4 bars by ear.
-7. Repeat for `9/8` and `12/8`.
+1. Open a fresh project.
+2. Use the BPM input to set BPM. Use the top-bar Meter dropdown to set meter.
+3. Turn on the metronome.
+4. Press Play. Start the stopwatch when the playhead crosses bar 1.
+5. Stop the stopwatch when the playhead crosses the start of bar 5 after 4 full bars have played.
+6. Compare to the expected duration in the table.
 
-Expected:
+Expected 4-bar wall-clock time:
 
-- `4/4`: 4 bars take about 8.0 seconds.
-- `6/8`: 4 bars take about 4.0 seconds, with two felt-pulse clicks per bar.
-- `9/8`: 4 bars take about 6.0 seconds, with three felt-pulse clicks per bar.
-- `12/8`: 4 bars take about 8.0 seconds, with four felt-pulse clicks per bar.
+| Meter | 60 BPM | 120 BPM | 240 BPM | Pulses/bar |
+|---|---:|---:|---:|---:|
+| `2/4` | 8.0 s | 4.0 s | 2.0 s | 2 |
+| `3/4` | 12.0 s | 6.0 s | 3.0 s | 3 |
+| `4/4` | 16.0 s | 8.0 s | 4.0 s | 4 |
+| `5/4` | 20.0 s | 10.0 s | 5.0 s | 5 |
+| `6/8` | 8.0 s | 4.0 s | 2.0 s | 2 |
+| `9/8` | 12.0 s | 6.0 s | 3.0 s | 3 |
+| `12/8` | 16.0 s | 8.0 s | 4.0 s | 4 |
+
+Pair-up invariant:
+
+- At any BPM, `2/4` and `6/8` must match each other.
+- At any BPM, `3/4` and `9/8` must match each other.
+- At any BPM, `4/4` and `12/8` must match each other.
+
+Linearity invariant:
+
+- Bar duration at 60 BPM divided by bar duration at 120 BPM should be 2.0 within +/-5%.
+- Bar duration at 120 BPM divided by bar duration at 240 BPM should be 2.0 within +/-5%.
 - Canvas ruler and lane grid show the big pulses with faint sub-beat divisions.
 - Beat dots match the felt pulse count for each meter.
 
@@ -728,3 +745,25 @@ Expected:
 
 - MIDI and WAV export duration match live playback closely enough that no tempo difference is audible.
 - If either export plays noticeably faster or slower than live playback, compound meter tempo parity is broken.
+
+### 12.4 Diagnostics Panel (Developer)
+
+Steps:
+
+1. Open the app with `?debug=1` appended to the URL.
+2. Open Settings.
+3. Confirm the Diagnostics tab is visible.
+4. Open Diagnostics.
+5. Confirm Live Timing readouts are populated.
+6. Change BPM and Meter in the top bar.
+7. Click Verify Current Meter.
+8. Click Run Full Matrix.
+9. Remove `?debug=1`, clear `localStorage.notenotes-debug`, reload, and open Settings.
+
+Expected:
+
+- Diagnostics appears only with `?debug=1` or `localStorage.setItem('notenotes-debug', '1')`.
+- Live Timing numbers match the top bar and update without starting playback.
+- Verify Current Meter reports PASS for supported meters.
+- Run Full Matrix reports PASS for all supported meter/BPM cells, pair-up checks, and linearity checks.
+- The diagnostics panel does not play audio, start transport, or mutate the current project.

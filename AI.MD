@@ -2429,3 +2429,23 @@ project.settings.degreeHighlighting = {
 - `src/engine/Transport.js` now derives `_rawTickAtTime()` from `1 / this.secondsPerTick`, so live playback and the exporter-side pulse math agree again.
 - `Manual QA.md` section `12.3` now includes stopwatch checks for bar duration and a live-vs-MIDI/WAV export duration cross-check. The previous QA only counted clicks per bar, which proved grouping but not tempo rate.
 - Phase 3 asymmetric meters are still intentionally not exposed. Unequal pulse groups require a fresh timing decision before shipping; do not assume the equal compound-meter shortcut is enough for `5/8` or `7/8`.
+
+## Tempo QA Diagnostics 0.1.31
+
+- `Manual QA.md` section `12.3` now uses a 21-cell meter/BPM matrix instead of one 120 BPM spot check.
+  - The matrix covers `2/4`, `3/4`, `4/4`, `5/4`, `6/8`, `9/8`, and `12/8` at `60`, `120`, and `240` BPM.
+  - Pair-up invariants are documented: `2/4 = 6/8`, `3/4 = 9/8`, and `4/4 = 12/8` at the same BPM.
+  - Linearity invariants are documented: 60/120 and 120/240 duration ratios should both be 2.0 within tolerance.
+- Developer-only timing diagnostics are available by loading the app with `?debug=1`.
+  - `main.js` sets `window.__notenotesDebug` when `?debug=1` is present and persists it with `localStorage.notenotes-debug = "1"`.
+  - Clearing `localStorage.notenotes-debug` and removing the query hides the Diagnostics tab again.
+- `SettingsPanel` conditionally adds a `Diagnostics` tab only when `window.__notenotesDebug === true`.
+  - The diagnostics panel is destroyed when leaving the tab or closing Settings so the requestAnimationFrame readout does not keep running in the background.
+- `src/ui/DiagnosticsPanel.js` is intentionally math-first and non-invasive.
+  - It does not start transport, play audio, subscribe to every tick, change BPM, change loop regions, or mutate project data.
+  - Live Timing reads current transport fields at animation-frame rate only while visible: meter, grouping, BPM, seconds/tick, ticks/sec, ticks/bar, ticks/pulse, current bar/pulse/tick.
+  - `Verify Current Meter` compares the current meter/BPM 8-bar duration from the pulse formula against `ticksPerBarForMeter() * secondsPerTickForMeter()`.
+  - `Run Full Matrix` checks all supported meter/BPM cells, pair-up invariants, and linearity invariants immediately from the same meter helpers used by transport/export.
+- This replaces the heavier live-transport diagnostic idea for now.
+  - Avoid diagnostic tests that use the real transport as a metronome unless they are explicitly isolated; otherwise the measuring tool can become the source of jitter or can disturb user playback state.
+  - If future QA needs a live scheduling probe, build it as a separate opt-in tool and make clear that it measures scheduler/runtime behavior, not just meter math.

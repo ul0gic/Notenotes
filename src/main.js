@@ -6,6 +6,7 @@
 import './style.css';
 import './instruments/instruments.css';
 import './ui/settings.css';
+import './ui/diagnostics.css';
 
 import { AudioEngine } from './engine/AudioEngine.js';
 import { Transport } from './engine/Transport.js';
@@ -25,6 +26,16 @@ import { ModulationManager } from './engine/ModulationManager.js';
 import { normalizeMusicalContext } from './engine/MusicTheory.js';
 import { meterToTimeSignature, normalizeMeter, pulseCountForMeter } from './engine/Meter.js';
 import { workspaceBackupStatus } from './utils/BackupStatus.js';
+
+if (typeof window !== 'undefined') {
+  const params = new URLSearchParams(window.location.search);
+  try {
+    if (params.has('debug')) localStorage.setItem('notenotes-debug', '1');
+    window.__notenotesDebug = params.has('debug') || localStorage.getItem('notenotes-debug') === '1';
+  } catch (_) {
+    window.__notenotesDebug = params.has('debug');
+  }
+}
 
 if (import.meta.env.DEV && typeof window !== 'undefined') {
   import('./dev/AudioParityHarness.js').then((harness) => {

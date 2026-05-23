@@ -5,6 +5,7 @@
  */
 
 import { SheetMusicView } from '../export/SheetMusicView.js';
+import { DiagnosticsPanel } from './DiagnosticsPanel.js';
 import { downloadBlob, projectToMidiBlob, safeFilename, snippetToMidiBlob } from '../export/MidiExporter.js';
 import { projectToWavBlob, snippetToWavBlob } from '../export/WavExporter.js';
 import { backupFilename, customInstrumentsWithFreshIds, readJsonFile, saveJsonFile, saveJsonToDirectory, snippetsBackup, snippetsWithFreshIds, validateBackup, workspaceBackup } from '../export/BackupExporter.js';
@@ -126,7 +127,8 @@ export class SettingsPanel {
     this.el = null;
     this._isOpen = false;
     this._sheetMusicView = null;
-    this._activeSection = 'settings'; // 'settings' | 'sheet' | 'history'
+    this._diagnosticsPanel = null;
+    this._activeSection = 'settings'; // 'settings' | 'sheet' | 'history' | 'diagnostics'
   }
 
   render() {
@@ -145,6 +147,7 @@ export class SettingsPanel {
           <button class="settings-panel__tab is-active" data-section="settings">Settings</button>
           <button class="settings-panel__tab" data-section="sheet">Export</button>
           <button class="settings-panel__tab" data-section="history">Save</button>
+          ${this._diagnosticsEnabled() ? '<button class="settings-panel__tab" data-section="diagnostics">Diagnostics</button>' : ''}
         </div>
         <div class="settings-panel__body" id="settings-body">
           ${this._renderSettingsSection()}
@@ -154,6 +157,10 @@ export class SettingsPanel {
 
     this._bindEvents();
     return this.el;
+  }
+
+  _diagnosticsEnabled() {
+    return typeof window !== 'undefined' && window.__notenotesDebug === true;
   }
 
   _renderSettingsSection() {
@@ -707,6 +714,9 @@ export class SettingsPanel {
   }
 
   _switchSection(section) {
+    if (section === 'diagnostics' && !this._diagnosticsEnabled()) section = 'settings';
+    this._diagnosticsPanel?.destroy();
+    this._diagnosticsPanel = null;
     this._activeSection = section;
 
     // Update tab visuals
@@ -736,6 +746,12 @@ export class SettingsPanel {
         this._loadStorageStatus();
         this._loadMilestones();
         this._loadVersionHistory();
+        break;
+
+      case 'diagnostics':
+        body.innerHTML = '<div id="section-diagnostics"></div>';
+        this._diagnosticsPanel = new DiagnosticsPanel({ transport: this.transport });
+        body.querySelector('#section-diagnostics')?.appendChild(this._diagnosticsPanel.render());
         break;
     }
   }
@@ -1426,6 +1442,8 @@ export class SettingsPanel {
 
   close() {
     this._isOpen = false;
+    this._diagnosticsPanel?.destroy();
+    this._diagnosticsPanel = null;
     this.el.classList.remove('is-open');
   }
 

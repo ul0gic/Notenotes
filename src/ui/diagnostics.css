@@ -1,0 +1,128 @@
+/* Developer timing diagnostics. Hidden unless ?debug=1 is active. */
+
+.diagnostics-panel {
+  font-size: var(--font-size-sm);
+}
+
+.diagnostics-panel__section {
+  gap: var(--space-lg);
+}
+
+.diagnostics-grid {
+  display: grid;
+  grid-template-columns: minmax(110px, 0.7fr) minmax(0, 1fr);
+  gap: 6px 12px;
+  padding: var(--space-sm);
+  background: var(--surface-2);
+  border: var(--border-subtle);
+  border-radius: var(--radius-sm);
+}
+
+.diagnostics-grid--compact {
+  margin-top: var(--space-sm);
+}
+
+.diagnostics-grid__label {
+  color: var(--text-tertiary);
+}
+
+.diagnostics-grid__value {
+  color: var(--text-primary);
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  text-align: right;
+  word-break: break-word;
+}
+
+.diagnostics-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.diagnostics-result {
+  color: var(--text-secondary);
+}
+
+.diagnostics-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--surface-4);
+  background: var(--surface-2);
+}
+
+.diagnostics-summary--pass {
+  border-color: rgba(83, 220, 140, 0.45);
+  color: #7df0aa;
+}
+
+.diagnostics-summary--warn {
+  border-color: rgba(235, 192, 82, 0.55);
+  color: #ffd46f;
+}
+
+.diagnostics-summary--fail {
+  border-color: rgba(255, 97, 97, 0.6);
+  color: #ff8b8b;
+}
+
+.diagnostics-table {
+  margin-top: var(--space-sm);
+  border: var(--border-subtle);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--surface-2);
+}
+
+.diagnostics-table__row {
+  display: grid;
+  grid-template-columns: 0.8fr 0.7fr 1fr 1fr 1fr;
+  gap: var(--space-xs);
+  padding: 6px 8px;
+  border-top: 1px solid var(--surface-3);
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 0.72rem;
+}
+
+.diagnostics-table__row:first-child {
+  border-top: 0;
+}
+
+.diagnostics-table__row--head {
+  color: var(--text-tertiary);
+  background: var(--surface-3);
+  font-family: var(--font-family);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.diagnostics-table__row--fail,
+.diagnostics-list__item--fail {
+  color: #ff8b8b;
+}
+
+.diagnostics-table__row--warn,
+.diagnostics-list__item--warn {
+  color: #ffd46f;
+}
+
+.diagnostics-details {
+  margin-top: var(--space-sm);
+  color: var(--text-secondary);
+}
+
+.diagnostics-details summary {
+  cursor: pointer;
+  color: var(--text-tertiary);
+}
+
+.diagnostics-list {
+  margin-top: var(--space-xs);
+  display: grid;
+  gap: 3px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  font-size: 0.72rem;
+}
