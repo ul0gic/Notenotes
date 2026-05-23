@@ -2332,3 +2332,22 @@ project.settings.degreeHighlighting = {
   - Presets are stored inside the workspace/project JSON, so workspace backups carry them.
   - The Controller Mapper list view can save the current binding map as a named preset, load a preset over the current map, or delete a preset.
   - Presets clone `project.settings.controllerBindings`; they do not store live gamepad state.
+
+## Local Backup Folder / Controller Label Cleanup 0.1.26
+
+- Controller Pads binding labels now use one canonical label instead of repeating the same idea in multiple forms.
+  - `scalePad` labels are now `Pad N`, `Chord N`, or `Root N`.
+  - The label intentionally does not include the learned note name because Pads bindings are slot/action bindings, not fixed pitch bindings. Changing project key/scale can make the same slot resolve to a new pitch.
+  - Piano bindings still display exact note names because `type: "midi"` remains a fixed-note binding.
+  - Existing saved bindings may still contain older `label` strings, so UI display paths now recompute the label for `scalePad` bindings instead of trusting stale stored text.
+- `ProjectStore` IndexedDB schema is now version 4 and adds a `localSettings` object store.
+  - This store is for browser-local handles/settings that must not be embedded inside workspace JSON.
+  - The first local setting is `workspaceBackupDirectoryHandle`, a File System Access API directory handle for desktop Chrome/Edge folder backups.
+  - Directory handles are local browser capabilities. Workspace backups do not include them, and importing a workspace will not reconnect a folder on another browser/device.
+- Settings -> Save now has a Local folder backup row.
+  - `Connect Folder` calls `window.showDirectoryPicker({ mode: "readwrite" })`, requests read/write permission, and stores the resulting directory handle in `localSettings`.
+  - `Save To Folder` builds the same workspace backup payload as Save Backup, including the currently selected contents mode (`current`, `milestones`, or `archive`), then writes a timestamped JSON file directly into the connected folder.
+  - A successful folder save sets `project.settings.lastWorkspaceBackupAt = Date.now()` and saves with `{ markEdit: false }`, matching manual workspace backup behavior.
+  - `Disconnect` only forgets the stored directory handle. It never deletes backup files already written to disk.
+- Unsupported browsers show Local folder backup as unavailable and keep the regular Save Backup download flow as the fallback.
+- `BackupExporter.saveJsonToDirectory(data, filename, directoryHandle)` is the small write helper for folder saves. Keep it JSON-only and explicit; do not use it for audio exports or arbitrary file writes.

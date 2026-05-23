@@ -1194,7 +1194,7 @@ export class CreativeMode {
       const bindingKey = `controller-${index}`;
       const played = this.scaleBoard.pressControllerPadBinding(bindingKey, binding);
       if (!played) {
-        showToast(`${binding.label || 'Controller binding'} is not available in the current Pads layout`);
+        showToast(`${this._controllerTargetLabel(binding)} is not available in the current Pads layout`);
         return;
       }
       this._heldControllerPads.set(index, bindingKey);
@@ -1802,7 +1802,7 @@ export class CreativeMode {
         midi: Number.isFinite(target.midi) ? Number(target.midi) : null,
         padMode: target.padMode || null,
         padAction: target.padAction || null,
-        label: target.label || `Pad ${padIndex + 1}`,
+        label: target.label || this._controllerPadBindingName({ padIndex, padAction: target.padAction }),
         source: 'scale',
       };
     }
@@ -1821,17 +1821,21 @@ export class CreativeMode {
   _controllerTargetLabel(binding) {
     if (binding?.type === 'drum') return binding.padId || 'Drum';
     if (binding?.type === 'scalePad' && Number.isFinite(binding.padIndex)) {
-      const action = this._controllerPadActionName(binding.padAction || binding.padMode);
-      return binding.label ? `${binding.label} (${action})` : `Pad ${binding.padIndex + 1} (${action})`;
+      return this._controllerPadBindingName(binding);
     }
     if (binding?.type === 'midi' && Number.isFinite(binding.midi)) return midiToNoteName(binding.midi).display;
     return 'Unknown';
   }
 
-  _controllerPadActionName(action) {
-    if (action === 'chord' || action === 'chords') return 'Chord';
-    if (action === 'root') return 'Root';
-    return 'Note';
+  _controllerPadBindingName(binding = {}) {
+    const index = Number(binding.padIndex);
+    const action = binding.padAction || binding.padMode;
+    const prefix = action === 'chord' || action === 'chords'
+      ? 'Chord'
+      : action === 'root'
+        ? 'Root'
+        : 'Pad';
+    return `${prefix} ${Number.isFinite(index) ? index + 1 : '?'}`;
   }
 
   _closeControllerMapperPopover() {

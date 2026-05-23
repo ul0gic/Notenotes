@@ -94,6 +94,16 @@ export async function saveJsonFile(data, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+export async function saveJsonToDirectory(data, filename, directoryHandle) {
+  if (!directoryHandle?.getFileHandle) {
+    throw new Error('Backup folder is not available');
+  }
+  const fileHandle = await directoryHandle.getFileHandle(filename, { create: true });
+  const writable = await fileHandle.createWritable();
+  await writable.write(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+  await writable.close();
+}
+
 export async function readJsonFile(file) {
   const text = await file.text();
   return JSON.parse(text);

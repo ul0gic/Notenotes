@@ -7,7 +7,7 @@
 import { SheetMusicView } from '../export/SheetMusicView.js';
 import { downloadBlob, projectToMidiBlob, safeFilename, snippetToMidiBlob } from '../export/MidiExporter.js';
 import { projectToWavBlob, snippetToWavBlob } from '../export/WavExporter.js';
-import { backupFilename, customInstrumentsWithFreshIds, readJsonFile, saveJsonFile, snippetsBackup, snippetsWithFreshIds, validateBackup, workspaceBackup } from '../export/BackupExporter.js';
+import { backupFilename, customInstrumentsWithFreshIds, readJsonFile, saveJsonFile, saveJsonToDirectory, snippetsBackup, snippetsWithFreshIds, validateBackup, workspaceBackup } from '../export/BackupExporter.js';
 import { CHORD_TYPES, ARP_PATTERNS, ARP_RATES } from '../engine/ArpeggioManager.js';
 import { DEFAULT_VERSION_HISTORY_LIMIT, VERSION_HISTORY_LIMITS } from '../data/ProjectStore.js';
 import { APP_VERSION } from '../version.js';
@@ -40,6 +40,7 @@ const BACKUP_CONTENT_OPTIONS = [
 ];
 
 const LATEST_VERSION_URL = 'https://raw.githubusercontent.com/zeidalidiez/Notenotes/main/package.json';
+const LOCAL_BACKUP_FOLDER_KEY = 'workspaceBackupDirectoryHandle';
 
 function byteLength(text = '') {
   return new TextEncoder().encode(text).length;
@@ -460,6 +461,17 @@ export class SettingsPanel {
             </select>
           </div>
           <p class="settings-desc" id="backup-contents-desc">${this._backupContentsDescription(backupContents)}</p>
+          <div class="settings-row">
+            <label class="settings-label">Local folder</label>
+            <span class="settings-value" id="backup-folder-status">Checking...</span>
+          </div>
+          <div class="settings-row">
+            <label class="settings-label"></label>
+            <button class="btn btn--ghost" id="backup-folder-connect" style="font-size:0.75rem;min-height:30px;padding:2px 10px;">Connect Folder</button>
+            <button class="btn btn--ghost" id="backup-folder-save" style="font-size:0.75rem;min-height:30px;padding:2px 10px;">Save To Folder</button>
+            <button class="btn btn--ghost version-list__danger" id="backup-folder-disconnect" style="font-size:0.75rem;min-height:30px;padding:2px 10px;">Disconnect</button>
+          </div>
+          <p class="settings-desc" id="backup-folder-desc">Desktop Chrome and Edge can save workspace backups straight into a folder you pick. Other browsers can still use Save Backup.</p>
           <div class="settings-row">
             <label class="settings-label">Workspace</label>
             <button class="btn btn--ghost" id="backup-workspace-save" style="font-size:0.75rem;min-height:30px;padding:2px 10px;">Save Backup</button>
@@ -1075,6 +1087,94 @@ export class SettingsPanel {
     return workspaceBackup(portableProject, options);
   }
 
+  _folderBackupSupported() {
+    return typeof window !== 'undefined' && !!window.showDirectoryPicker;
+  }
+
+  async _backupFolderHandle() {
+    if (!this._folderBackupSupported()) return null;
+    try {
+      return await this.store?.getLocalSetting(LOCAL_BACKUP_FOLDER_KEY);
+    } catch (err) {
+      console.warn('[Settings] Could not read backup folder handle:', err);
+      return null;
+    }
+  }
+
+  async _backupFolderPermission(handle, request = false) {
+    if (!handle) return 'denied';
+    const options = { mode: 'readwrite' };
+    if (handle.queryPermission) {
+      const queried = await handle.queryPermission(options);
+      if (queried === 'granted' || !request) return queried;
+    }
+    if (request && handle.requestPermission) return handle.requestPermission(options);
+    return 'prompt';
+  }
+
+  async _refreshBackupFolderStatus() {
+    const statusEl = this.el?.querySelector('#backup-folder-status');
+    const descEl = this.el?.querySelector('#backup-folder-desc');
+    const connectBtn = this.el?.querySelector('#backup-folder-connect');
+    const saveBtn = this.el?.querySelector('#backup-folder-save');
+    const disconnectBtn = this.el?.querySelector('#backup-folder-disconnect');
+
+    if (!this._folderBackupSupported()) {
+      if (statusEl) statusEl.textContent = 'Not supported here';
+      if (descEl) descEl.textContent = 'Folder backup needs desktop Chrome or Edge. Use Save Backup on this browser.';
+      if (connectBtn) connectBtn.disabled = true;
+      if (saveBtn) saveBtn.disabled = true;
+      if (disconnectBtn) disconnectBtn.disabled = true;
+      return;
+    }
+
+    const handle = await this._backupFolderHandle();
+    if (!handle) {
+      if (statusEl) statusEl.textContent = 'No folder connected';
+      if (descEl) descEl.textContent = 'Connect a folder to save workspace backups there without relying on browser storage.';
+      if (connectBtn) connectBtn.disabled = false;
+      if (saveBtn) saveBtn.disabled = true;
+      if (disconnectBtn) disconnectBtn.disabled = true;
+      return;
+    }
+
+    const permission = await this._backupFolderPermission(handle, false);
+    if (statusEl) statusEl.textContent = permission === 'granted'
+      ? `Connected: ${handle.name || 'backup folder'}`
+      : `Connected: ${handle.name || 'backup folder'} (needs permission)`;
+    if (descEl) descEl.textContent = permission === 'granted'
+      ? 'Save To Folder writes a timestamped workspace backup JSON into this folder.'
+      : 'Save To Folder may ask permission before writing the next backup.';
+    if (connectBtn) connectBtn.disabled = false;
+    if (saveBtn) saveBtn.disabled = false;
+    if (disconnectBtn) disconnectBtn.disabled = false;
+  }
+
+  async _saveWorkspaceBackupToFolder() {
+    const handle = await this._backupFolderHandle();
+    if (!handle) {
+      showToast('Connect a backup folder first');
+      return false;
+    }
+    const permission = await this._backupFolderPermission(handle, true);
+    if (permission !== 'granted') {
+      showToast('Backup folder permission denied');
+      await this._refreshBackupFolderStatus();
+      return false;
+    }
+    await this.store?.save(this.project);
+    const contents = this.project?.settings?.backupContents || 'current';
+    const backup = await this._workspaceBackupPayload(contents);
+    const suffix = contents === 'archive' ? 'archive' : contents === 'milestones' ? 'workspace-milestones' : 'workspace';
+    await saveJsonToDirectory(backup, backupFilename(this.project, suffix), handle);
+    this.project.settings ||= {};
+    this.project.settings.lastWorkspaceBackupAt = Date.now();
+    await this.store?.save(this.project, { markEdit: false });
+    await this._loadStorageStatus();
+    await this._refreshBackupFolderStatus();
+    return true;
+  }
+
   _bindExportEvents() {
     const body = this.el.querySelector('#settings-body');
     body.querySelector('#export-canvas-midi')?.addEventListener('pointerdown', (e) => {
@@ -1155,6 +1255,7 @@ export class SettingsPanel {
 
   _bindBackupEvents() {
     const body = this.el.querySelector('#settings-body');
+    this._refreshBackupFolderStatus();
 
     body.querySelector('#backup-contents')?.addEventListener('change', (e) => {
       if (!this.project) return;
@@ -1209,6 +1310,55 @@ export class SettingsPanel {
           showToast('Workspace backup failed');
         }
       }
+    });
+
+    body.querySelector('#backup-folder-connect')?.addEventListener('pointerdown', async (e) => {
+      e.preventDefault();
+      if (!this._folderBackupSupported()) {
+        showToast('Folder backup needs desktop Chrome or Edge');
+        return;
+      }
+      try {
+        const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
+        const permission = await this._backupFolderPermission(handle, true);
+        if (permission !== 'granted') {
+          showToast('Backup folder permission denied');
+          return;
+        }
+        await this.store?.setLocalSetting(LOCAL_BACKUP_FOLDER_KEY, handle);
+        await this._refreshBackupFolderStatus();
+        showToast('Backup folder connected');
+      } catch (err) {
+        if (err?.name !== 'AbortError') {
+          console.error('[Settings] Backup folder connect failed:', err);
+          showToast('Could not connect backup folder');
+        }
+      }
+    });
+
+    body.querySelector('#backup-folder-save')?.addEventListener('pointerdown', async (e) => {
+      e.preventDefault();
+      if (!this.project) return;
+      const btn = e.currentTarget;
+      btn.disabled = true;
+      try {
+        const saved = await this._saveWorkspaceBackupToFolder();
+        if (saved) showToast('Workspace backup saved to folder');
+      } catch (err) {
+        console.error('[Settings] Folder workspace backup failed:', err);
+        showToast('Folder backup failed');
+      } finally {
+        btn.disabled = false;
+        await this._refreshBackupFolderStatus();
+      }
+    });
+
+    body.querySelector('#backup-folder-disconnect')?.addEventListener('pointerdown', async (e) => {
+      e.preventDefault();
+      if (!confirm('Disconnect backup folder? Existing backup files will stay in the folder.')) return;
+      await this.store?.deleteLocalSetting(LOCAL_BACKUP_FOLDER_KEY);
+      await this._refreshBackupFolderStatus();
+      showToast('Backup folder disconnected');
     });
 
     body.querySelector('#backup-snippets-save')?.addEventListener('pointerdown', async (e) => {

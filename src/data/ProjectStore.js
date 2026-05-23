@@ -7,12 +7,13 @@ import { openDB } from 'idb';
 import { DEFAULT_DEGREE_HIGHLIGHTING, DEFAULT_MUSICAL_CONTEXT } from '../engine/MusicTheory.js';
 
 const DB_NAME = 'notenotes';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 const STORE_PROJECTS = 'projects';
 const STORE_VERSIONS = 'versions';
 const STORE_MILESTONES = 'milestones';
 const STORE_AUDIO_ASSETS = 'audioAssets';
+const STORE_LOCAL_SETTINGS = 'localSettings';
 
 export const VERSION_HISTORY_LIMITS = [5, 10, 25, 50];
 export const DEFAULT_VERSION_HISTORY_LIMIT = 5;
@@ -119,6 +120,9 @@ async function getDB() {
       if (!db.objectStoreNames.contains(STORE_AUDIO_ASSETS)) {
         db.createObjectStore(STORE_AUDIO_ASSETS, { keyPath: 'audioAssetId' });
       }
+      if (!db.objectStoreNames.contains(STORE_LOCAL_SETTINGS)) {
+        db.createObjectStore(STORE_LOCAL_SETTINGS);
+      }
     }
   });
 }
@@ -200,6 +204,21 @@ export class ProjectStore {
   async getAudioAsset(audioAssetId) {
     if (!audioAssetId) return null;
     return this._db.get(STORE_AUDIO_ASSETS, audioAssetId);
+  }
+
+  async getLocalSetting(key) {
+    if (!this._db) await this.init();
+    return this._db.get(STORE_LOCAL_SETTINGS, key);
+  }
+
+  async setLocalSetting(key, value) {
+    if (!this._db) await this.init();
+    await this._db.put(STORE_LOCAL_SETTINGS, value, key);
+  }
+
+  async deleteLocalSetting(key) {
+    if (!this._db) await this.init();
+    await this._db.delete(STORE_LOCAL_SETTINGS, key);
   }
 
   async getAudioAssetBlob(audioAssetId) {

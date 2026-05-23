@@ -211,7 +211,7 @@ export class ControllerMode {
         const info = gamepadButtonInfo(Number(index));
         return `<div class="ctrlmode__binding-row">
           <span class="ctrlmode__binding-button">${info.short}</span>
-          <span class="ctrlmode__binding-target">${this._escapeHtml(binding.label || this._bindingLabel(binding))}</span>
+          <span class="ctrlmode__binding-target">${this._escapeHtml(this._bindingLabel(binding))}</span>
         </div>`;
       }).join('');
 
@@ -646,8 +646,8 @@ export class ControllerMode {
   _bindingLabel(binding) {
     if (binding?.type === 'drum') return binding.padId || 'Drum';
     if (binding?.type === 'scalePad' && Number.isFinite(binding.padIndex)) {
-      const action = binding.padAction === 'chord' ? 'Chord' : binding.padAction === 'root' ? 'Root' : 'Note';
-      return binding.label ? `${binding.label} (${action})` : `Pad ${binding.padIndex + 1} (${action})`;
+      const prefix = binding.padAction === 'chord' ? 'Chord' : binding.padAction === 'root' ? 'Root' : 'Pad';
+      return `${prefix} ${binding.padIndex + 1}`;
     }
     if (binding?.type === 'midi' && Number.isFinite(binding.midi)) return midiToNoteName(binding.midi).display;
     return 'Unknown';

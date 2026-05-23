@@ -386,7 +386,26 @@ Expected:
 - Imported audio snippets play after reload.
 - Imported snippets get fresh IDs and do not overwrite existing snippets.
 
-### 6.5 Newer Backup Rejection
+### 6.5 Local Backup Folder
+
+Steps:
+
+1. Use desktop Chrome or Edge.
+2. Open Settings, then Save.
+3. Click Connect Folder and pick a real folder.
+4. Click Save To Folder.
+5. Check the selected folder on disk.
+6. Disconnect the folder.
+
+Expected:
+
+- Unsupported browsers show folder backup as unavailable and leave the manual Save Backup path usable.
+- The connected folder status shows the folder name when permission is available.
+- Save To Folder writes a timestamped workspace JSON backup into the selected folder.
+- The normal backup status updates after the folder save.
+- Disconnect removes the app connection but does not delete any backup files.
+
+### 6.6 Newer Backup Rejection
 
 Steps:
 
