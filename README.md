@@ -115,7 +115,7 @@ Inspect also lets you make a blank MIDI or drum clip directly, even while you ar
 - **PWA.** Installable, works offline, lives on your home screen.
 - **Auto-save history is adjustable** - keep 5, 10, 25, or 50 versions, restore from history when you need to, and delete individual entries or clear the list when it gets in your way.
 - **Milestones and backups.** Save named checkpoints in the app, load them later, delete the ones you no longer need, export a full workspace JSON backup, export just your snippet library, or connect a local backup folder on desktop Chrome/Edge so browser storage is not the only copy. The Save tab shows whether browser storage is persistent or best effort, estimates local usage, and tells you whether the workspace has changed since the last workspace backup. The top controls also show a small backup status shortcut so Save is not buried when the project needs a fresh backup. Backup files include the app version that created them. Older backups can move forward into newer Notenotes versions, but newer backups are blocked from importing into older builds.
-- **Customizable everywhere.** 2/4, 3/4, 4/4, 5/4, 6/8, 9/8, and 12/8 meters, with meter living in the top bar beside key and scale. Custom beat colors for the background visualizer. The Create toolbar has a stable Layout button for Pads and Piano layout controls. Both edit the same optional degree colors.
+- **Customizable everywhere.** 2/4, 3/4, 4/4, 5/4, 6/8, 9/8, 12/8, 5/8, and 7/8 meters, with meter living in the top bar beside key and scale. Custom beat colors for the background visualizer. The Create toolbar has a stable Layout button for Pads and Piano layout controls. Both edit the same optional degree colors.
 - **AI seed is optional and direct.** The AI panel can run in Mock mode without a key, or use your own provider key for the current browser session. Clicking the provider name in the AI panel opens Settings right to the provider controls.
 - **Snippets are nameable** - and auto-named ones update themselves as you edit. Deleting a snippet asks first, because it also clears that snippet from the Canvas. You can arm recording before you play, then the first note or drum hit starts the recording instead of making you race the record button.
 - **Exports.** Sheet music as **SVG** or **ABC**, with a **percussion clef** for drum snippets. Export the whole Canvas or individual snippets as **MIDI** or **WAV**. Canvas WAV export now respects the MIDI track's synth patch instead of turning every preset into the same generic tone. New MIDI snippets also remember the patch they were recorded with, so a standalone snippet WAV has a sane sound even before you put it on the Canvas. WAV export renders Tone; MIDI export keeps the notes and timing but not the Notenotes-specific sound shaping. Empty or unavailable exports now fail clearly instead of handing you a misleading silent or tempo-only file. MP3 is still on the [roadmap](#future-vision).
@@ -178,6 +178,7 @@ These are the ideas that drive the project. Some are coded, some are sketches, s
 - [x] **Meter belongs with key and scale** - the top bar now holds the project meter as a first-class project setting.
 - [x] **Simple project meters** - 2/4, 3/4, 4/4, and 5/4 are supported as project-level timing.
 - [x] **Compound meter presets** - 6/8, 9/8, and 12/8 are supported with felt pulses, grouped canvas lines, matching beat dots, and export timing that does not pretend they are just longer 4/4.
+- [x] **Asymmetric meter presets** - 5/8 and 7/8 are supported with visible grouping choices, so 7/8 can be 2+2+3, 2+3+2, or 3+2+2 instead of one vague uneven bar.
 - [x] **Clear pulse behavior** - in compound meters, BPM means the big felt pulse. 6/8 at 120 BPM means two dotted-quarter pulses per bar, not six frantic eighth-note clicks.
 - [ ] **No random time-signature soup** - I do not want a giant custom meter box that technically works but teaches the wrong idea. Fewer choices that feel right beats a dropdown full of confusing math.
 - [ ] **Meter maps later** - one Canvas has one project timing for now. Changing meter mid-song is a real feature, but it needs a proper design instead of a rushed checkbox.
@@ -316,7 +317,7 @@ Notenotes is built in the open and grows with its community. Whether you're fili
 3. **Fork → branch → PR.** Keep PRs small and focused; describe the user-facing change.
 4. **Music tests welcome.** A 10-second clip of "this used to break and now it doesn't" is a perfectly good test.
 
-Developer timing diagnostics exist for QA without living in the normal UI. Open the app with `?debug=1`, then Settings -> Diagnostics, to inspect meter timing and run the tempo matrix.
+Developer timing diagnostics exist for QA without living in the normal UI. Open the app with `?debug=1`, then Settings -> Diagnostics, to inspect meter timing and run the tempo matrix. The diagnostics panel is URL-only, so it does not hang around for regular users after QA.
 
 ### For AI agents working on this codebase
 

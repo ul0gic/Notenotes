@@ -370,50 +370,36 @@
   flex: 1;
   position: relative;
   overflow: hidden;
-  background:
-    repeating-linear-gradient(
-      90deg,
-      transparent,
-      transparent calc(var(--bar-width) - 1px),
-      var(--surface-3) calc(var(--bar-width) - 1px),
-      var(--surface-3) var(--bar-width)
-    );
+  background: transparent;
 }
 
-/* Beat subdivisions within bars */
-.canvas-lane__content::before {
-  content: '';
+.canvas-lane__meter-grid {
   position: absolute;
   inset: 0;
-  background:
-    repeating-linear-gradient(
-      90deg,
-      transparent,
-      transparent calc(var(--beat-width) - 1px),
-      rgba(255,255,255,0.02) calc(var(--beat-width) - 1px),
-      rgba(255,255,255,0.02) var(--beat-width)
-    );
   pointer-events: none;
+  z-index: 0;
 }
 
-.canvas-lane__content::after {
-  content: '';
+.canvas-lane__meter-line {
   position: absolute;
-  inset: 0;
-  background:
-    repeating-linear-gradient(
-      90deg,
-      transparent,
-      transparent calc(var(--subbeat-width, var(--beat-width)) - 1px),
-      rgba(255,255,255,0.012) calc(var(--subbeat-width, var(--beat-width)) - 1px),
-      rgba(255,255,255,0.012) var(--subbeat-width, var(--beat-width))
-    );
-  pointer-events: none;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(255,255,255,0.018);
+}
+
+.canvas-lane__meter-line--pulse {
+  background: rgba(255,255,255,0.032);
+}
+
+.canvas-lane__meter-line--bar {
+  background: var(--surface-3);
 }
 
 /* --- Clip Block --- */
 .canvas-clip {
   position: absolute;
+  z-index: 1;
   top: 4px;
   bottom: 4px;
   border-radius: var(--radius-sm);

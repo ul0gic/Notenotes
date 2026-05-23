@@ -9,7 +9,7 @@
  */
 
 import { AudioEngine } from './AudioEngine.js';
-import { meterToTimeSignature, normalizeMeter, pulseForTick, pulseTicksForMeter, ticksPerBarForMeter } from './Meter.js';
+import { meterToTimeSignature, normalizeMeter, pulseForTick, pulseTicksForMeter, secondsPerTickForMeter, ticksPerBarForMeter } from './Meter.js';
 
 /** Transport states */
 export const TransportState = {
@@ -91,7 +91,8 @@ export class Transport {
   }
 
   get ticksPerPulse() {
-    return this.pulseTicks[0] || this.ticksPerBeat;
+    const pulses = Math.max(1, this.pulseCount);
+    return this.ticksPerBar / pulses;
   }
 
   /** Current tick position */
@@ -128,7 +129,7 @@ export class Transport {
 
   /** Seconds per tick */
   get secondsPerTick() {
-    return 60 / (this._bpm * this.ticksPerPulse);
+    return secondsPerTickForMeter(this._meter, this._bpm, this.ticksPerBeat);
   }
 
   /** Maximum bars (derived from 10-minute limit) */

@@ -2437,8 +2437,8 @@ project.settings.degreeHighlighting = {
   - Pair-up invariants are documented: `2/4 = 6/8`, `3/4 = 9/8`, and `4/4 = 12/8` at the same BPM.
   - Linearity invariants are documented: 60/120 and 120/240 duration ratios should both be 2.0 within tolerance.
 - Developer-only timing diagnostics are available by loading the app with `?debug=1`.
-  - `main.js` sets `window.__notenotesDebug` when `?debug=1` is present and persists it with `localStorage.notenotes-debug = "1"`.
-  - Clearing `localStorage.notenotes-debug` and removing the query hides the Diagnostics tab again.
+  - Original 0.1.31 behavior persisted this with `localStorage.notenotes-debug = "1"`.
+  - Superseded in 0.1.33: diagnostics are URL-only and no longer persist through localStorage.
 - `SettingsPanel` conditionally adds a `Diagnostics` tab only when `window.__notenotesDebug === true`.
   - The diagnostics panel is destroyed when leaving the tab or closing Settings so the requestAnimationFrame readout does not keep running in the background.
 - `src/ui/DiagnosticsPanel.js` is intentionally math-first and non-invasive.
@@ -2459,3 +2459,28 @@ project.settings.degreeHighlighting = {
 - Audio rename now uses the shared `#edit-snippet-name` input class and audio-specific save/toast logic, so the visual design is common while the preview-only behavior remains scoped.
 - Audio preview creation buttons now use the shared toolbar ids `#edit-new-midi-toolbar` and `#edit-new-drum-toolbar`, calling the same `_createBlankSnippet(type)` path as the empty state and MIDI/drum Inspect.
 - The obsolete audio header/name/action CSS was removed from `src/modes/edit.css`; `.edit-audio` now only owns the centered preview body.
+
+## Asymmetric Meter Phase 3 / Diagnostics Scope 0.1.33
+
+- Developer diagnostics are now URL-only.
+  - `main.js` sets `window.__notenotesDebug` only when the current URL has `?debug=1`.
+  - The old `localStorage.notenotes-debug` persistence path was removed because it made the Diagnostics tab remain visible after QA and loaded diagnostic code for normal users.
+  - `SettingsPanel` no longer imports `DiagnosticsPanel` at module load. It lazy-loads `./DiagnosticsPanel.js` only when the Diagnostics section is actually opened while `?debug=1` is active.
+  - `DiagnosticsPanel.js` imports its own CSS, so the diagnostics stylesheet is not part of the normal main entry path.
+  - `vite.config.js` excludes `DiagnosticsPanel-*` chunks from the PWA precache so the QA tool is not downloaded during normal service-worker install.
+- `METER_PICKER_IDS` now exposes `5/8` and `7/8`.
+  - `5/8` defaults to grouping `[2, 3]` and allows `[3, 2]`.
+  - `7/8` defaults to grouping `[2, 2, 3]` and allows `[2, 3, 2]` and `[3, 2, 2]`.
+  - The top transport bar shows a grouping dropdown only for meters listed in `ALLOWED_GROUPINGS`.
+- Asymmetric timing now uses a bar-average tick rate instead of the first pulse length.
+  - `secondsPerTickForMeter()` computes `secondsPerBar / ticksPerBar`, where `secondsPerBar = pulseCount * (60 / bpm)`.
+  - This keeps BPM as felt-pulses-per-minute while allowing unequal pulse widths inside the bar.
+  - `quarterBpmForMeter()` uses the same bar-average relationship so MIDI export remains duration-aligned with live playback.
+  - `Transport.secondsPerTick` delegates to `secondsPerTickForMeter()`, and `ticksPerPulse` now reports average pulse ticks for diagnostics/readouts rather than assuming every pulse matches the first group.
+- Canvas grouping is now proportional for asymmetrical meters.
+  - The ruler uses each grouping value as a width share of the bar (`2+3`, `3+2`, etc.) instead of splitting the bar into equal pulse columns.
+  - Lane grid lines are rendered as explicit `.canvas-lane__meter-grid` children so variable pulse/sub-beat positions can be drawn accurately; the old repeating equal-beat CSS grid was removed.
+  - Clip snapping uses the current grouping boundaries. Changing a grouping updates the visual pulse accents without changing the stored clip start/duration ticks.
+- `App._setProjectMeter()` now treats grouping changes on the same meter id as real meter changes. Previously `current.id === next.id` returned early, which would have ignored a `7/8 2+2+3 -> 3+2+2` update.
+- `Manual QA.md` section `12.3` now includes `5/8` and `7/8` timing rows and grouping checks. `DiagnosticsPanel` pair-up checks also include `2/4 = 5/8` and `3/4 = 7/8` duration invariants.
+- Free mode remains unshipped. Do not expose `free` until the Canvas seconds ruler, disabled sheet export, and mode-switch confirmation behavior are implemented.

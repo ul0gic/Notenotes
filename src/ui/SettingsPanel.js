@@ -5,7 +5,6 @@
  */
 
 import { SheetMusicView } from '../export/SheetMusicView.js';
-import { DiagnosticsPanel } from './DiagnosticsPanel.js';
 import { downloadBlob, projectToMidiBlob, safeFilename, snippetToMidiBlob } from '../export/MidiExporter.js';
 import { projectToWavBlob, snippetToWavBlob } from '../export/WavExporter.js';
 import { backupFilename, customInstrumentsWithFreshIds, readJsonFile, saveJsonFile, saveJsonToDirectory, snippetsBackup, snippetsWithFreshIds, validateBackup, workspaceBackup } from '../export/BackupExporter.js';
@@ -749,9 +748,14 @@ export class SettingsPanel {
         break;
 
       case 'diagnostics':
-        body.innerHTML = '<div id="section-diagnostics"></div>';
-        this._diagnosticsPanel = new DiagnosticsPanel({ transport: this.transport });
-        body.querySelector('#section-diagnostics')?.appendChild(this._diagnosticsPanel.render());
+        body.innerHTML = '<div id="section-diagnostics"><div class="settings-empty">Loading diagnostics...</div></div>';
+        import('./DiagnosticsPanel.js').then(({ DiagnosticsPanel }) => {
+          const mount = body.querySelector('#section-diagnostics');
+          if (!mount || this._activeSection !== 'diagnostics') return;
+          mount.innerHTML = '';
+          this._diagnosticsPanel = new DiagnosticsPanel({ transport: this.transport });
+          mount.appendChild(this._diagnosticsPanel.render());
+        });
         break;
     }
   }

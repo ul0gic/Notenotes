@@ -6,7 +6,7 @@
 import { TransportState } from '../engine/Transport.js';
 import { ARP_MODES } from '../engine/ArpeggioManager.js';
 import { NOTE_NAMES, SCALES, normalizeMusicalContext } from '../engine/MusicTheory.js';
-import { METER_PICKER_IDS, METER_PRESETS, meterLabel, normalizeMeter, pulseCountForMeter } from '../engine/Meter.js';
+import { ALLOWED_GROUPINGS, METER_PICKER_IDS, METER_PRESETS, meterLabel, normalizeMeter, pulseCountForMeter } from '../engine/Meter.js';
 
 export class TransportBar {
   /**
@@ -85,6 +85,9 @@ export class TransportBar {
             const meter = METER_PRESETS[id];
             return `<option value="${id}" ${id === this._projectMeter.id ? 'selected' : ''}>${meterLabel(meter)}</option>`;
           }).join('')}
+        </select>
+        <select id="project-meter-grouping-select" aria-label="Meter grouping" ${ALLOWED_GROUPINGS[this._projectMeter.id] ? '' : 'hidden disabled'}>
+          ${this._renderGroupingOptions()}
         </select>
       </div>
 
@@ -179,6 +182,7 @@ export class TransportBar {
     this.el.querySelector('#project-root-select')?.addEventListener('change', () => this._emitProjectKeyChange());
     this.el.querySelector('#project-scale-select')?.addEventListener('change', () => this._emitProjectKeyChange());
     this.el.querySelector('#project-meter-select')?.addEventListener('change', () => this._emitProjectMeterChange());
+    this.el.querySelector('#project-meter-grouping-select')?.addEventListener('change', () => this._emitProjectMeterChange());
 
     // Metronome toggle
     this.el.querySelector('#btn-metronome').addEventListener('pointerdown', (e) => {
@@ -323,6 +327,13 @@ export class TransportBar {
     this._projectMeter = normalizeMeter(meter);
     const select = this.el?.querySelector('#project-meter-select');
     if (select) select.value = this._projectMeter.id || '4/4';
+    const grouping = this.el?.querySelector('#project-meter-grouping-select');
+    if (grouping) {
+      grouping.innerHTML = this._renderGroupingOptions();
+      grouping.value = this._groupingValue(this._projectMeter.grouping);
+      grouping.hidden = !ALLOWED_GROUPINGS[this._projectMeter.id];
+      grouping.disabled = !ALLOWED_GROUPINGS[this._projectMeter.id];
+    }
     this.updateTimeSignature();
   }
 
@@ -335,8 +346,28 @@ export class TransportBar {
 
   _emitProjectMeterChange() {
     const id = this.el?.querySelector('#project-meter-select')?.value || '4/4';
-    this.setProjectMeter(id);
+    const groupingValue = this.el?.querySelector('#project-meter-grouping-select')?.value;
+    const next = normalizeMeter(id);
+    if (groupingValue && ALLOWED_GROUPINGS[id]) {
+      next.grouping = groupingValue.split('+').map(value => Number(value));
+      next.pulseCount = next.grouping.length;
+    }
+    this.setProjectMeter(next);
     if (this.onProjectMeterChange) this.onProjectMeterChange({ ...this._projectMeter });
+  }
+
+  _groupingValue(grouping = []) {
+    return Array.isArray(grouping) ? grouping.join('+') : '';
+  }
+
+  _renderGroupingOptions() {
+    const options = ALLOWED_GROUPINGS[this._projectMeter.id] || [];
+    if (!options.length) return '<option value="">Grouping</option>';
+    const current = this._groupingValue(this._projectMeter.grouping);
+    return options.map(grouping => {
+      const value = this._groupingValue(grouping);
+      return `<option value="${value}" ${value === current ? 'selected' : ''}>${value}</option>`;
+    }).join('');
   }
 
   syncFromTransport() {

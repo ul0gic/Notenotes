@@ -723,11 +723,15 @@ Expected 4-bar wall-clock time:
 | `6/8` | 8.0 s | 4.0 s | 2.0 s | 2 |
 | `9/8` | 12.0 s | 6.0 s | 3.0 s | 3 |
 | `12/8` | 16.0 s | 8.0 s | 4.0 s | 4 |
+| `5/8` | 8.0 s | 4.0 s | 2.0 s | 2 |
+| `7/8` | 12.0 s | 6.0 s | 3.0 s | 3 |
 
 Pair-up invariant:
 
 - At any BPM, `2/4` and `6/8` must match each other.
+- At any BPM, `2/4` and `5/8` must match each other.
 - At any BPM, `3/4` and `9/8` must match each other.
+- At any BPM, `3/4` and `7/8` must match each other.
 - At any BPM, `4/4` and `12/8` must match each other.
 
 Linearity invariant:
@@ -736,6 +740,8 @@ Linearity invariant:
 - Bar duration at 120 BPM divided by bar duration at 240 BPM should be 2.0 within +/-5%.
 - Canvas ruler and lane grid show the big pulses with faint sub-beat divisions.
 - Beat dots match the felt pulse count for each meter.
+- `5/8` exposes grouping choices `2+3` and `3+2`; switching grouping changes the ruler/grid accents but does not move clips.
+- `7/8` exposes grouping choices `2+2+3`, `2+3+2`, and `3+2+2`; switching grouping changes the ruler/grid accents but does not move clips.
 
 Cross-check:
 
@@ -760,11 +766,11 @@ Steps:
 6. Change BPM and Meter in the top bar.
 7. Click Verify Current Meter.
 8. Click Run Full Matrix.
-9. Remove `?debug=1`, clear `localStorage.notenotes-debug`, reload, and open Settings.
+9. Remove `?debug=1`, reload, and open Settings.
 
 Expected:
 
-- Diagnostics appears only with `?debug=1` or `localStorage.setItem('notenotes-debug', '1')`.
+- Diagnostics appears only with `?debug=1`.
 - Live Timing numbers match the top bar and update without starting playback.
 - Verify Current Meter reports PASS for supported meters.
 - Run Full Matrix reports PASS for all supported meter/BPM cells, pair-up checks, and linearity checks.

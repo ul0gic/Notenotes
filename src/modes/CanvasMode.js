@@ -76,9 +76,29 @@ export class CanvasMode {
   }
 
   _barPositionFromPixels(px, snap = 'floor') {
-    const beat = px / this.beatWidth;
-    const snappedBeat = snap === 'round' ? Math.round(beat) : Math.floor(beat);
-    return Math.max(0, snappedBeat / this._beatsPerBar());
+    const groups = this._pulseGroups();
+    const total = groups.reduce((sum, value) => sum + value, 0) || this._beatsPerBar();
+    const bar = Math.max(0, Math.floor(px / this.barWidth));
+    const offset = Math.max(0, px - bar * this.barWidth);
+    const boundaries = [0];
+    let cursor = 0;
+    for (const group of groups) {
+      cursor += group;
+      boundaries.push((cursor / total) * this.barWidth);
+    }
+    const boundary = snap === 'round'
+      ? boundaries.reduce((best, value) => Math.abs(value - offset) < Math.abs(best - offset) ? value : best, boundaries[0])
+      : boundaries.reduce((best, value) => value <= offset ? value : best, boundaries[0]);
+    const clampedBoundary = Math.min(this.barWidth, boundary);
+    return Math.max(0, bar + (clampedBoundary / this.barWidth));
+  }
+
+  _pulseGroups() {
+    const meter = this._meter();
+    if (meter.type === 'metered' && Array.isArray(meter.grouping) && meter.grouping.length) {
+      return meter.grouping;
+    }
+    return Array.from({ length: this._beatsPerBar() }, () => 1);
   }
 
   _autoSetLoopFromClips() {
@@ -322,23 +342,49 @@ export class CanvasMode {
     if (!this._rulerEl) return;
     const totalBars = Math.min(this.transport.maxBars, 80);
     const meter = this._meter();
-    const groups = meter.type === 'metered' && Array.isArray(meter.grouping) && meter.grouping.length
-      ? meter.grouping
-      : Array.from({ length: this._beatsPerBar() }, () => 1);
+    const groups = this._pulseGroups();
+    const totalSubBeats = groups.reduce((sum, value) => sum + value, 0) || groups.length;
     let html = '';
     html += `<div class="canvas-ruler__bar" style="width:140px;flex-shrink:0;border-right:1px solid var(--surface-4);"></div>`;
     for (let bar = 0; bar < totalBars; bar += 1) {
+      let cursor = 0;
       for (let pulse = 0; pulse < groups.length; pulse += 1) {
         const label = pulse === 0 ? `${bar + 1}` : `${bar + 1}.${pulse + 1}`;
-        const seek = bar + (pulse / groups.length);
+        const width = (groups[pulse] / totalSubBeats) * this.barWidth;
+        const seek = bar + (cursor / totalSubBeats);
         const isBar = pulse === 0;
         const title = groups[pulse] > 1
           ? `Move playhead to ${label} (${groups[pulse]} sub-beats)`
           : `Move playhead to ${label}`;
-        html += `<div class="canvas-ruler__beat" data-seek-bar="${seek.toFixed(6)}" title="${title}" style="width:${this.beatWidth}px;${isBar ? 'font-weight:var(--font-weight-semibold);color:var(--accent-light);' : ''}">${label}</div>`;
+        html += `<div class="canvas-ruler__beat" data-seek-bar="${seek.toFixed(6)}" title="${title}" style="width:${width}px;${isBar ? 'font-weight:var(--font-weight-semibold);color:var(--accent-light);' : ''}">${label}</div>`;
+        cursor += groups[pulse];
       }
     }
     this._rulerEl.innerHTML = html;
+  }
+
+  _renderMeterGrid(totalBars) {
+    const groups = this._pulseGroups();
+    const totalSubBeats = groups.reduce((sum, value) => sum + value, 0) || groups.length;
+    let html = '<div class="canvas-lane__meter-grid" aria-hidden="true">';
+    for (let bar = 0; bar < totalBars; bar += 1) {
+      const barX = bar * this.barWidth;
+      html += `<span class="canvas-lane__meter-line canvas-lane__meter-line--bar" style="left:${barX}px"></span>`;
+      let cursor = 0;
+      for (const group of groups) {
+        const pulseX = barX + (cursor / totalSubBeats) * this.barWidth;
+        if (cursor > 0) {
+          html += `<span class="canvas-lane__meter-line canvas-lane__meter-line--pulse" style="left:${pulseX}px"></span>`;
+        }
+        for (let sub = 1; sub < group; sub += 1) {
+          const subX = barX + ((cursor + sub) / totalSubBeats) * this.barWidth;
+          html += `<span class="canvas-lane__meter-line canvas-lane__meter-line--subbeat" style="left:${subX}px"></span>`;
+        }
+        cursor += group;
+      }
+    }
+    html += '</div>';
+    return html;
   }
 
   /** Render all track lanes */
@@ -391,6 +437,7 @@ export class CanvasMode {
       content.className = 'canvas-lane__content';
       content.dataset.trackId = track.id;
       content.style.width = `${contentWidth}px`;
+      content.innerHTML = this._renderMeterGrid(totalBars);
 
       // Render clips
       this._renderClipsForTrack(content, track, color);

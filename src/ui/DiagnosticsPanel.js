@@ -1,3 +1,5 @@
+import './diagnostics.css';
+
 import {
   METER_PICKER_IDS,
   METER_PRESETS,
@@ -46,7 +48,7 @@ function matrixRows(ticksPerQuarter = 480) {
 }
 
 function pairInvariantRows(rows) {
-  const pairs = [['2/4', '6/8'], ['3/4', '9/8'], ['4/4', '12/8']];
+  const pairs = [['2/4', '6/8'], ['2/4', '5/8'], ['3/4', '9/8'], ['3/4', '7/8'], ['4/4', '12/8']];
   const byKey = new Map(rows.map(row => [`${row.id}:${row.bpm}`, row]));
   return pairs.flatMap(([left, right]) => MATRIX_BPMS.map(bpm => {
     const a = byKey.get(`${left}:${bpm}`);

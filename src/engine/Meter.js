@@ -105,7 +105,7 @@ export const METER_PRESETS = {
   },
 };
 
-export const METER_PICKER_IDS = ['2/4', '3/4', '4/4', '5/4', '6/8', '9/8', '12/8'];
+export const METER_PICKER_IDS = ['2/4', '3/4', '4/4', '5/4', '6/8', '9/8', '12/8', '5/8', '7/8'];
 
 export const ALLOWED_GROUPINGS = {
   '5/8': [[2, 3], [3, 2]],
@@ -213,15 +213,19 @@ export function barDurationSeconds(input, bpm = 120) {
 }
 
 export function secondsPerTickForMeter(input, bpm = 120, ticksPerQuarter = 480) {
-  const pulseTicks = pulseTicksForMeter(input, ticksPerQuarter)[0] || ticksPerQuarter;
-  return 60 / Math.max(1, bpm) / pulseTicks;
+  const meter = normalizeMeter(input);
+  if (meter.type === 'free') return 60 / Math.max(1, bpm) / ticksPerQuarter;
+  const barTicks = ticksPerBarForMeter(meter, ticksPerQuarter);
+  const secondsPerBar = (60 / Math.max(1, bpm)) * pulseCountForMeter(meter);
+  return secondsPerBar / Math.max(1, barTicks);
 }
 
 export function quarterBpmForMeter(input, bpm = 120) {
   const meter = normalizeMeter(input);
   if (meter.type === 'free') return bpm;
-  const pulseTicks = pulseTicksForMeter(meter, 480)[0] || 480;
-  return Math.max(1, bpm) * (pulseTicks / 480);
+  const barTicks = ticksPerBarForMeter(meter, 480);
+  const pulses = Math.max(1, pulseCountForMeter(meter));
+  return Math.max(1, bpm) * (barTicks / (pulses * 480));
 }
 
 export function subBeatsForPulse(input, pulseIndex = 0) {
