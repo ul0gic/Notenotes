@@ -26,13 +26,6 @@ import { GeminiProvider } from '../ai/GeminiProvider.js';
 import { showToast } from './Toast.js';
 import { formatRelativeTime, workspaceBackupStatus } from '../utils/BackupStatus.js';
 
-const TIME_SIGNATURE_OPTIONS = [
-  { beats: 2, subdivision: 4, label: '2/4' },
-  { beats: 3, subdivision: 4, label: '3/4' },
-  { beats: 4, subdivision: 4, label: '4/4' },
-  { beats: 5, subdivision: 4, label: '5/4' },
-];
-
 const BACKUP_CONTENT_OPTIONS = [
   { id: 'current', label: 'Current workspace' },
   { id: 'milestones', label: 'Workspace + milestones' },
@@ -166,7 +159,6 @@ export class SettingsPanel {
     const metVol = this.project?.settings?.metronomeVolume ?? 0.5;
     const masterVol = this.project?.settings?.masterVolume ?? 0.8;
     const timeSig = this.project?.timeSignature || this.transport?.timeSignature || { beats: 4, subdivision: 4 };
-    const timeSigValue = `${timeSig.beats}/${timeSig.subdivision}`;
     const beatColors = this._beatColorsForBeats(timeSig.beats);
 
     return `
@@ -180,15 +172,6 @@ export class SettingsPanel {
           <div class="settings-row">
             <label class="settings-label">BPM</label>
             <input class="settings-input settings-input--sm" id="setting-bpm" type="number" min="40" max="240" value="${this.transport?.bpm || 120}" aria-label="BPM"/>
-          </div>
-          <div class="settings-row">
-            <label class="settings-label">Time Signature</label>
-            <select class="settings-select" id="setting-time-signature" aria-label="Project time signature">
-              ${TIME_SIGNATURE_OPTIONS.map(ts => {
-                const value = `${ts.beats}/${ts.subdivision}`;
-                return `<option value="${value}" ${timeSigValue === value ? 'selected' : ''}>${ts.label}</option>`;
-              }).join('')}
-            </select>
           </div>
           <div class="settings-row settings-row--version">
             <label class="settings-label">App Version</label>
@@ -572,11 +555,6 @@ export class SettingsPanel {
         }
         showToast(`BPM: ${bpm}`);
       }
-    });
-
-    body.querySelector('#setting-time-signature')?.addEventListener('change', (e) => {
-      const [beats, subdivision] = e.target.value.split('/').map(v => parseInt(v, 10));
-      this._setProjectTimeSignature({ beats, subdivision });
     });
 
     body.querySelector('#setting-install-app')?.addEventListener('pointerdown', async (e) => {

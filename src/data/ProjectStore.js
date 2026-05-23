@@ -5,6 +5,7 @@
 
 import { openDB } from 'idb';
 import { DEFAULT_DEGREE_HIGHLIGHTING, DEFAULT_MUSICAL_CONTEXT } from '../engine/MusicTheory.js';
+import { METER_PRESETS, meterToTimeSignature, normalizeMeter } from '../engine/Meter.js';
 
 const DB_NAME = 'notenotes';
 const DB_VERSION = 4;
@@ -33,6 +34,7 @@ export function createProject(name = 'Untitled Sketch') {
     id: crypto.randomUUID(),
     name,
     bpm: 120,
+    meter: normalizeMeter(METER_PRESETS['4/4']),
     timeSignature: { beats: 4, subdivision: 4 },
     musicalContext: { ...DEFAULT_MUSICAL_CONTEXT },
     createdAt: Date.now(),
@@ -285,6 +287,7 @@ export class ProjectStore {
   }
 
   _sanitizeProjectForStorage(project) {
+    this._normalizeProjectMeter(project);
     const safe = clone(project);
     for (const snippet of walkSnippets(safe)) {
       if (snippet.type !== 'audio') continue;
@@ -387,9 +390,18 @@ export class ProjectStore {
    */
   async load(id) {
     const project = await this._db.get(STORE_PROJECTS, id);
+    if (project) this._normalizeProjectMeter(project);
     if (project && await this.migrateProjectAudioAssets(project)) {
       await this.save(project);
     }
+    return project;
+  }
+
+  _normalizeProjectMeter(project) {
+    if (!project) return project;
+    const meter = normalizeMeter(project.meter || project.timeSignature);
+    project.meter = meter;
+    project.timeSignature = meterToTimeSignature(meter);
     return project;
   }
 

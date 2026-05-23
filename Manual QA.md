@@ -434,6 +434,25 @@ Expected:
 - The original audio recording remains available in the Load dropdown.
 - The snippet tray updates without needing a reload.
 
+### 6.8 Meter Top-Bar Phase 1
+
+Steps:
+
+1. Load an existing project that was saved before the top-bar meter selector.
+2. Confirm the top bar shows meter next to key and scale.
+3. Switch between 2/4, 3/4, 4/4, and 5/4 from the top bar.
+4. Open Settings.
+5. Place clips on the Canvas before and after a meter change.
+6. Save, reload, and confirm the selected meter is still shown.
+
+Expected:
+
+- Old projects load with their original meter.
+- Settings no longer has a duplicate Time Signature selector.
+- The beat dots and Canvas ruler update to the selected meter.
+- Existing Canvas clips keep their absolute tick positions when the meter changes.
+- Reload preserves both `project.meter` and legacy `project.timeSignature` behavior.
+
 ## 7. Tone Presets And Clip Tone
 
 ### 7.1 Synth Tone Preset

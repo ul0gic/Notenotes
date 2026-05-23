@@ -2358,3 +2358,24 @@ project.settings.degreeHighlighting = {
 - These buttons call the same `EditMode._createBlankSnippet(type)` path used by the empty Inspect state and the MIDI/drum editor toolbar.
 - Creating a blank clip from an audio preview immediately loads the new editable MIDI/drum clip in Inspect, dispatches `project-snippets-changed`, and keeps the existing `onSnippetCreated` callback behavior.
 - This is a workflow-only change. Audio snippets remain preview/rename/load surfaces, not piano-roll editable clips.
+
+## Meter Model Phase 1 0.1.28
+
+- `src/engine/Meter.js` introduces the project meter abstraction as a discriminated union.
+  - Metered presets include `id`, `numerator`, `denominator`, `pulse`, `pulseCount`, `grouping`, and `feelName`.
+  - `free` exists in the preset table for future work, but Phase 1 does not expose it in the UI.
+  - `PHASE1_METER_IDS` intentionally limits the live picker to `2/4`, `3/4`, `4/4`, and `5/4`.
+  - `5/4` uses the display name `Odd 5`; avoid song-title labels for meter presets.
+- `project.meter` is now a top-level project field. `project.timeSignature` remains as a mirrored legacy field.
+  - `ProjectStore.createProject()` writes both fields.
+  - `ProjectStore.load()` normalizes older projects with only `timeSignature` into the new meter shape.
+  - `ProjectStore._sanitizeProjectForStorage()` normalizes/mirrors both fields before writing to IndexedDB.
+  - Do not remove `timeSignature` yet. Export, AI, Canvas, Inspect, snippets, and older backups still depend on the legacy `{ beats, subdivision }` shape.
+- `Transport` now has `meter` getters/setters and keeps `_timeSignature` as a legacy mirror via `meterToTimeSignature()`.
+  - In Phase 1, timing behavior is intentionally unchanged because all exposed meters are quarter-pulse meters.
+  - `ticksPerBar` still resolves through the mirrored `timeSignature.beats`.
+- The top bar now owns meter selection beside key and scale.
+  - `TransportBar` renders a compact meter select showing only the fraction (`4/4`, not `4/4 Standard`).
+  - Settings no longer renders the duplicate Time Signature control.
+  - `App._setProjectMeter()` preserves Canvas clip absolute tick positions through meter changes using the same old/new ticks-per-bar conversion that Settings used before this move.
+- Phase 1 is a foundation/refactor step. Do not expose `6/8`, `9/8`, `12/8`, `5/8`, `7/8`, or Free until Canvas ruler grouping, metronome pulse behavior, exports, beat colors, and QA are updated together.

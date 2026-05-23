@@ -23,6 +23,7 @@ import { SettingsPanel } from './ui/SettingsPanel.js';
 import { PlaybackEngine } from './engine/PlaybackEngine.js';
 import { ModulationManager } from './engine/ModulationManager.js';
 import { normalizeMusicalContext } from './engine/MusicTheory.js';
+import { meterToTimeSignature, normalizeMeter } from './engine/Meter.js';
 import { workspaceBackupStatus } from './utils/BackupStatus.js';
 
 if (import.meta.env.DEV && typeof window !== 'undefined') {
@@ -78,8 +79,10 @@ class App {
 
     // Pass project reference to creative mode
     this._ensureProjectMusicalContext();
+    this._ensureProjectMeter();
     this.creativeMode.project = this.project;
     this.transportBar.setProjectKey(this.project.musicalContext);
+    this.transportBar.setProjectMeter(this.project.meter);
 
     // Create and render Canvas Mode (needs project)
     this.canvasMode = new CanvasMode(this.transport, this.project, this.undoManager, this.store);
@@ -191,6 +194,9 @@ class App {
     this.transportBar.onProjectKeyChange = (context) => {
       this._setProjectMusicalContext(context, { source: 'transport' });
     };
+    this.transportBar.onProjectMeterChange = (meter) => {
+      this._setProjectMeter(meter);
+    };
     this.creativeMode.onProjectKeyChange = (context) => {
       this._setProjectMusicalContext(context, { source: 'creative' });
     };
@@ -200,6 +206,7 @@ class App {
 
     window.addEventListener('project-time-signature-changed', () => {
       this.transportBar.updateTimeSignature();
+      this.transportBar.setProjectMeter(this.project?.meter || this.transport.meter);
       this.canvasMode?.refresh();
       if (this.editMode?._snippet) {
         this.editMode.loadSnippet(this.editMode._snippet, this.editMode._clipId);
@@ -258,6 +265,15 @@ class App {
     return context;
   }
 
+  _ensureProjectMeter() {
+    if (!this.project) return normalizeMeter('4/4');
+    const meter = normalizeMeter(this.project.meter || this.project.timeSignature);
+    this.project.meter = meter;
+    this.project.timeSignature = meterToTimeSignature(meter);
+    this.transport.meter = meter;
+    return meter;
+  }
+
   _setProjectMusicalContext(context, options = {}) {
     if (!this.project) return;
     const next = normalizeMusicalContext(context);
@@ -268,6 +284,54 @@ class App {
     this.creativeMode?.applyProjectMusicalContext?.(next, { source: options.source });
     this.store?.scheduleAutoSave(this.project);
     window.dispatchEvent(new CustomEvent('project-musical-context-changed', { detail: next }));
+  }
+
+  _setProjectMeter(meter) {
+    if (!this.project || !this.transport) return;
+    const next = normalizeMeter(meter);
+    const current = normalizeMeter(this.project.meter || this.project.timeSignature);
+    if (current.id === next.id) return;
+
+    const oldTicksPerBar = this.transport.ticksPerBar;
+    const clipPositions = [];
+    for (const track of (this.project.tracks || [])) {
+      for (const clip of (track.clips || [])) {
+        clipPositions.push({
+          clip,
+          startTick: (clip.startBar || 0) * oldTicksPerBar,
+          durationTicks: clip.snippet?.durationTicks || (clip.durationBars || 1) * oldTicksPerBar,
+        });
+      }
+    }
+
+    this.project.meter = next;
+    this.project.timeSignature = meterToTimeSignature(next);
+    this.transport.meter = next;
+    const newTicksPerBar = this.transport.ticksPerBar;
+
+    for (const item of clipPositions) {
+      item.clip.startBar = item.startTick / newTicksPerBar;
+      item.clip.durationBars = Math.max(1 / (this.project.timeSignature.beats || 4), item.durationTicks / newTicksPerBar);
+    }
+
+    this.project.settings ||= {};
+    this.project.settings.beatColors = this._beatColorsForBeats(this.project.timeSignature.beats);
+    this.transportBar.setProjectMeter(next);
+    this.canvasMode?.refresh();
+    if (this.editMode?._snippet) {
+      this.editMode.loadSnippet(this.editMode._snippet, this.editMode._clipId);
+    }
+    this.store?.scheduleAutoSave(this.project);
+    window.dispatchEvent(new CustomEvent('project-time-signature-changed', {
+      detail: { timeSignature: { ...this.project.timeSignature }, meter: { ...this.project.meter } },
+    }));
+    showToast(`Meter: ${next.id}`);
+  }
+
+  _beatColorsForBeats(beats = 4) {
+    const defaults = ['#1e1e2e', '#2a2a3e', '#1e1e2e', '#2a2a3e', '#242436'];
+    const existing = this.project?.settings?.beatColors || defaults;
+    return Array.from({ length: beats }, (_, i) => existing[i] || defaults[i] || defaults[0]);
   }
 
   _setupInstallPrompt() {
@@ -467,8 +531,10 @@ class App {
       this.project = await this.store.load(projects[0].id);
       if (this.project) {
         this.transport.bpm = this.project.bpm;
-        this.transport.timeSignature = this.project.timeSignature || { beats: 4, subdivision: 4 };
-        this.project.timeSignature = this.transport.timeSignature;
+        const meter = normalizeMeter(this.project.meter || this.project.timeSignature);
+        this.project.meter = meter;
+        this.project.timeSignature = meterToTimeSignature(meter);
+        this.transport.meter = meter;
         this.quantizer.setGrid(0);
         if (this.project.settings) this.project.settings.quantize = 0;
         this.metronome.enabled = this.project.settings.metronomeOn || false;

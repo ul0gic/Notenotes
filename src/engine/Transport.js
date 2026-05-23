@@ -9,6 +9,7 @@
  */
 
 import { AudioEngine } from './AudioEngine.js';
+import { meterToTimeSignature, normalizeMeter } from './Meter.js';
 
 /** Transport states */
 export const TransportState = {
@@ -23,7 +24,8 @@ export class Transport {
 
     // Tempo & time signature
     this._bpm = 120;
-    this._timeSignature = { beats: 4, subdivision: 4 }; // 4/4
+    this._meter = normalizeMeter('4/4');
+    this._timeSignature = meterToTimeSignature(this._meter); // legacy mirror
 
     // Transport state
     this.state = TransportState.STOPPED;
@@ -66,7 +68,13 @@ export class Transport {
 
   get timeSignature() { return this._timeSignature; }
   set timeSignature(ts) {
-    this._timeSignature = { beats: ts.beats || 4, subdivision: ts.subdivision || 4 };
+    this.meter = normalizeMeter(ts);
+  }
+
+  get meter() { return this._meter; }
+  set meter(value) {
+    this._meter = normalizeMeter(value);
+    this._timeSignature = meterToTimeSignature(this._meter);
   }
 
   /** Ticks per bar based on current time signature */

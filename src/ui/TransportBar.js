@@ -6,6 +6,7 @@
 import { TransportState } from '../engine/Transport.js';
 import { ARP_MODES } from '../engine/ArpeggioManager.js';
 import { NOTE_NAMES, SCALES, normalizeMusicalContext } from '../engine/MusicTheory.js';
+import { METER_PRESETS, PHASE1_METER_IDS, meterLabel, normalizeMeter } from '../engine/Meter.js';
 
 export class TransportBar {
   /**
@@ -25,11 +26,13 @@ export class TransportBar {
     this.onPanicClick = null;
     this.onArmRecordClick = null;
     this.onProjectKeyChange = null;
+    this.onProjectMeterChange = null;
     this.onMoreOpen = null;
     this._lastMoreToggle = 0;
     this._lastStopPress = 0;
     this._recordArmed = false;
     this._projectKey = normalizeMusicalContext();
+    this._projectMeter = normalizeMeter('4/4');
   }
 
   /**
@@ -75,6 +78,13 @@ export class TransportBar {
           ${Object.entries(SCALES).filter(([key]) => key !== 'chromatic').map(([key, scale]) =>
             `<option value="${key}" ${key === this._projectKey.scale ? 'selected' : ''}>${scale.name}</option>`
           ).join('')}
+        </select>
+        <span class="transport-bar__project-key-label">Meter</span>
+        <select id="project-meter-select" aria-label="Project meter">
+          ${PHASE1_METER_IDS.map(id => {
+            const meter = METER_PRESETS[id];
+            return `<option value="${id}" ${id === this._projectMeter.id ? 'selected' : ''}>${meterLabel(meter)}</option>`;
+          }).join('')}
         </select>
       </div>
 
@@ -168,6 +178,7 @@ export class TransportBar {
 
     this.el.querySelector('#project-root-select')?.addEventListener('change', () => this._emitProjectKeyChange());
     this.el.querySelector('#project-scale-select')?.addEventListener('change', () => this._emitProjectKeyChange());
+    this.el.querySelector('#project-meter-select')?.addEventListener('change', () => this._emitProjectMeterChange());
 
     // Metronome toggle
     this.el.querySelector('#btn-metronome').addEventListener('pointerdown', (e) => {
@@ -308,6 +319,13 @@ export class TransportBar {
     if (scale) scale.value = this._projectKey.scale;
   }
 
+  setProjectMeter(meter = '4/4') {
+    this._projectMeter = normalizeMeter(meter);
+    const select = this.el?.querySelector('#project-meter-select');
+    if (select) select.value = this._projectMeter.id || '4/4';
+    this.updateTimeSignature();
+  }
+
   _emitProjectKeyChange() {
     const root = this.el?.querySelector('#project-root-select')?.value;
     const scale = this.el?.querySelector('#project-scale-select')?.value;
@@ -315,9 +333,16 @@ export class TransportBar {
     if (this.onProjectKeyChange) this.onProjectKeyChange({ ...this._projectKey });
   }
 
+  _emitProjectMeterChange() {
+    const id = this.el?.querySelector('#project-meter-select')?.value || '4/4';
+    this.setProjectMeter(id);
+    if (this.onProjectMeterChange) this.onProjectMeterChange({ ...this._projectMeter });
+  }
+
   syncFromTransport() {
     const bpmInput = this.el?.querySelector('#bpm-input');
     if (bpmInput) bpmInput.value = this.transport.bpm;
+    this.setProjectMeter(this.transport.meter || this.transport.timeSignature);
     this.updateTimeSignature();
     this._clearBeatIndicator();
   }
