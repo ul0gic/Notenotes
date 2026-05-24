@@ -1225,6 +1225,9 @@ export class SettingsPanel {
         }
         await this.store?.setLocalSetting(LOCAL_BACKUP_FOLDER_KEY, handle);
         await this._refreshBackupFolderStatus();
+        window.dispatchEvent(new CustomEvent('notenotes-backup-status-changed', {
+          detail: { projectId: this.project?.id, markEdit: false },
+        }));
         showToast('Backup folder connected');
       } catch (err) {
         if (err?.name !== 'AbortError') {
@@ -1256,6 +1259,9 @@ export class SettingsPanel {
       if (!confirm('Disconnect backup folder? Existing backup files will stay in the folder.')) return;
       await this.store?.deleteLocalSetting(LOCAL_BACKUP_FOLDER_KEY);
       await this._refreshBackupFolderStatus();
+      window.dispatchEvent(new CustomEvent('notenotes-backup-status-changed', {
+        detail: { projectId: this.project?.id, markEdit: false },
+      }));
       showToast('Backup folder disconnected');
     });
 

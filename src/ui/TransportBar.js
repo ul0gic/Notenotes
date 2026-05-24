@@ -288,7 +288,7 @@ export class TransportBar {
     const btn = this.el?.querySelector('#btn-backup-status');
     if (!btn) return;
     const state = status.state || 'unknown';
-    btn.classList.remove('is-ok', 'is-warning', 'is-danger', 'is-unknown');
+    btn.classList.remove('is-ok', 'is-warning', 'is-danger', 'is-unknown', 'is-auto', 'is-permission');
     btn.classList.add(`is-${state}`);
     const label = btn.querySelector('#backup-status-label');
     if (label) label.textContent = status.shortLabel || status.label || 'Backup';

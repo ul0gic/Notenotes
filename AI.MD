@@ -2522,3 +2522,15 @@ project.settings.degreeHighlighting = {
   - It never opens permission prompts in the background. Auto backup only proceeds when a folder handle exists and `queryPermission({ mode: "readwrite" })` is already `granted`; otherwise it silently skips until the user uses Save To Folder or reconnects.
   - `visibilitychange` to hidden attempts the same quiet backup path so closing or backgrounding the tab has a chance to write if a backup is due and permission is already granted.
 - `Manual QA.md` section `6.5` now includes the auto-folder-backup behavior and the no-background-permission-prompt rule.
+
+## Folder Backup Status Indicator 0.1.36
+
+- The top backup shortcut now reports local-folder auto-backup capability in addition to normal workspace backup age.
+- `App._syncBackupStatus()` is async and layers folder state over `workspaceBackupStatus(project)`:
+  - No connected folder: show the normal `ok` / `warning` / `danger` backup-age state.
+  - Connected folder with `queryPermission({ mode: "readwrite" }) === "granted"`: show `state: "auto"`, short label `Auto backup`, and blue styling. This means current-workspace folder auto-backup can run without prompting.
+  - Connected folder with permission `prompt` or `denied`: show `state: "permission"`, short label `Grant folder`, and a permission-focused title. Clicking still opens Settings -> Save, where the user can re-grant permission through the explicit `Save To Folder` gesture.
+- This does not try to solve browser permission persistence because Chrome may keep a directory handle but downgrade write permission after reload. The app cannot silently restore that permission; it can only detect and guide the user.
+- `TransportBar.setBackupStatus()` now recognizes `is-auto` and `is-permission` classes.
+- `src/style.css` gives `is-auto` the blue folder-auto-backup treatment and `is-permission` an amber grant-permission treatment.
+- Settings folder connect/disconnect dispatch `notenotes-backup-status-changed` with `markEdit: false` so the top shortcut updates immediately without scheduling an auto backup.

@@ -381,10 +381,23 @@ input, textarea, select, [contenteditable] {
   background: rgba(121, 217, 139, 0.08);
 }
 
+.backup-status.is-auto {
+  color: #79c8ff;
+  border-color: rgba(121, 200, 255, 0.42);
+  background: rgba(60, 150, 230, 0.12);
+  box-shadow: 0 0 12px rgba(60, 150, 230, 0.12);
+}
+
 .backup-status.is-warning {
   color: #f4bf75;
   border-color: rgba(244, 191, 117, 0.36);
   background: rgba(244, 191, 117, 0.08);
+}
+
+.backup-status.is-permission {
+  color: #ffd27a;
+  border-color: rgba(255, 210, 122, 0.5);
+  background: rgba(255, 210, 122, 0.1);
 }
 
 .backup-status.is-danger {

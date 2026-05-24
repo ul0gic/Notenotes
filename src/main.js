@@ -273,9 +273,37 @@ class App {
     window.addEventListener('keydown', request, { once: true, capture: true });
   }
 
-  _syncBackupStatus() {
+  async _syncBackupStatus() {
     if (!this.project || !this.transportBar) return;
-    this.transportBar.setBackupStatus(workspaceBackupStatus(this.project));
+    const baseStatus = workspaceBackupStatus(this.project);
+    try {
+      const handle = await getBackupFolderHandle(this.store);
+      if (!handle) {
+        this.transportBar.setBackupStatus(baseStatus);
+        return;
+      }
+      const permission = await backupFolderPermission(handle, false);
+      if (permission === 'granted') {
+        this.transportBar.setBackupStatus({
+          ...baseStatus,
+          state: 'auto',
+          label: `Auto folder backup: ${handle.name || 'connected'}`,
+          shortLabel: 'Auto backup',
+          advice: `Auto folder backup is connected${handle.name ? ` to ${handle.name}` : ''}. Current-workspace backups are written after edits.`,
+        });
+        return;
+      }
+      this.transportBar.setBackupStatus({
+        ...baseStatus,
+        state: 'permission',
+        label: `Backup folder needs permission`,
+        shortLabel: 'Grant folder',
+        advice: 'Your backup folder is still connected, but the browser needs permission again before automatic folder backups can continue. Open Save and click Save To Folder.',
+      });
+    } catch (err) {
+      console.warn('[Backup] Could not check folder backup status:', err);
+      this.transportBar.setBackupStatus(baseStatus);
+    }
   }
 
   _folderAutoBackupDue() {
