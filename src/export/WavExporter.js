@@ -156,7 +156,7 @@ function applyToneTraits(input, traits = {}) {
   const noise = traitCurve(traits, 'noise');
   if (noise > 0) {
     const drive = traitCurve(traits, 'drive');
-    const driveDucking = 1 - drive * 0.55;
+    const driveDucking = Math.pow(1 - drive * 0.78, 2);
     let last = 0;
     for (let i = 0; i < out.length; i++) {
       last = last * 0.72 + (Math.random() * 2 - 1) * 0.28;

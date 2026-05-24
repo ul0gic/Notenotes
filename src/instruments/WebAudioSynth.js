@@ -136,7 +136,7 @@ export const PRESETS = {
     name: 'Soft Pad',
     family: 'modern',
     oscillator: { type: 'sine', detune: 8 },
-    envelope: { attack: 0.18, decay: 0.5, sustain: 0.7, release: 1.2 },
+    envelope: { attack: 0.09, decay: 0.5, sustain: 0.7, release: 1.2 },
     filter: { type: 'lowpass', frequency: 3000, Q: 0.7 },
     gain: 0.4,
   },
@@ -205,9 +205,9 @@ export const PRESETS = {
     schemaVersion: 2,
     oscillator: { type: 'sawtooth', detune: -3 },
     oscillator2: { type: 'triangle', detune: 1200, gain: 0.22 },
-    envelope: { attack: 0.22, decay: 0.8, sustain: 0.74, release: 1.6 },
+    envelope: { attack: 0.09, decay: 0.8, sustain: 0.74, release: 1.6 },
     filter: { type: 'lowpass', frequency: 2200, Q: 0.8 },
-    filterEnv: { attack: 0.16, decay: 1.15, sustain: 0.62, depth: 0.56 },
+    filterEnv: { attack: 0.07, decay: 1.15, sustain: 0.62, depth: 0.56 },
     vibrato: { rate: 4.2, depth: 7, delay: 0.35 },
     unison: { voices: 3, spread: 14 },
     keyTrack: 0.36,
@@ -355,6 +355,19 @@ export class WebAudioSynth {
     filter.frequency.linearRampToValueAtTime(sustainFrequency, now + attack + decay);
   }
 
+  _envelopeLevelAt(envelope, elapsed, velocity = 1) {
+    const attack = Math.max(0.001, envelope?.attack ?? DEFAULT_PATCH.envelope.attack);
+    const decay = Math.max(0.001, envelope?.decay ?? DEFAULT_PATCH.envelope.decay);
+    const sustain = Math.max(0, Math.min(1, envelope?.sustain ?? DEFAULT_PATCH.envelope.sustain));
+    const t = Math.max(0, elapsed);
+    if (t < attack) return velocity * (t / attack);
+    if (t < attack + decay) {
+      const d = (t - attack) / decay;
+      return velocity * (1 - d * (1 - sustain));
+    }
+    return velocity * sustain;
+  }
+
   _createOscillatorStack(midi, oscPatch, gainAmount, now) {
     const ctx = this.engine.ctx;
     const unison = this.patch.unison || {};
@@ -445,7 +458,7 @@ export class WebAudioSynth {
       env.connect(this._toneInput || this._output);
       source.start(now);
 
-      const voice = { source, filter, env, midi, startTime: now, sample: true };
+      const voice = { source, filter, env, midi, startTime: now, velocity, sample: true };
       this._voices.set(midi, voice);
       this._voiceQueue.push(midi);
 
@@ -509,7 +522,7 @@ export class WebAudioSynth {
     if (noise) noise.source.start(now);
 
     // Store voice
-    const voice = { oscillators, oscillators2, vibrato, noise, filter, env, midi, startTime: now };
+    const voice = { oscillators, oscillators2, vibrato, noise, filter, env, midi, startTime: now, velocity };
     this._voices.set(midi, voice);
     this._voiceQueue.push(midi);
   }
@@ -528,7 +541,9 @@ export class WebAudioSynth {
     const p = this.patch;
 
     // Release envelope
+    const releaseLevel = this._envelopeLevelAt(p.envelope, now - (voice.startTime ?? now), voice.velocity ?? 1);
     voice.env.gain.cancelScheduledValues(now);
+    voice.env.gain.setValueAtTime(Math.max(0.0001, releaseLevel), now);
     // We use setTargetAtTime for a smoother release instead of linearRamp to avoid clicks if the value isn't exact
     voice.env.gain.setTargetAtTime(0, now, p.envelope.release / 3);
 
@@ -758,7 +773,7 @@ export class WebAudioSynth {
     source.buffer = buffer;
     source.loop = true;
     const gain = ctx.createGain();
-    const driveDucking = 1 - drive * 0.55;
+    const driveDucking = Math.pow(1 - drive * 0.78, 2);
     gain.gain.setValueAtTime((0.045 + amount * 0.26) * driveDucking, now);
     source.connect(gain);
     return { source, gain };

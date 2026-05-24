@@ -2550,3 +2550,22 @@ project.settings.degreeHighlighting = {
 - Settings -> Save folder status now states when auto folder backup is active and includes the relative last workspace backup time when available.
 - Manual workspace JSON downloads and manual `Save To Folder` now dispatch `notenotes-backup-status-changed` with `markEdit: false` after successful saves so the top backup shortcut updates immediately without triggering another auto-backup loop.
 - The browser permission limitation remains: Notenotes cannot silently restore a downgraded directory permission after reload. The app now uses the top shortcut as the explicit user gesture that can restore it.
+
+## Audio/UX Papercut Pass 0.1.38
+
+- Drive + Noise has been softened further because QA found the pair could still become a strong static wall at low-to-mid amounts.
+  - `WebAudioSynth._createVoiceNoise()` now uses a squared drive-ducking curve: `Math.pow(1 - drive * 0.78, 2)`.
+  - `WavExporter.applyToneTraits()` mirrors the same curve so exported WAVs follow the live synth behavior.
+  - `SketchKit._rebuildEffects()` uses the same squared idea for kit Tone noise, with a slightly lighter `0.72` drive factor because drum transients tolerate more grit than sustained synth notes.
+  - This keeps Noise useful as texture by itself, but makes Drive the dominant character when both are raised.
+- Quick taps on slow modern patches should speak more reliably.
+  - `soft_pad.envelope.attack` moved from `0.18` to `0.09`.
+  - `modern_pad.envelope.attack` moved from `0.22` to `0.09`.
+  - `modern_pad.filterEnv.attack` moved from `0.16` to `0.07`.
+  - The patches still keep long releases and slower filter motion than chip presets, so the modern family remains lush without feeling silent on short presses.
+- `WebAudioSynth.noteOff()` now computes the expected ADSR level at release time with `_envelopeLevelAt()` and pins the gain param to that value before starting the release target.
+  - Previously `cancelScheduledValues(now)` could leave a note released during its attack/decay at an engine-dependent param value, making very short modern-pad taps feel inconsistent.
+  - Voices now store their triggering `velocity` so release starts from the right computed level for both oscillator and sample voices.
+- Confirmed existing UX papercut fixes still hold in this baseline:
+  - AI Seed Cancel closes the popover after aborting active generation.
+  - Layout Reset restores enabled state, label visibility, intensity, and default degree colors.
