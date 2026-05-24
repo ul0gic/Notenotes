@@ -2503,3 +2503,22 @@ project.settings.degreeHighlighting = {
   - It can resume the shared `AudioContext` because it is measuring scheduler time, but it schedules no audio nodes and produces no sound.
   - `destroy()` stops any diagnostic runtime transport so closing Settings cannot leave a measurement loop running.
 - `Manual QA.md` section `12.4` now describes all three diagnostic buttons and clarifies that asymmetric pair-up invariants mean total bar duration, not identical pulse spacing.
+
+## Local Folder Auto Backup 0.1.35
+
+- Local folder backup logic is now shared in `src/utils/FolderBackup.js`.
+  - `LOCAL_BACKUP_FOLDER_KEY` remains the local browser setting key for the File System Access API directory handle.
+  - `workspaceBackupPayload(store, project, contents)` builds the same portable backup payload previously owned by `SettingsPanel`, including embedded audio assets and optional milestone/version archive payloads.
+  - `saveWorkspaceBackupToFolder()` writes a timestamped JSON workspace backup with `saveJsonToDirectory()` and, when requested, updates `project.settings.lastWorkspaceBackupAt` via `store.save(project, { markEdit: false })`.
+- Settings -> Save still owns the explicit user-gesture flows.
+  - `Connect Folder` still calls `showDirectoryPicker({ mode: "readwrite" })`.
+  - `Save To Folder` still requests permission if needed and respects the selected backup contents mode (`current`, `milestones`, or `archive`).
+  - The folder row now tells users that connected folders also receive automatic current-workspace backups after edits.
+- `main.js` now runs a quiet auto-folder-backup scheduler.
+  - It listens for `notenotes-backup-status-changed` events from `ProjectStore.save()`.
+  - Only events with `detail.markEdit === true` schedule auto folder backup; the follow-up `markEdit: false` save after a backup does not schedule another run.
+  - It waits `AUTO_FOLDER_BACKUP_DELAY_MS` (currently 60 seconds) after a saved edit before writing, and it will not write more often than `AUTO_FOLDER_BACKUP_MIN_INTERVAL_MS` (currently 15 minutes) from the last workspace backup timestamp.
+  - It writes `contents: "current"` only. Manual `Save To Folder` remains the path for milestone/archive backup modes because auto-writing full archives can be heavy and noisy.
+  - It never opens permission prompts in the background. Auto backup only proceeds when a folder handle exists and `queryPermission({ mode: "readwrite" })` is already `granted`; otherwise it silently skips until the user uses Save To Folder or reconnects.
+  - `visibilitychange` to hidden attempts the same quiet backup path so closing or backgrounding the tab has a chance to write if a backup is due and permission is already granted.
+- `Manual QA.md` section `6.5` now includes the auto-folder-backup behavior and the no-background-permission-prompt rule.

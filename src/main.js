@@ -25,6 +25,13 @@ import { ModulationManager } from './engine/ModulationManager.js';
 import { normalizeMusicalContext } from './engine/MusicTheory.js';
 import { meterToTimeSignature, normalizeMeter, pulseCountForMeter } from './engine/Meter.js';
 import { workspaceBackupStatus } from './utils/BackupStatus.js';
+import {
+  AUTO_FOLDER_BACKUP_DELAY_MS,
+  AUTO_FOLDER_BACKUP_MIN_INTERVAL_MS,
+  backupFolderPermission,
+  getBackupFolderHandle,
+  saveWorkspaceBackupToFolder,
+} from './utils/FolderBackup.js';
 
 if (typeof window !== 'undefined') {
   const params = new URLSearchParams(window.location.search);
@@ -61,6 +68,8 @@ class App {
 
     this._initialized = false;
     this._lastCtrlWheelAt = 0;
+    this._folderAutoBackupTimer = null;
+    this._folderAutoBackupRunning = false;
   }
 
   /**
@@ -164,7 +173,13 @@ class App {
       this.transportBar.closeMore?.();
       this.settingsPanel.openTo(event.detail?.section || 'settings', event.detail || {});
     });
-    window.addEventListener('notenotes-backup-status-changed', () => this._syncBackupStatus());
+    window.addEventListener('notenotes-backup-status-changed', (event) => {
+      this._syncBackupStatus();
+      if (event.detail?.markEdit) this._scheduleFolderAutoBackup();
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') this._runFolderAutoBackup({ reason: 'visibility' });
+    });
     this._syncBackupStatus();
 
     // Wire modulation manager to creative mode synth (after synth init)
@@ -261,6 +276,52 @@ class App {
   _syncBackupStatus() {
     if (!this.project || !this.transportBar) return;
     this.transportBar.setBackupStatus(workspaceBackupStatus(this.project));
+  }
+
+  _folderAutoBackupDue() {
+    if (!this.project?.settings) return false;
+    const lastEditAt = Number(this.project.settings.lastEditAt || this.project.updatedAt || 0);
+    const lastBackupAt = Number(this.project.settings.lastWorkspaceBackupAt || 0);
+    if (!lastEditAt || lastBackupAt >= lastEditAt) return false;
+    if (!lastBackupAt) return true;
+    return Date.now() - lastBackupAt >= AUTO_FOLDER_BACKUP_MIN_INTERVAL_MS;
+  }
+
+  _scheduleFolderAutoBackup() {
+    if (this._folderAutoBackupTimer) clearTimeout(this._folderAutoBackupTimer);
+    if (!this._folderAutoBackupDue()) return;
+    this._folderAutoBackupTimer = setTimeout(() => {
+      this._folderAutoBackupTimer = null;
+      this._runFolderAutoBackup({ reason: 'timer' });
+    }, AUTO_FOLDER_BACKUP_DELAY_MS);
+  }
+
+  async _runFolderAutoBackup({ reason = 'timer' } = {}) {
+    if (this._folderAutoBackupRunning || !this._folderAutoBackupDue()) return;
+    this._folderAutoBackupRunning = true;
+    try {
+      const handle = await getBackupFolderHandle(this.store);
+      if (!handle) return;
+      const permission = await backupFolderPermission(handle, false);
+      if (permission !== 'granted') return;
+      const result = await saveWorkspaceBackupToFolder({
+        store: this.store,
+        project: this.project,
+        handle,
+        contents: 'current',
+        requestPermission: false,
+        saveBefore: false,
+        markBackup: true,
+      });
+      if (result.saved) {
+        console.log(`[Backup] Auto-saved workspace to folder (${reason})`);
+        this._syncBackupStatus();
+      }
+    } catch (err) {
+      console.warn('[Backup] Auto folder backup failed:', err);
+    } finally {
+      this._folderAutoBackupRunning = false;
+    }
   }
 
   _ensureProjectMusicalContext() {

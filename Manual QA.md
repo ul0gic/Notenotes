@@ -395,13 +395,18 @@ Steps:
 3. Click Connect Folder and pick a real folder.
 4. Click Save To Folder.
 5. Check the selected folder on disk.
-6. Disconnect the folder.
+6. Make a small edit after the manual folder save.
+7. Wait at least one auto-folder-backup delay, or leave the tab to trigger the visibility backup path.
+8. Check the selected folder again.
+9. Disconnect the folder.
 
 Expected:
 
 - Unsupported browsers show folder backup as unavailable and leave the manual Save Backup path usable.
 - The connected folder status shows the folder name when permission is available.
 - Save To Folder writes a timestamped workspace JSON backup into the selected folder.
+- After later edits, a connected folder with granted permission receives a current-workspace backup automatically.
+- Auto folder backup does not open permission prompts. If permission is no longer granted, it silently skips until the user uses Save To Folder or reconnects.
 - The normal backup status updates after the folder save.
 - Disconnect removes the app connection but does not delete any backup files.
 

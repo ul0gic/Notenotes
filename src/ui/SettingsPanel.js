@@ -7,7 +7,7 @@
 import { SheetMusicView } from '../export/SheetMusicView.js';
 import { downloadBlob, projectToMidiBlob, safeFilename, snippetToMidiBlob } from '../export/MidiExporter.js';
 import { projectToWavBlob, snippetToWavBlob } from '../export/WavExporter.js';
-import { backupFilename, customInstrumentsWithFreshIds, readJsonFile, saveJsonFile, saveJsonToDirectory, snippetsBackup, snippetsWithFreshIds, validateBackup, workspaceBackup } from '../export/BackupExporter.js';
+import { backupFilename, customInstrumentsWithFreshIds, readJsonFile, saveJsonFile, snippetsBackup, snippetsWithFreshIds, validateBackup, workspaceBackup } from '../export/BackupExporter.js';
 import { CHORD_TYPES, ARP_PATTERNS, ARP_RATES } from '../engine/ArpeggioManager.js';
 import { DEFAULT_VERSION_HISTORY_LIMIT, VERSION_HISTORY_LIMITS } from '../data/ProjectStore.js';
 import { APP_VERSION } from '../version.js';
@@ -26,6 +26,14 @@ import { AnthropicProvider } from '../ai/AnthropicProvider.js';
 import { GeminiProvider } from '../ai/GeminiProvider.js';
 import { showToast } from './Toast.js';
 import { formatRelativeTime, workspaceBackupStatus } from '../utils/BackupStatus.js';
+import {
+  LOCAL_BACKUP_FOLDER_KEY,
+  backupFolderPermission,
+  folderBackupSupported,
+  getBackupFolderHandle,
+  saveWorkspaceBackupToFolder,
+  workspaceBackupPayload,
+} from '../utils/FolderBackup.js';
 
 const BACKUP_CONTENT_OPTIONS = [
   { id: 'current', label: 'Current workspace' },
@@ -34,7 +42,6 @@ const BACKUP_CONTENT_OPTIONS = [
 ];
 
 const LATEST_VERSION_URL = 'https://raw.githubusercontent.com/zeidalidiez/Notenotes/main/package.json';
-const LOCAL_BACKUP_FOLDER_KEY = 'workspaceBackupDirectoryHandle';
 
 function byteLength(text = '') {
   return new TextEncoder().encode(text).length;
@@ -985,48 +992,19 @@ export class SettingsPanel {
   }
 
   async _workspaceBackupPayload(contents = 'current') {
-    const portableProject = await this.store.embedAudioForBackup(this.project);
-    const options = { contents };
-    if (contents === 'milestones' || contents === 'archive') {
-      const milestones = await this.store.getMilestoneSnapshots(this.project.id);
-      options.milestones = await Promise.all(milestones.map(async snapshot => ({
-        ...snapshot,
-        data: await this.store.embedAudioForBackup(snapshot.data),
-      })));
-    }
-    if (contents === 'archive') {
-      const versions = await this.store.getVersionSnapshots(this.project.id);
-      options.versions = await Promise.all(versions.map(async snapshot => ({
-        ...snapshot,
-        data: await this.store.embedAudioForBackup(snapshot.data),
-      })));
-    }
-    return workspaceBackup(portableProject, options);
+    return workspaceBackupPayload(this.store, this.project, contents);
   }
 
   _folderBackupSupported() {
-    return typeof window !== 'undefined' && !!window.showDirectoryPicker;
+    return folderBackupSupported();
   }
 
   async _backupFolderHandle() {
-    if (!this._folderBackupSupported()) return null;
-    try {
-      return await this.store?.getLocalSetting(LOCAL_BACKUP_FOLDER_KEY);
-    } catch (err) {
-      console.warn('[Settings] Could not read backup folder handle:', err);
-      return null;
-    }
+    return getBackupFolderHandle(this.store);
   }
 
   async _backupFolderPermission(handle, request = false) {
-    if (!handle) return 'denied';
-    const options = { mode: 'readwrite' };
-    if (handle.queryPermission) {
-      const queried = await handle.queryPermission(options);
-      if (queried === 'granted' || !request) return queried;
-    }
-    if (request && handle.requestPermission) return handle.requestPermission(options);
-    return 'prompt';
+    return backupFolderPermission(handle, request);
   }
 
   async _refreshBackupFolderStatus() {
@@ -1060,7 +1038,7 @@ export class SettingsPanel {
       ? `Connected: ${handle.name || 'backup folder'}`
       : `Connected: ${handle.name || 'backup folder'} (needs permission)`;
     if (descEl) descEl.textContent = permission === 'granted'
-      ? 'Save To Folder writes a timestamped workspace backup JSON into this folder.'
+      ? 'Save To Folder writes a timestamped workspace backup JSON into this folder. Notenotes also auto-saves the current workspace here after edits.'
       : 'Save To Folder may ask permission before writing the next backup.';
     if (connectBtn) connectBtn.disabled = false;
     if (saveBtn) saveBtn.disabled = false;
@@ -1079,14 +1057,17 @@ export class SettingsPanel {
       await this._refreshBackupFolderStatus();
       return false;
     }
-    await this.store?.save(this.project);
     const contents = this.project?.settings?.backupContents || 'current';
-    const backup = await this._workspaceBackupPayload(contents);
-    const suffix = contents === 'archive' ? 'archive' : contents === 'milestones' ? 'workspace-milestones' : 'workspace';
-    await saveJsonToDirectory(backup, backupFilename(this.project, suffix), handle);
-    this.project.settings ||= {};
-    this.project.settings.lastWorkspaceBackupAt = Date.now();
-    await this.store?.save(this.project, { markEdit: false });
+    const result = await saveWorkspaceBackupToFolder({
+      store: this.store,
+      project: this.project,
+      handle,
+      contents,
+      requestPermission: false,
+      saveBefore: true,
+      markBackup: true,
+    });
+    if (!result.saved) return false;
     await this._loadStorageStatus();
     await this._refreshBackupFolderStatus();
     return true;
