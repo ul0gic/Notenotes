@@ -24,6 +24,7 @@ import { RecordingManager } from '../engine/RecordingManager.js';
 import { SnippetTray } from '../ui/SnippetTray.js';
 import { AISeedPanel } from '../ui/AISeedPanel.js';
 import '../ui/AISeedPanel.css';
+import { ChoicePicker } from '../ui/ChoicePicker.js';
 import { AIController } from '../ai/AIController.js';
 import { VoiceEngine } from '../instruments/voice/VoiceEngine.js';
 import englishBaseVoice from '../instruments/voice/voices/english-base.json';
@@ -133,6 +134,7 @@ export class CreativeMode {
     this._toneClickOutsideHandler = null;
     this._instrumentPopover = null;
     this._instrumentClickOutsideHandler = null;
+    this._patchPicker = null;
     this._padsPopover = null;
     this._padsClickOutsideHandler = null;
     this._keysPopover = null;
@@ -398,9 +400,10 @@ export class CreativeMode {
     patchSel.id = 'patch-selector';
     patchSel.innerHTML = `
       <span class="patch-selector__label" id="patch-selector-label">Patch</span>
-      <select id="patch-select" aria-label="Synth patch">
-        ${this._renderPatchOptions()}
-      </select>
+      <button class="choice-picker-button patch-selector__picker" id="patch-picker-button" type="button" aria-label="Synth patch" aria-haspopup="dialog">
+        <span class="choice-picker-button__label" id="patch-picker-label">${this._patchDisplayName(this._activePatchId)}</span>
+        <span class="choice-picker-button__chevron" aria-hidden="true">▼</span>
+      </button>
       <button class="tone-button" id="create-instrument-button" type="button">${this._activePatchId.startsWith('custom:') ? 'Edit Instrument' : 'Create Instrument'}</button>
       <button class="tone-button" id="delete-instrument-button" type="button">Delete</button>
       <button class="tone-button" id="tone-button" type="button" aria-expanded="false" aria-controls="tone-popover">Tone</button>
@@ -409,8 +412,9 @@ export class CreativeMode {
       <button class="tone-button" id="layout-button" type="button" aria-expanded="false" aria-controls="layout-popover">Layout</button>
       <span class="tone-trigger-indicator" id="tone-trigger-indicator" aria-live="polite"></span>
     `;
-    patchSel.querySelector('#patch-select').addEventListener('change', async (e) => {
-      await this._selectPatch(e.target.value);
+    patchSel.querySelector('#patch-picker-button').addEventListener('pointerdown', async (e) => {
+      e.preventDefault();
+      this._openPatchPicker(e.currentTarget);
       this._syncInstrumentButtons();
     });
     patchSel.querySelector('#create-instrument-button').addEventListener('pointerdown', (e) => {
@@ -474,32 +478,79 @@ export class CreativeMode {
     return this.el;
   }
 
-  _renderPatchOptions() {
+  _patchDisplayName(id = this._activePatchId) {
+    if (id?.startsWith?.('custom:')) {
+      const instrument = this._customInstruments().find(item => item.id === id.slice(7));
+      return instrument?.name || 'Custom instrument';
+    }
+    return PRESETS[id]?.name || PRESETS.chip_lead.name;
+  }
+
+  _patchGroups() {
     const custom = this._customInstruments().filter(instrument => instrument.type === 'patch');
     const chipPresets = Object.entries(PRESETS).filter(([, p]) => (p.family || 'chip') === 'chip');
     const modernPresets = Object.entries(PRESETS).filter(([, p]) => p.family === 'modern');
-    const renderOptions = entries => entries.map(([key, p]) =>
-      `<option value="${key}" ${key === this._activePatchId ? 'selected' : ''}>${p.name}</option>`
-    ).join('');
-    return `
-      <optgroup label="Chip presets">${renderOptions(chipPresets)}</optgroup>
-      <optgroup label="Modern presets">${renderOptions(modernPresets)}</optgroup>
-      ${custom.length ? `
-        <optgroup label="Custom instruments">
-          ${custom.map(instrument =>
-            `<option value="custom:${instrument.id}" ${`custom:${instrument.id}` === this._activePatchId ? 'selected' : ''}>${instrument.name}</option>`
-          ).join('')}
-        </optgroup>
-      ` : ''}
-    `;
+    const presetItem = ([key, patch]) => ({
+      value: key,
+      label: patch.name,
+      kicker: (patch.family || 'chip') === 'modern' ? 'Modern synth' : 'Chip synth',
+      description: this._patchDescription(patch),
+      tags: [patch.oscillator?.type, patch.filter?.type, patch.family].filter(Boolean),
+    });
+    const groups = [
+      { id: 'chip', label: 'Chip presets', items: chipPresets.map(presetItem) },
+      { id: 'modern', label: 'Modern presets', items: modernPresets.map(presetItem) },
+    ];
+    if (custom.length) {
+      groups.push({
+        id: 'custom',
+        label: 'Custom instruments',
+        items: custom.map(instrument => ({
+          value: `custom:${instrument.id}`,
+          label: instrument.name || 'Untitled instrument',
+          kicker: 'Sample patch',
+          description: instrument.playbackMode === 'oneShot' ? 'One-shot sample instrument' : 'Gated sample instrument',
+          tags: ['custom', 'sample', instrument.name],
+        })),
+      });
+    }
+    return groups;
+  }
+
+  _patchDescription(patch = {}) {
+    const bits = [];
+    if (patch.oscillator?.type) bits.push(patch.oscillator.type);
+    if (patch.unison?.voices) bits.push(`${patch.unison.voices}-voice unison`);
+    if (patch.filterEnv) bits.push('filter motion');
+    if (patch.vibrato) bits.push('vibrato');
+    if (patch.drive) bits.push('drive');
+    return bits.join(' - ') || 'Simple synth patch';
+  }
+
+  _openPatchPicker(anchor) {
+    if (this.activeInstrument === INSTRUMENTS.KIT) return;
+    this._patchPicker?.close();
+    this._patchPicker = new ChoicePicker({
+      title: 'Choose Instrument',
+      groups: this._patchGroups(),
+      selectedValue: this._activePatchId,
+      searchPlaceholder: 'Search instruments...',
+      onSelect: async (value) => {
+        await this._selectPatch(value);
+        this._refreshPatchSelector();
+        this._syncInstrumentButtons();
+      },
+    });
+    this._patchPicker.open(anchor);
   }
 
   _refreshPatchSelector() {
-    const select = this.el?.querySelector('#patch-select');
-    if (!select) return;
-    select.innerHTML = this._renderPatchOptions();
-    if ([...select.options].some(option => option.value === this._activePatchId)) {
-      select.value = this._activePatchId;
+    const label = this.el?.querySelector('#patch-picker-label');
+    const button = this.el?.querySelector('#patch-picker-button');
+    if (label) label.textContent = this._patchDisplayName(this._activePatchId);
+    if (button) {
+      button.title = this._patchDisplayName(this._activePatchId);
+      button.setAttribute('aria-label', `Synth patch: ${this._patchDisplayName(this._activePatchId)}`);
     }
     this._syncInstrumentButtons();
   }
@@ -561,11 +612,11 @@ export class CreativeMode {
     const createBtn = this.el?.querySelector('#create-instrument-button');
     const deleteBtn = this.el?.querySelector('#delete-instrument-button');
     const patchLabel = this.el?.querySelector('#patch-selector-label');
-    const patchSelect = this.el?.querySelector('#patch-select');
+    const patchPicker = this.el?.querySelector('#patch-picker-button');
     const toneBtn = this.el?.querySelector('#tone-button');
     const isKit = this.activeInstrument === INSTRUMENTS.KIT;
     if (patchLabel) patchLabel.hidden = isKit;
-    if (patchSelect) patchSelect.hidden = isKit;
+    if (patchPicker) patchPicker.hidden = isKit;
     if (toneBtn) toneBtn.hidden = isKit;
     if (createBtn) createBtn.textContent = isCustom ? 'Edit Instrument' : 'Create Instrument';
     if (deleteBtn) deleteBtn.hidden = !isCustom;
@@ -883,7 +934,7 @@ export class CreativeMode {
   _selectedCustomInstrument() {
     const selected = this.activeInstrument === INSTRUMENTS.KIT
       ? (this.sketchKit?.selectedKitId || '')
-      : (this._activePatchId || this.el?.querySelector('#patch-select')?.value || '');
+      : (this._activePatchId || '');
     if (!selected.startsWith('custom:')) return null;
     return this._customInstruments().find(item => item.id === selected.slice(7)) || null;
   }
@@ -902,7 +953,7 @@ export class CreativeMode {
   async _deleteSelectedCustomInstrument() {
     const selected = this.activeInstrument === INSTRUMENTS.KIT
       ? (this.sketchKit?.selectedKitId || '')
-      : (this.el?.querySelector('#patch-select')?.value || '');
+      : (this._activePatchId || '');
     if (!selected.startsWith('custom:')) {
       showToast('Choose a custom instrument to delete');
       return;

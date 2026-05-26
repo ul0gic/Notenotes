@@ -73,6 +73,12 @@
   min-height: 32px;
 }
 
+.patch-selector__picker {
+  min-width: 128px;
+  max-width: 220px;
+  min-height: 32px;
+}
+
 .tone-button {
   background: var(--surface-3);
   border: var(--border-subtle);

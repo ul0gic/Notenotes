@@ -117,6 +117,25 @@ Expected:
 - Changing project key to G rotates the circle so G is at the top.
 - The recorded snippet contains simultaneous MIDI notes for the chord.
 
+### 1.6 Patch Picker
+
+Steps:
+
+1. Go to Pads or Piano.
+2. Open the Patch picker.
+3. Search for `Modern`, choose Modern Keys, then play a note.
+4. Reopen the picker, switch to Chip presets, choose Chip Bass, then play a note.
+5. If a custom patch instrument exists, confirm it appears under Custom instruments.
+6. Switch to Kit and confirm the Patch picker is hidden while Kit's own selector remains available.
+
+Expected:
+
+- Patch selection opens as a categorized searchable panel, not a long native dropdown.
+- Chip, Modern, and Custom instruments are separated into clear groups.
+- Selecting a patch updates the toolbar label and changes the live synth sound.
+- Long custom instrument names truncate cleanly in the toolbar instead of stretching it.
+- Kit mode keeps its kit-specific selector and does not show the synth Patch picker.
+
 ## 2. Audio In Recording
 
 ### 2.1 Audio In Creates A Snippet
