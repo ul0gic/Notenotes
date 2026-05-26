@@ -874,11 +874,39 @@ export class ScaleBoard {
     }
   }
 
+  pressMidiInput(midi, bindingKey = `midi-${midi}`) {
+    if (this.padMode === 'voices') return false;
+    const index = this._nearestPadIndexForMidi(midi);
+    if (index < 0) return false;
+    const padMidi = this._notes[index];
+    return this.pressControllerPadBinding(bindingKey, {
+      type: 'scalePad',
+      padIndex: index,
+      midi: padMidi,
+      padMode: this.padMode,
+      padAction: this._padActionForIndex(index),
+    });
+  }
+
+  _nearestPadIndexForMidi(midi) {
+    if (!this._notes.length || !Number.isFinite(midi)) return -1;
+    let bestIndex = 0;
+    let bestDistance = Infinity;
+    this._notes.forEach((padMidi, index) => {
+      const distance = Math.abs(padMidi - midi);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestIndex = index;
+      }
+    });
+    return bestIndex;
+  }
+
   _controllerLearnTargetForPad(index, midi) {
     if (this.padMode === 'voices') return null;
-    const isChord = this.padMode === 'chords' || (this.padMode === 'custom' && this.customPadTypes[index] === 'chord');
-    const isRootMode = this.padMode === 'root';
-    const padAction = isChord ? 'chord' : isRootMode ? 'root' : 'single';
+    const padAction = this._padActionForIndex(index);
+    const isChord = padAction === 'chord';
+    const isRootMode = padAction === 'root';
     const kind = isChord ? 'Chord' : isRootMode ? 'Root' : 'Pad';
     return {
       type: 'scalePad',
@@ -889,6 +917,12 @@ export class ScaleBoard {
       label: `${kind} ${index + 1}`,
       source: 'scale',
     };
+  }
+
+  _padActionForIndex(index) {
+    if (this.padMode === 'chords' || (this.padMode === 'custom' && this.customPadTypes[index] === 'chord')) return 'chord';
+    if (this.padMode === 'root') return 'root';
+    return 'single';
   }
 
   _padActionFromMode(mode) {

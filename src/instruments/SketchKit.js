@@ -371,6 +371,17 @@ export class SketchKit {
     if (sid) this.triggerPad(sid);
   }
 
+  triggerMidiInput(midi) {
+    const direct = Object.entries(GM_DRUM_NOTES).find(([, note]) => note === midi)?.[0];
+    const ids = this.visiblePadIds();
+    const sid = direct && ids.includes(direct)
+      ? direct
+      : ids.length
+        ? ids[((midi % ids.length) + ids.length) % ids.length]
+        : null;
+    if (sid) this.triggerPad(sid);
+  }
+
   triggerPad(sid) {
     if (!this._output || !this._toneInput) this.init();
     this.engine.unlockGesture?.();

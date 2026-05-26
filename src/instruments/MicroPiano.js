@@ -306,14 +306,14 @@ export class MicroPiano {
     if (this._onNoteOn) this._onNoteOn(midi, 0.8);
   }
 
-  pressControllerMidi(midi) {
+  pressControllerMidi(midi, velocity = 0.8) {
     if (this._activeKeys.has(midi)) return true;
     if (this._onBeforeNoteOn) this._onBeforeNoteOn();
     this.synth.noteOn(midi);
     const key = this.el?.querySelector(`.micropiano__key[data-midi="${midi}"]`);
     if (key) key.classList.add('is-active');
     this._activeKeys.add(midi);
-    if (this._onNoteOn) this._onNoteOn(midi, 0.8);
+    if (this._onNoteOn) this._onNoteOn(midi, velocity);
     return true;
   }
 

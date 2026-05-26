@@ -188,6 +188,25 @@ Expected:
 - Dwell Play fires large playable targets after the configured dwell time.
 - Pads and Piano release when the pointer leaves after a dwell-triggered note; Kit fires once.
 
+### 1.10 Keyboard And MIDI Performance Input
+
+Steps:
+
+1. Open Create > Pads.
+2. Press keys across `1-=`, `Q-]`, `A-'`, and `Z-/`.
+3. Confirm `1` plays the highest visible pad and later keys move downward through visible pads.
+4. Switch to Piano and repeat with enough visible keys to cover more than the number row.
+5. Switch to Kit and confirm the same keyboard rows trigger visible kit pads in pad order.
+6. Connect a MIDI keyboard in a browser that supports Web MIDI.
+7. Play MIDI notes while viewing Pads, Piano, and Kit.
+
+Expected:
+
+- Computer keyboard input plays the active Create surface instead of only triggering global shortcuts.
+- Pads and Piano keyboard notes hold until keyup; Kit hits fire immediately.
+- MIDI notes route through the active surface: nearest visible Pads target, exact Piano MIDI, and Kit drum mapping.
+- Global pitch/mod digit shortcuts still work when the active Create surface does not claim that key.
+
 ## 2. Audio In Recording
 
 ### 2.1 Audio In Creates A Snippet

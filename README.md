@@ -96,8 +96,8 @@ Plus: **16 synth presets** split into Chip and Modern families, picked from the 
 - **Hold & arpeggio modes** - latch notes, auto-arpeggiate chords across **10 chord types**, **4 patterns**, and **4 rates**. Or sustain a drone while you explore.
 - **Tone** - simple sliders for Crush, Echo, Space, Wobble, Drive, and Noise. They work on synths and the drum kit, can be saved as searchable presets, reset back to zero, and are meant to be fast and playful rather than a wall of studio knobs. Echo and Space have been tightened so live playback and WAV export are chasing the same sound instead of two separate guesses. Noise now ducks hard when Drive is high so texture does not turn into a static wall.
 - **Controller triggers as sound switches or note switches** - assign LT and RT to Tone, or use them to reach related notes like 7ths and 9ths by holding the trigger before you strike the pad. Regular controller buttons can also be learned to Pads slots as notes, chords, or Root pads, exact Piano notes, or Kit sounds, then saved as controller presets. Triggers and sticks stay reserved for expression.
-- **Keyboard shortcuts as instrument** - number row triggers pads, letter row triggers piano keys, `ArrowUp`/`ArrowDown` shift octave.
-- **Pitch & mod via QWERTY** - Korg K25-style mod (1/4/7) and pitch (3/6/9) when keys aren't in use.
+- **Keyboard and MIDI as instruments** - in Create, the active surface owns your input. `1-=`, `Q-]`, `A-'`, and `Z-/` play Pads, Piano, or Kit depending on what you are looking at; Pads and Piano map the top-left key to the highest visible note and move downward from there. A connected MIDI keyboard routes the same way: Pads play the nearest visible pad through the current Pad Mode, Piano plays exact MIDI notes, and Kit uses drum-note mappings.
+- **Pitch & mod via QWERTY** - Korg K25-style mod (1/4/7) and pitch (3/6/9) when those keys are not being used by the active Create surface.
 - **Mobile and desktop focus, including iOS Safari** - touch drag-and-drop everywhere, a cleaner labeled transport menu on narrow screens, and extra audio unlock nudges when a real note or drum hit happens.
 
 ### Three modes

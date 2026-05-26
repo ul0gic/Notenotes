@@ -419,6 +419,27 @@ Step Play is planned as a Pads mode, not a separate top-level instrument, becaus
 one-button performance surface: each trigger advances through a user-entered
 sequence while recording captures the user's timing.
 
+## Keyboard And MIDI Input
+
+Create-mode performance input is surface-routed. The active Create surface owns
+the input meaning:
+
+- Computer keyboard uses `PERFORMANCE_KEYS` in `CreativeMode.js`:
+  `1-=`, `Q-]`, `A-'`, `Z-/`. Pads and Piano reverse-map this list so `1` is
+  the highest visible note and later keys move downward. Kit maps forward through
+  visible drum pads because drums are not pitch-ordered.
+- Global digit modulation shortcuts must yield when the active Create surface
+  can play that key. `main.js` asks `creativeMode.handlesPerformanceKey(code)`
+  before starting pitch/mod ramps.
+- Web MIDI input is requested when Creative audio initializes. Incoming MIDI is
+  routed to the active Create surface: Pads map the MIDI note to the nearest
+  visible pad and then play the current Pad Mode action, Piano plays the exact
+  MIDI note, and Kit prefers General MIDI drum notes with a visible-pad fallback.
+
+Do not add another keyboard mapping table in a separate file unless this becomes
+user-configurable. Keep computer-keyboard, MIDI, and controller routing
+conceptually aligned: the active surface decides what the input does.
+
 ## Canvas
 
 Canvas stores clips on tracks with absolute tick positions. Meter changes should

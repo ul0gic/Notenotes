@@ -42,9 +42,12 @@ const INSTRUMENTS = {
   CONTROLLER: 'controller',
 };
 
-const SCALE_KEYS = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9', 'Digit0', 'Minus', 'Equal', 'Backquote'];
-const PIANO_KEYS = ['Backquote', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9', 'Digit0', 'Minus', 'Equal'];
-const KIT_KEYS = SCALE_KEYS;
+const PERFORMANCE_KEYS = [
+  'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9', 'Digit0', 'Minus', 'Equal',
+  'KeyQ', 'KeyW', 'KeyE', 'KeyR', 'KeyT', 'KeyY', 'KeyU', 'KeyI', 'KeyO', 'KeyP', 'BracketLeft', 'BracketRight',
+  'KeyA', 'KeyS', 'KeyD', 'KeyF', 'KeyG', 'KeyH', 'KeyJ', 'KeyK', 'KeyL', 'Semicolon', 'Quote',
+  'KeyZ', 'KeyX', 'KeyC', 'KeyV', 'KeyB', 'KeyN', 'KeyM', 'Comma', 'Period', 'Slash',
+];
 
 export class CreativeMode {
   constructor(engine, transport, quantizer, store, project, modManager) {
@@ -130,6 +133,9 @@ export class CreativeMode {
     this._initialized = false;
     this._heldScaleKeyPads = new Map();
     this._heldPianoKeyIndexes = new Map();
+    this._midiBound = false;
+    this._midiAccess = null;
+    this._activeMidiNotes = new Map();
     this._tonePopover = null;
     this._toneClickOutsideHandler = null;
     this._instrumentPopover = null;
@@ -221,6 +227,7 @@ export class CreativeMode {
     this.sketchKit.setControllerLearnCallback((target) => this._handleControllerLearnTarget(target));
     this._bindGamepadInput();
     this.gamepadInput.start();
+    this._initMidiInput();
 
     // When snippets are created
     this.recordingManager.onSnippetCreated((snippet) => {
@@ -1124,9 +1131,8 @@ export class CreativeMode {
       }
 
       if (this.activeInstrument === INSTRUMENTS.SCALEBOARD) {
-        const idx = SCALE_KEYS.indexOf(e.code);
+        const idx = this._performanceIndexForSurface(e.code, this.scaleBoard._notes.length, { reverse: true });
         if (idx === -1) return;
-        if (idx >= this.scaleBoard._notes.length) return;
 
         e.preventDefault();
         e.stopPropagation();
@@ -1137,9 +1143,8 @@ export class CreativeMode {
       }
 
       if (this.activeInstrument === INSTRUMENTS.PIANO) {
-        const idx = PIANO_KEYS.indexOf(e.code);
+        const idx = this._performanceIndexForSurface(e.code, this.microPiano.visibleMidis().length, { reverse: true });
         if (idx === -1) return;
-        if (idx >= this.microPiano.visibleMidis().length) return;
 
         e.preventDefault();
         e.stopPropagation();
@@ -1150,9 +1155,8 @@ export class CreativeMode {
       }
 
       if (this.activeInstrument === INSTRUMENTS.KIT) {
-        const idx = KIT_KEYS.indexOf(e.code);
+        const idx = this._performanceIndexForSurface(e.code, this.sketchKit.visiblePadIds().length, { reverse: false });
         if (idx === -1) return;
-        if (idx >= this.sketchKit.visiblePadIds().length) return;
 
         e.preventDefault();
         e.stopPropagation();
@@ -1179,6 +1183,89 @@ export class CreativeMode {
         this._heldPianoKeyIndexes.delete(e.code);
       }
     }, true);
+  }
+
+  handlesPerformanceKey(code) {
+    if (!this._isCreativeActive()) return false;
+    if (this.activeInstrument === INSTRUMENTS.SCALEBOARD) {
+      return this._performanceIndexForSurface(code, this.scaleBoard?._notes?.length || 0, { reverse: true }) !== -1;
+    }
+    if (this.activeInstrument === INSTRUMENTS.PIANO) {
+      return this._performanceIndexForSurface(code, this.microPiano?.visibleMidis?.().length || 0, { reverse: true }) !== -1;
+    }
+    if (this.activeInstrument === INSTRUMENTS.KIT) {
+      return this._performanceIndexForSurface(code, this.sketchKit?.visiblePadIds?.().length || 0, { reverse: false }) !== -1;
+    }
+    return false;
+  }
+
+  _performanceIndexForSurface(code, count, { reverse = false } = {}) {
+    const keyIndex = PERFORMANCE_KEYS.indexOf(code);
+    if (keyIndex < 0 || keyIndex >= count) return -1;
+    return reverse ? count - 1 - keyIndex : keyIndex;
+  }
+
+  async _initMidiInput() {
+    if (this._midiBound || typeof navigator === 'undefined' || !navigator.requestMIDIAccess) return;
+    this._midiBound = true;
+    try {
+      this._midiAccess = await navigator.requestMIDIAccess({ sysex: false });
+      this._bindMidiInputs();
+      this._midiAccess.onstatechange = () => this._bindMidiInputs();
+      if (this._midiAccess.inputs.size) showToast('MIDI input ready');
+    } catch (err) {
+      console.warn('[CreativeMode] MIDI input unavailable:', err);
+      showToast('MIDI input unavailable or blocked');
+    }
+  }
+
+  _bindMidiInputs() {
+    if (!this._midiAccess) return;
+    for (const input of this._midiAccess.inputs.values()) {
+      input.onmidimessage = (event) => this._handleMidiMessage(event);
+    }
+  }
+
+  _handleMidiMessage(event) {
+    if (!this._isCreativeActive() || this._controllerMapperPopover) return;
+    const [status, note, velocity] = event.data || [];
+    const command = status & 0xf0;
+    if (command === 0x90 && velocity > 0) {
+      this._handleMidiNoteOn(note, velocity / 127);
+    } else if (command === 0x80 || (command === 0x90 && velocity === 0)) {
+      this._handleMidiNoteOff(note);
+    }
+  }
+
+  _handleMidiNoteOn(note, velocity = 0.8) {
+    if (!Number.isFinite(note) || this._activeMidiNotes.has(note)) return;
+    this.ensureAudioReady();
+
+    if (this.activeInstrument === INSTRUMENTS.SCALEBOARD) {
+      const bindingKey = `midi-${note}`;
+      if (this.scaleBoard.pressMidiInput(note, bindingKey, velocity)) {
+        this._activeMidiNotes.set(note, { type: 'scale', bindingKey });
+      }
+      return;
+    }
+
+    if (this.activeInstrument === INSTRUMENTS.PIANO) {
+      this.microPiano.pressControllerMidi(note, velocity);
+      this._activeMidiNotes.set(note, { type: 'piano', midi: note });
+      return;
+    }
+
+    if (this.activeInstrument === INSTRUMENTS.KIT) {
+      this.sketchKit.triggerMidiInput(note, velocity);
+    }
+  }
+
+  _handleMidiNoteOff(note) {
+    const held = this._activeMidiNotes.get(note);
+    if (!held) return;
+    if (held.type === 'scale') this.scaleBoard.releaseControllerPadBinding(held.bindingKey);
+    else if (held.type === 'piano') this.microPiano.releaseControllerMidi(held.midi);
+    this._activeMidiNotes.delete(note);
   }
 
   _bindGamepadInput() {
@@ -1551,6 +1638,7 @@ export class CreativeMode {
     }
     this._heldScaleKeyPads.clear();
     this._heldPianoKeyIndexes.clear();
+    for (const note of [...this._activeMidiNotes.keys()]) this._handleMidiNoteOff(note);
     for (const index of [...this._heldControllerMidis.keys()]) this._releaseControllerBinding(index);
     for (const index of [...this._heldControllerPads.keys()]) this._releaseControllerBinding(index);
     for (const index of [...this._heldControllerFallback.keys()]) this._playControllerFallbackUp(index);
