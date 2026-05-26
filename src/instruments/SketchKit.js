@@ -7,6 +7,7 @@
 import { AudioEngine } from '../engine/AudioEngine.js';
 import { SOUND_TRAITS, normalizeSoundTraits } from './WebAudioSynth.js';
 import { showToast } from '../ui/Toast.js';
+import { ChoicePicker } from '../ui/ChoicePicker.js';
 
 export const DRUM_KITS = {
   classic: {
@@ -547,6 +548,7 @@ export class SketchKit {
       const current = this.el?.querySelector('#sk-tone-popover');
       if (!current) return;
       if (current.contains(e.target)) return;
+      if (e.target.closest?.('.choice-picker, .choice-picker-backdrop')) return;
       if (anchor.contains(e.target)) return;
       this._closeTonePopover();
     };
@@ -561,14 +563,13 @@ export class SketchKit {
   }
 
   _renderTonePresetControls() {
-    const presets = this._tonePresets();
     return `
-      <div class="tone-preset">
+      <div class="tone-preset" data-selected-tone-preset="">
         <div class="tone-preset__row tone-preset__row--manage">
-          <select class="tone-preset__select" id="sk-tone-preset-select" aria-label="Tone preset">
-            <option value="">Preset...</option>
-            ${presets.map(preset => `<option value="${preset.id}">${preset.name}</option>`).join('')}
-          </select>
+          <button class="choice-picker-button tone-preset__picker" id="sk-tone-preset-picker" type="button" aria-label="Tone preset" aria-haspopup="dialog">
+            <span class="choice-picker-button__label" id="sk-tone-preset-label">Preset...</span>
+            <span class="choice-picker-button__chevron" aria-hidden="true">▼</span>
+          </button>
           <button class="btn btn--ghost" id="sk-tone-preset-apply" type="button">Apply</button>
           <button class="btn btn--ghost" id="sk-tone-preset-delete" type="button">Delete</button>
           <button class="btn btn--ghost" id="sk-tone-reset" type="button">Reset</button>
@@ -603,10 +604,9 @@ export class SketchKit {
       showToast(`Tone preset deleted: ${preset.name}`);
     });
 
-    popover.querySelector('#sk-tone-preset-select')?.addEventListener('change', () => {
-      const preset = this._selectedTonePreset(popover);
-      const input = popover.querySelector('#sk-tone-preset-name');
-      if (input) input.value = preset?.name || '';
+    popover.querySelector('#sk-tone-preset-picker')?.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      this._openTonePresetPicker(e.currentTarget, popover);
     });
 
     popover.querySelector('#sk-tone-reset')?.addEventListener('pointerdown', (e) => {
@@ -646,8 +646,52 @@ export class SketchKit {
   }
 
   _selectedTonePreset(root) {
-    const id = root?.querySelector('#sk-tone-preset-select')?.value;
+    const id = root?.querySelector('.tone-preset')?.dataset.selectedTonePreset || '';
     return this._tonePresets().find(preset => preset.id === id) || null;
+  }
+
+  _tonePresetGroups() {
+    return [{
+      id: 'saved',
+      label: 'Saved Tone presets',
+      items: this._tonePresets().map(preset => ({
+        value: preset.id,
+        label: preset.name || 'Untitled Tone',
+        kicker: this._tonePresetSummary(preset.soundTraits),
+        description: preset.updatedAt ? `Updated ${new Date(preset.updatedAt).toLocaleDateString()}` : '',
+        tags: [preset.name, this._tonePresetSummary(preset.soundTraits)],
+      })),
+    }];
+  }
+
+  _tonePresetSummary(traits = {}) {
+    const normalized = normalizeSoundTraits(traits);
+    const active = Object.values(SOUND_TRAITS)
+      .filter(trait => (normalized[trait.id]?.amount || 0) > 0.03)
+      .map(trait => `${trait.name} ${Math.round((normalized[trait.id]?.amount || 0) * 100)}%`);
+    return active.length ? active.join(' - ') : 'No Tone';
+  }
+
+  _setSelectedTonePreset(root, preset) {
+    const wrap = root?.querySelector('.tone-preset');
+    if (wrap) wrap.dataset.selectedTonePreset = preset?.id || '';
+    const label = root?.querySelector('#sk-tone-preset-label');
+    if (label) label.textContent = preset?.name || 'Preset...';
+    const input = root?.querySelector('#sk-tone-preset-name');
+    if (input && preset) input.value = preset.name || '';
+  }
+
+  _openTonePresetPicker(anchor, root = this.el?.querySelector('#sk-tone-popover')) {
+    const picker = new ChoicePicker({
+      title: 'Choose Tone Preset',
+      groups: this._tonePresetGroups(),
+      selectedValue: root?.querySelector('.tone-preset')?.dataset.selectedTonePreset || '',
+      searchPlaceholder: 'Search Tone presets...',
+      onSelect: (value) => {
+        this._setSelectedTonePreset(root, this._tonePresets().find(preset => preset.id === value) || null);
+      },
+    });
+    picker.open(anchor);
   }
 
   _saveTonePreset(name, { id = null, forceNew = false } = {}) {
@@ -677,9 +721,12 @@ export class SketchKit {
     const popover = this.el?.querySelector('#sk-tone-popover');
     if (!popover) return;
     const old = popover.querySelector('.tone-preset');
+    const selectedId = old?.dataset.selectedTonePreset || '';
     old?.insertAdjacentHTML('beforebegin', this._renderTonePresetControls());
     old?.remove();
     this._bindTonePresetControls(popover);
+    const preset = this._tonePresets().find(item => item.id === selectedId) || null;
+    this._setSelectedTonePreset(popover, preset);
   }
 
   _closeTonePopover() {

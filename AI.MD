@@ -375,7 +375,9 @@ Current intended picker targets:
 - Patch/instrument picker: implemented for Create mode synth patches. Built-in
   Chip and Modern patches plus Custom patch instruments use the shared picker;
   Kit keeps its own kit selector because drum kits are instrument-specific.
-- Tone preset picker: likely target once saved Tone preset lists get long.
+- Tone preset picker: implemented for Create synth Tone, Kit Tone, and Canvas
+  Apply-to-Clip. Saved Tone presets still live in
+  `project.settings.tonePresets`; the picker only changes selection UI.
 
 ChoicePicker is category-first, searchable, mobile-friendly, and DOM-native. Do
 not build another one-off long dropdown for creative libraries.

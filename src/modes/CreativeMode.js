@@ -1942,6 +1942,7 @@ export class CreativeMode {
     const handleOutside = (e) => {
       if (!this._tonePopover) return;
       if (this._tonePopover.contains(e.target)) return;
+      if (e.target.closest?.('.choice-picker, .choice-picker-backdrop')) return;
       if (anchor.contains(e.target)) return;
       this._closeTonePopover();
     };
@@ -2189,10 +2190,9 @@ export class CreativeMode {
       showToast(`Tone preset deleted: ${preset.name}`);
     });
 
-    popover.querySelector('#tone-preset-select')?.addEventListener('change', () => {
-      const preset = this._selectedTonePreset(popover);
-      const input = popover.querySelector('#tone-preset-name');
-      if (input) input.value = preset?.name || '';
+    popover.querySelector('#tone-preset-picker')?.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      this._openTonePresetPicker(e.currentTarget, popover);
     });
 
     popover.querySelector('#tone-reset')?.addEventListener('pointerdown', (e) => {
@@ -2225,14 +2225,13 @@ export class CreativeMode {
   }
 
   _renderTonePresetControls() {
-    const presets = this._tonePresets();
     return `
-      <div class="tone-preset">
+      <div class="tone-preset" data-selected-tone-preset="">
         <div class="tone-preset__row tone-preset__row--manage">
-          <select class="tone-preset__select" id="tone-preset-select" aria-label="Tone preset">
-            <option value="">Preset...</option>
-            ${presets.map(preset => `<option value="${preset.id}">${preset.name}</option>`).join('')}
-          </select>
+          <button class="choice-picker-button tone-preset__picker" id="tone-preset-picker" type="button" aria-label="Tone preset" aria-haspopup="dialog">
+            <span class="choice-picker-button__label" id="tone-preset-label">Preset...</span>
+            <span class="choice-picker-button__chevron" aria-hidden="true">▼</span>
+          </button>
           <button class="btn btn--ghost" id="tone-preset-apply" type="button">Apply</button>
           <button class="btn btn--ghost" id="tone-preset-delete" type="button">Delete</button>
           <button class="btn btn--ghost" id="tone-reset" type="button">Reset</button>
@@ -2253,8 +2252,52 @@ export class CreativeMode {
   }
 
   _selectedTonePreset(root = this._tonePopover) {
-    const id = root?.querySelector('#tone-preset-select')?.value;
+    const id = root?.querySelector('.tone-preset')?.dataset.selectedTonePreset || '';
     return this._tonePresets().find(preset => preset.id === id) || null;
+  }
+
+  _tonePresetGroups() {
+    return [{
+      id: 'saved',
+      label: 'Saved Tone presets',
+      items: this._tonePresets().map(preset => ({
+        value: preset.id,
+        label: preset.name || 'Untitled Tone',
+        kicker: this._tonePresetSummary(preset.soundTraits),
+        description: preset.updatedAt ? `Updated ${new Date(preset.updatedAt).toLocaleDateString()}` : '',
+        tags: [preset.name, this._tonePresetSummary(preset.soundTraits)],
+      })),
+    }];
+  }
+
+  _tonePresetSummary(traits = {}) {
+    const normalized = normalizeSoundTraits(traits);
+    const active = Object.values(SOUND_TRAITS)
+      .filter(trait => (normalized[trait.id]?.amount || 0) > 0.03)
+      .map(trait => `${trait.name} ${Math.round((normalized[trait.id]?.amount || 0) * 100)}%`);
+    return active.length ? active.join(' - ') : 'No Tone';
+  }
+
+  _setSelectedTonePreset(root, preset) {
+    const wrap = root?.querySelector('.tone-preset');
+    if (wrap) wrap.dataset.selectedTonePreset = preset?.id || '';
+    const label = root?.querySelector('#tone-preset-label');
+    if (label) label.textContent = preset?.name || 'Preset...';
+    const input = root?.querySelector('#tone-preset-name');
+    if (input && preset) input.value = preset.name || '';
+  }
+
+  _openTonePresetPicker(anchor, root = this._tonePopover) {
+    const picker = new ChoicePicker({
+      title: 'Choose Tone Preset',
+      groups: this._tonePresetGroups(),
+      selectedValue: root?.querySelector('.tone-preset')?.dataset.selectedTonePreset || '',
+      searchPlaceholder: 'Search Tone presets...',
+      onSelect: (value) => {
+        this._setSelectedTonePreset(root, this._tonePresets().find(preset => preset.id === value) || null);
+      },
+    });
+    picker.open(anchor);
   }
 
   _saveTonePreset(name, { id = null, forceNew = false } = {}) {
@@ -2283,9 +2326,12 @@ export class CreativeMode {
   _refreshTonePresetControls() {
     if (!this._tonePopover) return;
     const old = this._tonePopover.querySelector('.tone-preset');
+    const selectedId = old?.dataset.selectedTonePreset || '';
     old?.insertAdjacentHTML('beforebegin', this._renderTonePresetControls());
     old?.remove();
     this._bindTonePresetControls();
+    const preset = this._tonePresets().find(item => item.id === selectedId) || null;
+    this._setSelectedTonePreset(this._tonePopover, preset);
   }
 
   _syncTonePopover() {

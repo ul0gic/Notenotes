@@ -260,7 +260,7 @@
 }
 
 .tone-preset__row--manage {
-  grid-template-columns: 1fr auto auto;
+  grid-template-columns: 1fr auto auto auto;
 }
 
 .tone-preset__select,
@@ -274,6 +274,12 @@
   color: var(--text-primary);
   font-family: var(--font-family);
   font-size: var(--font-size-sm);
+}
+
+.tone-preset__picker {
+  width: 100%;
+  max-width: none;
+  height: 30px;
 }
 
 .tone-row {

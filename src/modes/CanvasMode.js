@@ -11,6 +11,7 @@ import { DRUM_KITS } from '../instruments/SketchKit.js';
 import { PRESETS, normalizeSoundTraits } from '../instruments/WebAudioSynth.js';
 import { normalizeMeter, pulseCountForMeter, subBeatsForPulse } from '../engine/Meter.js';
 import { showToast } from '../ui/Toast.js';
+import { ChoicePicker } from '../ui/ChoicePicker.js';
 
 /** Pixels per bar at default zoom */
 const DEFAULT_BAR_WIDTH = 120;
@@ -48,6 +49,7 @@ export class CanvasMode {
     this._tracksContainer = null;
     this._rulerEl = null;
     this._audioPeakLoads = new Set();
+    this._tonePicker = null;
 
     /** Called when a track's instrument changes */
     this.onTrackInstrumentChanged = null;
@@ -182,9 +184,10 @@ export class CanvasMode {
         <button class="btn btn--ghost canvas-toolbar__btn" id="canvas-trim-btn" title="Trim empty space from all snippets">Trim</button>
         <button class="btn btn--ghost canvas-loop-toggle" id="canvas-loop-toggle" type="button" aria-pressed="${this._canvasLoopEnabled() ? 'true' : 'false'}" title="Loop Canvas from the start to the latest clip">Loop</button>
         <div class="canvas-toolbar__divider"></div>
-        <select class="canvas-toolbar__select" id="canvas-tone-preset" aria-label="Tone preset for selected clip" disabled>
-          ${this._renderTonePresetOptions()}
-        </select>
+        <button class="choice-picker-button canvas-toolbar__select" id="canvas-tone-preset" type="button" aria-label="Tone preset for selected clip" aria-haspopup="dialog" disabled data-selected-tone-preset="">
+          <span class="choice-picker-button__label" id="canvas-tone-preset-label">Tone preset...</span>
+          <span class="choice-picker-button__chevron" aria-hidden="true">▼</span>
+        </button>
         <button class="btn btn--ghost canvas-toolbar__btn" id="canvas-tone-apply" title="Select a MIDI or drum clip first" disabled>Apply to Clip</button>
       </div>
     `;
@@ -665,17 +668,65 @@ export class CanvasMode {
     return Array.isArray(this.project?.settings?.tonePresets) ? this.project.settings.tonePresets : [];
   }
 
-  _renderTonePresetOptions() {
-    return `<option value="">Tone preset...</option>${this._tonePresets().map(preset => `<option value="${preset.id}">${preset.name}</option>`).join('')}`;
+  _refreshTonePresetSelect() {
+    const picker = this.el?.querySelector('#canvas-tone-preset');
+    if (!picker) return;
+    const selectedId = picker.dataset.selectedTonePreset || '';
+    const preset = this._tonePresets().find(p => p.id === selectedId) || null;
+    this._setSelectedTonePreset(preset);
+    this._syncClipTools();
   }
 
-  _refreshTonePresetSelect() {
-    const select = this.el?.querySelector('#canvas-tone-preset');
-    if (!select) return;
-    const value = select.value;
-    select.innerHTML = this._renderTonePresetOptions();
-    if (this._tonePresets().some(p => p.id === value)) select.value = value;
-    this._syncClipTools();
+  _tonePresetSummary(traits = {}) {
+    const normalized = normalizeSoundTraits(traits);
+    const labels = {
+      crush: 'Crush',
+      echo: 'Echo',
+      space: 'Space',
+      wobble: 'Wobble',
+      drive: 'Drive',
+      noise: 'Noise',
+    };
+    const active = Object.entries(labels)
+      .filter(([id]) => (normalized[id]?.amount || 0) > 0.03)
+      .map(([id, label]) => `${label} ${Math.round((normalized[id]?.amount || 0) * 100)}%`);
+    return active.length ? active.join(' - ') : 'No Tone';
+  }
+
+  _tonePresetGroups() {
+    return [{
+      id: 'saved',
+      label: 'Saved Tone presets',
+      items: this._tonePresets().map(preset => ({
+        value: preset.id,
+        label: preset.name || 'Untitled Tone',
+        kicker: this._tonePresetSummary(preset.soundTraits),
+        description: preset.updatedAt ? `Updated ${new Date(preset.updatedAt).toLocaleDateString()}` : '',
+        tags: [preset.name, this._tonePresetSummary(preset.soundTraits)],
+      })),
+    }];
+  }
+
+  _setSelectedTonePreset(preset) {
+    const picker = this.el?.querySelector('#canvas-tone-preset');
+    const label = this.el?.querySelector('#canvas-tone-preset-label');
+    if (picker) picker.dataset.selectedTonePreset = preset?.id || '';
+    if (label) label.textContent = preset?.name || 'Tone preset...';
+  }
+
+  _openTonePresetPicker(anchor) {
+    if (anchor?.disabled) return;
+    this._tonePicker?.close();
+    this._tonePicker = new ChoicePicker({
+      title: 'Choose Tone Preset',
+      groups: this._tonePresetGroups(),
+      selectedValue: anchor?.dataset.selectedTonePreset || '',
+      searchPlaceholder: 'Search Tone presets...',
+      onSelect: (value) => {
+        this._setSelectedTonePreset(this._tonePresets().find(preset => preset.id === value) || null);
+      },
+    });
+    this._tonePicker.open(anchor);
   }
 
   _findClip(clipId = this._selectedClip) {
@@ -688,7 +739,7 @@ export class CanvasMode {
   }
 
   _applyTonePresetToSelectedClip() {
-    const presetId = this.el?.querySelector('#canvas-tone-preset')?.value;
+    const presetId = this.el?.querySelector('#canvas-tone-preset')?.dataset.selectedTonePreset || '';
     const preset = this._tonePresets().find(p => p.id === presetId);
     if (!preset) return showToast('Choose a Tone preset first');
     const clip = this._findClip();
@@ -1245,6 +1296,11 @@ export class CanvasMode {
 
     this.el.querySelector('#canvas-tone-apply')?.addEventListener('click', () => {
       this._applyTonePresetToSelectedClip();
+    });
+
+    this.el.querySelector('#canvas-tone-preset')?.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      this._openTonePresetPicker(e.currentTarget);
     });
 
     // Delegated events on the canvas element

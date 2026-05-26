@@ -136,6 +136,24 @@ Expected:
 - Long custom instrument names truncate cleanly in the toolbar instead of stretching it.
 - Kit mode keeps its kit-specific selector and does not show the synth Patch picker.
 
+### 1.7 Tone Preset Picker
+
+Steps:
+
+1. Open Tone from Pads or Piano.
+2. Move a few Tone sliders, name the preset, and Save as new.
+3. Open the Tone preset picker, search for the preset, select it, then Apply.
+4. Rename the preset by changing the name field and pressing Save.
+5. Switch to Kit, open Tone, and confirm the same picker can apply the saved preset.
+6. Select a MIDI or drum clip on Canvas, choose the same Tone preset from the Canvas picker, and Apply to Clip.
+
+Expected:
+
+- Tone presets use a searchable picker instead of a long native dropdown in Create, Kit, and Canvas.
+- The selected preset name appears in the Tone panel after choosing it.
+- Apply, Delete, Save, Save as new, and Reset still work.
+- Canvas disables the Tone preset picker for audio clips and empty selection.
+
 ## 2. Audio In Recording
 
 ### 2.1 Audio In Creates A Snippet
