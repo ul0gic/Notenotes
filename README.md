@@ -89,7 +89,7 @@ Plus: **16 synth presets** split into Chip and Modern families, **Tone** control
 ### For someone who wants a different perspective into the world of music.
 
 - **Scale-locked pads** - every press is in key. You can't pick a wrong note. Turn on **Extensions** to keep the scale going into the next octave without turning it into a theory quiz.
-- **Project key and scale** - set the shared root and scale in the top bar. The scale picker is grouped by family and includes Western modes, pentatonic colors, Hungarian/Klezmer colors, and honest 12-TET maqam/raga-inspired approximations. Pads, Controller fallback, AI context, and the optional Piano/Pad degree colors all read from the same place instead of each feature guessing on its own. The old duplicate Root/Scale controls are intentionally gone from Pads and Ctrl.
+- **Project key and scale** - set the shared root and scale in the top bar. The scale picker is now a searchable family picker instead of a tiny dropdown, with Western modes, pentatonic colors, Hungarian/Klezmer colors, and honest 12-TET maqam/raga-inspired approximations grouped where they belong. Pads, Controller fallback, AI context, and the optional Piano/Pad degree colors all read from the same place instead of each feature guessing on its own. The old duplicate Root/Scale controls are intentionally gone from Pads and Ctrl.
 - **Curated chord pads** - Chords mode still stacks scale degrees for familiar Western scales, but uses hand-picked chord pads for scales where plain tertian stacking would feel wrong, such as Hirajoshi, Hungarian Minor, Double Harmonic, and Phrygian Dominant.
 - **Beat colors** - set a different color for each beat. The background pulses in time so you can *see* the meter.
 - **Degree colors** - the Layout panel can turn on shared degree highlighting, adjust color intensity, or show degree labels without the colored outlines. It is off by default. Pads use plain function names like Tonic and Dominant, while Piano keeps compact shorthand badges like b3 and 5.
@@ -235,7 +235,7 @@ export class MyInstrument {
 5. Add it to the `views` array in `render()`
 6. Add a tab to the instrument switcher
 
-For a deeper reference - including a synthesized drum sound built from oscillators and noise - read [`src/instruments/SketchKit.js`](src/instruments/SketchKit.js). It's heavily commented and uses every Web Audio primitive worth knowing. Architectural context, audio-scheduling rules, and the data model live in [`AI.MD`](./AI.MD).
+For a deeper reference - including a synthesized drum sound built from oscillators and noise - read [`src/instruments/SketchKit.js`](src/instruments/SketchKit.js). It's heavily commented and uses every Web Audio primitive worth knowing. Current architectural context, audio-scheduling rules, and the data model live in [`AI.MD`](./AI.MD).
 
 ---
 
@@ -323,7 +323,7 @@ Developer timing diagnostics exist for QA without living in the normal UI. Open 
 
 ### For AI agents working on this codebase
 
-If you're an AI agent assisting with this project, **read [`AI.MD`](./AI.MD) first.** It contains architectural context, audio-scheduling gotchas, and the exact state shape of the IndexedDB store. When you solve a non-obvious problem, append your findings to the bottom of `AI.MD` rather than deleting existing context.
+If you're an AI agent assisting with this project, **read [`AI.MD`](./AI.MD) first.** It contains architectural context, audio-scheduling gotchas, and the exact state shape of the IndexedDB store. Keep it current when you make meaningful changes: remove stale claims, update the canonical sections, and do not leave contradictory old notes behind.
 
 ---
 

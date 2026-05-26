@@ -7,6 +7,7 @@ import { TransportState } from '../engine/Transport.js';
 import { ARP_MODES } from '../engine/ArpeggioManager.js';
 import { NOTE_NAMES, SCALES, normalizeMusicalContext, scaleDescription, scaleFamilyLabel } from '../engine/MusicTheory.js';
 import { ALLOWED_GROUPINGS, METER_PICKER_IDS, METER_PRESETS, meterLabel, normalizeMeter, pulseCountForMeter } from '../engine/Meter.js';
+import { ChoicePicker } from './ChoicePicker.js';
 
 export class TransportBar {
   /**
@@ -33,6 +34,7 @@ export class TransportBar {
     this._recordArmed = false;
     this._projectKey = normalizeMusicalContext();
     this._projectMeter = normalizeMeter('4/4');
+    this._scalePicker = null;
   }
 
   /**
@@ -74,9 +76,10 @@ export class TransportBar {
         <select id="project-root-select" aria-label="Project root note">
           ${NOTE_NAMES.map(note => `<option value="${note}" ${note === this._projectKey.root ? 'selected' : ''}>${note}</option>`).join('')}
         </select>
-        <select id="project-scale-select" aria-label="Project scale">
-          ${this._renderScaleOptions()}
-        </select>
+        <button class="choice-picker-button transport-bar__scale-picker" id="project-scale-picker" type="button" aria-label="Project scale" aria-haspopup="dialog">
+          <span class="choice-picker-button__label" id="project-scale-label">${this._scaleLabel(this._projectKey.scale)}</span>
+          <span class="choice-picker-button__chevron" aria-hidden="true">▼</span>
+        </button>
         <span class="transport-bar__project-key-label">Meter</span>
         <select id="project-meter-select" aria-label="Project meter">
           ${METER_PICKER_IDS.map(id => {
@@ -178,7 +181,10 @@ export class TransportBar {
     });
 
     this.el.querySelector('#project-root-select')?.addEventListener('change', () => this._emitProjectKeyChange());
-    this.el.querySelector('#project-scale-select')?.addEventListener('change', () => this._emitProjectKeyChange());
+    this.el.querySelector('#project-scale-picker')?.addEventListener('pointerdown', (event) => {
+      event.preventDefault();
+      this._openScalePicker(event.currentTarget);
+    });
     this.el.querySelector('#project-meter-select')?.addEventListener('change', () => this._emitProjectMeterChange());
     this.el.querySelector('#project-meter-grouping-select')?.addEventListener('change', () => this._emitProjectMeterChange());
 
@@ -258,25 +264,45 @@ export class TransportBar {
     this.el.querySelector('#tb-more-btn')?.addEventListener('pointerdown', toggleMore);
   }
 
-  _renderScaleOptions() {
+  _scaleLabel(scaleName) {
+    return SCALES[scaleName]?.name || SCALES.major.name;
+  }
+
+  _scaleGroups() {
     const groups = new Map();
     Object.entries(SCALES)
       .filter(([key]) => key !== 'chromatic')
       .forEach(([key, scale]) => {
         const family = scale.family || 'western';
         if (!groups.has(family)) groups.set(family, []);
-        groups.get(family).push([key, scale]);
+        groups.get(family).push({
+          value: key,
+          label: scale.name,
+          kicker: scale.degreePattern || '',
+          description: scale.description || '',
+          tags: [scaleFamilyLabel(family), ...(scale.aliases || [])],
+        });
       });
 
-    return [...groups.entries()].map(([family, entries]) => `
-      <optgroup label="${scaleFamilyLabel(family)}">
-        ${entries.map(([key, scale]) => {
-          const selected = key === this._projectKey.scale ? 'selected' : '';
-          const title = scaleDescription(key);
-          return `<option value="${key}" ${selected} title="${title}">${scale.name}</option>`;
-        }).join('')}
-      </optgroup>
-    `).join('');
+    return [...groups.entries()].map(([family, items]) => ({
+      id: family,
+      label: scaleFamilyLabel(family),
+      items,
+    }));
+  }
+
+  _openScalePicker(anchor) {
+    this._scalePicker?.close();
+    this._scalePicker = new ChoicePicker({
+      title: 'Choose Scale',
+      groups: this._scaleGroups(),
+      selectedValue: this._projectKey.scale,
+      searchPlaceholder: 'Search scales...',
+      onSelect: (value) => {
+        this._emitProjectKeyChange({ scale: value });
+      },
+    });
+    this._scalePicker.open(anchor);
   }
 
   setArpLabel(mode) {
@@ -337,9 +363,14 @@ export class TransportBar {
   setProjectKey(context = {}) {
     this._projectKey = normalizeMusicalContext(context);
     const root = this.el?.querySelector('#project-root-select');
-    const scale = this.el?.querySelector('#project-scale-select');
+    const scaleLabel = this.el?.querySelector('#project-scale-label');
+    const scaleButton = this.el?.querySelector('#project-scale-picker');
     if (root) root.value = this._projectKey.root;
-    if (scale) scale.value = this._projectKey.scale;
+    if (scaleLabel) scaleLabel.textContent = this._scaleLabel(this._projectKey.scale);
+    if (scaleButton) {
+      scaleButton.title = scaleDescription(this._projectKey.scale);
+      scaleButton.setAttribute('aria-label', `Project scale: ${this._scaleLabel(this._projectKey.scale)}`);
+    }
   }
 
   setProjectMeter(meter = '4/4') {
@@ -356,9 +387,9 @@ export class TransportBar {
     this.updateTimeSignature();
   }
 
-  _emitProjectKeyChange() {
+  _emitProjectKeyChange(partial = {}) {
     const root = this.el?.querySelector('#project-root-select')?.value;
-    const scale = this.el?.querySelector('#project-scale-select')?.value;
+    const scale = partial.scale || this._projectKey.scale;
     this.setProjectKey({ root, scale });
     if (this.onProjectKeyChange) this.onProjectKeyChange({ ...this._projectKey });
   }

@@ -78,8 +78,8 @@ Expected:
 
 Steps:
 
-1. Open the top-bar Scale dropdown.
-2. Confirm scales are grouped by family.
+1. Open the top-bar Scale picker.
+2. Confirm scales are grouped by family and can be searched by name, family, interval pattern, or alias.
 3. Switch through one scale from each visible family.
 4. Open Pads and confirm pad count follows the selected scale.
 5. Switch to Chords mode on Hungarian Minor, Phrygian Dominant, and Hirajoshi.
@@ -87,7 +87,9 @@ Steps:
 
 Expected:
 
+- The picker opens as a categorized panel instead of a long native dropdown.
 - The picker groups Western, Pentatonic / East Asian, Hungarian / Klezmer, Maqam-inspired, and Raga-inspired scale entries.
+- Long scale names do not overflow the top bar; the selected scale label truncates cleanly if space is tight.
 - New scales load without resetting the project root.
 - Pentatonic scales show five pads without Extensions and ten pads with Extensions.
 - Seven-note scales show seven pads without Extensions and thirteen pads with Extensions.
