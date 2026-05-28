@@ -62,6 +62,7 @@ export class ScaleBoard {
     this._stepEditorKeyHandler = null;
     this._stepEditorSequence = [];
     this._stepEditorAltTarget = null;
+    this._stepEditorUndoStack = [];
     this._stepLoopIndex = 0;
 
     // Voice mode state
@@ -536,11 +537,16 @@ export class ScaleBoard {
   _renderStepChips() {
     const sequence = this._stepEntries();
     return sequence.map((entry, step) => {
-      const { note } = this._stepLabel(entry.degree);
+      const { midi, note } = this._stepLabel(entry.degree);
       const alternate = entry.alternateDegree ? this._stepLabel(entry.alternateDegree) : null;
       const isCurrent = step === (this._stepPointer % Math.max(1, sequence.length));
+      const degreeMeta = this._degreeMetaForMidi(midi);
+      const degreeClass = degreeMeta?.colorEnabled ? ' step-play__chip--degree-color' : '';
+      const degreeStyle = degreeMeta?.colorEnabled
+        ? ` style="--degree-color: ${this._escapeAttr(degreeMeta.color)}; --degree-intensity: ${this._escapeAttr(degreeMeta.intensityPercent)};"`
+        : '';
       return `
-        <span class="step-play__chip${isCurrent ? ' is-current' : ''}" data-step-chip="${step}">
+        <span class="step-play__chip${degreeClass}${isCurrent ? ' is-current' : ''}"${degreeStyle} data-step-chip="${step}">
           <span>${entry.degree}</span>
           <small>${this._escapeHtml(note.display)}</small>
           ${alternate ? `<em>⇄ ${entry.alternateDegree} ${this._escapeHtml(alternate.note.display)}</em>` : ''}
@@ -762,6 +768,7 @@ export class ScaleBoard {
     this._stepEditorOctave = 0;
     this._stepEditorSequence = this._stepEntries().map(entry => ({ ...entry }));
     this._stepEditorAltTarget = null;
+    this._stepEditorUndoStack = [];
     const overlay = document.createElement('div');
     overlay.className = 'step-editor-backdrop';
     overlay.innerHTML = this._renderStepEditor();
@@ -779,6 +786,7 @@ export class ScaleBoard {
     this._stepEditorOverlay = null;
     this._stepEditorSequence = [];
     this._stepEditorAltTarget = null;
+    this._stepEditorUndoStack = [];
   }
 
   _renderStepEditor() {
@@ -795,6 +803,7 @@ export class ScaleBoard {
         </div>
         <div class="step-editor__sequence" id="step-editor-sequence">${this._renderStepEditorSequence()}</div>
         <div class="step-editor__actions">
+          <button class="btn btn--ghost" id="step-editor-undo" type="button" disabled>Undo</button>
           <button class="btn btn--ghost" id="step-editor-clear" type="button">Clear</button>
           <button class="btn btn--ghost" id="step-editor-cancel" type="button">Cancel</button>
           <button class="btn btn--primary" id="step-editor-save" type="button">Save</button>
@@ -808,9 +817,14 @@ export class ScaleBoard {
     const start = this._stepEditorOctave * degreeCount + 1;
     return Array.from({ length: degreeCount }, (_, index) => {
       const degree = start + index;
-      const { note } = this._stepLabel(degree);
+      const { midi, note } = this._stepLabel(degree);
+      const degreeMeta = this._degreeMetaForMidi(midi);
+      const degreeClass = degreeMeta?.colorEnabled ? ' step-editor__note--degree-color' : '';
+      const degreeStyle = degreeMeta?.colorEnabled
+        ? ` style="--degree-color: ${this._escapeAttr(degreeMeta.color)}; --degree-intensity: ${this._escapeAttr(degreeMeta.intensityPercent)};"`
+        : '';
       return `
-        <button class="step-editor__note" type="button" data-degree="${degree}">
+        <button class="step-editor__note${degreeClass}"${degreeStyle} type="button" data-degree="${degree}">
           <span>${degree}</span>
           <small>${this._escapeHtml(note.display)}</small>
         </button>
@@ -822,12 +836,17 @@ export class ScaleBoard {
     const entries = this._stepEditorSequence || [];
     if (!entries.length) return '<p class="step-editor__empty">Tap notes above to build the sequence.</p>';
     return entries.map((entry, index) => {
-      const { note } = this._stepLabel(entry.degree);
+      const { midi, note } = this._stepLabel(entry.degree);
       const alternate = entry.alternateDegree ? this._stepLabel(entry.alternateDegree) : null;
       const pickingAlt = this._stepEditorAltTarget === index;
+      const degreeMeta = this._degreeMetaForMidi(midi);
+      const degreeClass = degreeMeta?.colorEnabled ? ' step-editor__seq-chip--degree-color' : '';
+      const degreeStyle = degreeMeta?.colorEnabled
+        ? ` style="--degree-color: ${this._escapeAttr(degreeMeta.color)}; --degree-intensity: ${this._escapeAttr(degreeMeta.intensityPercent)};"`
+        : '';
       return `
         <div class="step-editor__seq-item${pickingAlt ? ' is-picking-alt' : ''}">
-          <button class="step-editor__seq-chip" type="button" data-remove-step="${index}" title="Remove ${entry.degree}">
+          <button class="step-editor__seq-chip${degreeClass}"${degreeStyle} type="button" data-remove-step="${index}" title="Remove ${entry.degree}">
             <span>${entry.degree}</span>
             <small>${this._escapeHtml(note.display)}</small>
             ${alternate ? `<em>⇄ ${entry.alternateDegree} ${this._escapeHtml(alternate.note.display)}</em>` : ''}
@@ -849,6 +868,10 @@ export class ScaleBoard {
       e.preventDefault();
       this._closeStepEditor();
     });
+    overlay.querySelector('#step-editor-undo')?.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      this._undoStepEditor();
+    });
     overlay.querySelector('#step-editor-save')?.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       this._persistStepEntries(this._stepEditorSequence);
@@ -858,6 +881,7 @@ export class ScaleBoard {
     });
     overlay.querySelector('#step-editor-clear')?.addEventListener('pointerdown', (e) => {
       e.preventDefault();
+      this._pushStepEditorUndo();
       this._stepEditorSequence = [];
       this._stepEditorAltTarget = null;
       syncSequence();
@@ -874,18 +898,16 @@ export class ScaleBoard {
       overlay.querySelector('#step-editor-notes').innerHTML = this._renderStepEditorNotes();
       this._bindStepEditorNoteEvents();
     });
-    overlay.addEventListener('pointerdown', (e) => {
-      if (e.target === overlay) this._closeStepEditor();
-    });
     const esc = (e) => {
       if (e.key === 'Escape') {
-        this._closeStepEditor();
+        e.preventDefault();
       }
     };
     this._stepEditorKeyHandler = esc;
     document.addEventListener('keydown', this._stepEditorKeyHandler, true);
     this._bindStepEditorNoteEvents();
     this._bindStepEditorRemoveEvents();
+    this._syncStepEditorUndoButton();
   }
 
   _refreshStepEditorSequence() {
@@ -893,6 +915,30 @@ export class ScaleBoard {
     if (!target) return;
     target.innerHTML = this._renderStepEditorSequence();
     this._bindStepEditorRemoveEvents();
+    this._syncStepEditorUndoButton();
+  }
+
+  _pushStepEditorUndo() {
+    const snapshot = {
+      sequence: this._stepEditorSequence.map(entry => ({ ...entry })),
+      altTarget: this._stepEditorAltTarget,
+    };
+    this._stepEditorUndoStack.push(snapshot);
+    if (this._stepEditorUndoStack.length > 10) this._stepEditorUndoStack.shift();
+    this._syncStepEditorUndoButton();
+  }
+
+  _undoStepEditor() {
+    const previous = this._stepEditorUndoStack.pop();
+    if (!previous) return;
+    this._stepEditorSequence = previous.sequence.map(entry => ({ ...entry }));
+    this._stepEditorAltTarget = previous.altTarget;
+    this._refreshStepEditorSequence();
+  }
+
+  _syncStepEditorUndoButton() {
+    const button = this._stepEditorOverlay?.querySelector('#step-editor-undo');
+    if (button) button.disabled = this._stepEditorUndoStack.length === 0;
   }
 
   _bindStepEditorNoteEvents() {
@@ -903,6 +949,7 @@ export class ScaleBoard {
         e.preventDefault();
         const degree = this._normalizeStepDegree(button.dataset.degree);
         if (!degree) return;
+        this._pushStepEditorUndo();
         if (Number.isInteger(this._stepEditorAltTarget) && this._stepEditorSequence[this._stepEditorAltTarget]) {
           this._stepEditorSequence[this._stepEditorAltTarget].alternateDegree = degree;
           this._stepEditorAltTarget = null;
@@ -921,6 +968,7 @@ export class ScaleBoard {
       button.addEventListener('pointerdown', (e) => {
         e.preventDefault();
         const removeIndex = parseInt(button.dataset.removeStep, 10);
+        this._pushStepEditorUndo();
         this._stepEditorSequence.splice(removeIndex, 1);
         if (this._stepEditorAltTarget === removeIndex) this._stepEditorAltTarget = null;
         else if (this._stepEditorAltTarget > removeIndex) this._stepEditorAltTarget -= 1;
@@ -941,6 +989,7 @@ export class ScaleBoard {
         e.preventDefault();
         e.stopPropagation();
         const index = parseInt(button.dataset.clearAlt, 10);
+        this._pushStepEditorUndo();
         if (this._stepEditorSequence[index]) delete this._stepEditorSequence[index].alternateDegree;
         if (this._stepEditorAltTarget === index) this._stepEditorAltTarget = null;
         this._refreshStepEditorSequence();

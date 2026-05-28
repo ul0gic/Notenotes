@@ -461,6 +461,16 @@
   font-weight: var(--font-weight-semibold);
 }
 
+.step-play__chip--degree-color {
+  background:
+    linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--degree-color) var(--degree-intensity, 22%), transparent),
+      var(--surface-2) 58%
+    );
+  border-color: color-mix(in srgb, var(--degree-color) 70%, var(--surface-4));
+}
+
 .step-play__chip small {
   color: var(--text-tertiary);
   font-size: var(--font-size-xs);
@@ -584,6 +594,17 @@
   color: var(--text-primary);
   font-family: var(--font-family);
   cursor: pointer;
+}
+
+.step-editor__note--degree-color,
+.step-editor__seq-chip--degree-color {
+  background:
+    linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--degree-color) var(--degree-intensity, 22%), transparent),
+      var(--surface-2) 60%
+    );
+  border-color: color-mix(in srgb, var(--degree-color) 70%, var(--surface-4));
 }
 
 .step-editor__note:hover,

@@ -572,3 +572,33 @@ Editor interaction rules:
 - Clicking a sequence chip removes that step.
 - Clicking a chip's Alt button arms that chip; the next available-note click sets or replaces its `alternateDegree`.
 - Clear removes the in-modal sequence only; saving an empty sequence falls back to the current scale's first octave through `_persistStepEntries()`.
+
+## Step Play Degree Colors And Safer Editor 0.1.51
+
+Step Play now participates in the shared degree-color system. The main Step Play
+chips, the editor's available-note buttons, and the editor's sequence chips all
+call `ScaleBoard._degreeMetaForMidi(midi)` and apply `--degree-color` /
+`--degree-intensity` CSS variables when `degreeHighlighting.enabled` is true.
+This keeps Step Play visually aligned with Pads and Piano instead of becoming a
+separate uncolored sequence surface.
+
+Editor safety rules changed after mobile QA showed accidental outside taps could
+discard in-progress work. The Step Play editor no longer closes on backdrop
+clicks or Escape. It requires explicit Save or Cancel. Escape is swallowed while
+the editor is open so it does not close the modal through browser or higher-level
+handlers.
+
+The editor also keeps a bounded undo stack:
+
+- `this._stepEditorUndoStack` stores up to 10 snapshots.
+- A snapshot contains a shallow copy of `this._stepEditorSequence` plus the
+  current alternate-target index.
+- Appending a note, removing a chip, clearing the sequence, setting an alternate,
+  and clearing an alternate all push a snapshot before mutating the in-memory
+  sequence.
+- Undo only affects the open editor state. Project settings are still written
+  only when Save calls `_persistStepEntries()`.
+
+Do not reintroduce manual text entry on the performance surface. The whole point
+of this Step Play shape is that keyboard/MIDI/controller input can always mean
+"play" on the main surface, while editing stays inside the explicit modal.
