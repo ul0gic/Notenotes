@@ -205,8 +205,9 @@ Steps:
 11. Switch to a pentatonic scale, edit the Step Play sequence to `1 3 5 6`, and confirm `6` resolves to the next octave's first scale note.
 12. Reopen Edit Sequence, click a sequence chip to remove it, then add it back.
 13. Use a chip's Alt button, pick a different note from the note row, save, and step through the sequence twice.
-14. Open Layout, enable Highlight scale degrees, return to Step Play, and reopen Edit Sequence.
-15. Add and remove a few chips, press Undo, then tap outside the editor backdrop and press Escape.
+14. Change the project key and scale, then return to Step Play.
+15. Open Layout, enable Highlight scale degrees, return to Step Play, and reopen Edit Sequence.
+16. Add and remove a few chips, press Undo, then tap outside the editor backdrop and press Escape.
 
 Expected:
 
@@ -217,7 +218,8 @@ Expected:
 - Step Play uses chips in the modal instead of manual text entry; clicking a sequence chip removes it.
 - Step Play chips and editor note buttons use the same degree colors as Pads when Highlight scale degrees is enabled.
 - Undo restores recent editor chip changes. Outside taps and Escape do not close the editor; Save or Cancel is required.
-- Step Play advances one note per Step button press, keyboard keydown, or MIDI note-on, resolves degrees above the visible pad count into higher scale octaves, and records the user's timing when recording is armed.
+- Step Play advances one note per Step button press, keyboard keydown, or MIDI note-on, resolves picked degrees into fixed saved MIDI notes, and records the user's timing when recording is armed.
+- Changing key, scale, or Pad octave after saving Step Play does not change the saved notes. Notes outside the current scale continue playing and show a red `OUT` badge with a black outline.
 - A step with an alternate plays the normal note on the first pass through the sequence, the alternate note on the second pass, and alternates on later passes.
 - Global pitch/mod digit shortcuts still work when the active Create surface does not claim that key.
 

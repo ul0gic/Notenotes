@@ -123,6 +123,7 @@ export class ScaleBoard {
     this.scaleName = context.scale;
     this.extensionsEnabled = !!p?.settings?.scaleExtensionsEnabled;
     this._updateNotes();
+    this._upgradeStepPlayPattern();
     this._loadVoiceStateFromProject();
     if (this.el) {
       this._refreshPads();
@@ -423,14 +424,15 @@ export class ScaleBoard {
     }).join('');
   }
 
-  _degreeMetaForMidi(midi) {
+  _degreeMetaForMidi(midi, options = {}) {
     if (this.padMode === 'voices') return null;
     const degree = normalizeDegreeHighlighting(this.project?.settings?.degreeHighlighting);
-    if (!degree.enabled && !degree.showLabels) return null;
-    const context = normalizeMusicalContext(this.project?.musicalContext || { root: this.rootNote, scale: this.scaleName });
+    if (!options.includeOutOfScale && !degree.enabled && !degree.showLabels) return null;
+    const context = normalizeMusicalContext({ root: this.rootNote, scale: this.scaleName });
     const meta = degreeForMidi(midi, context);
-    if (!meta) return null;
+    if (!meta) return options.includeOutOfScale ? { inScale: false } : null;
     return {
+      inScale: true,
       color: degree.colors[meta.interval],
       colorEnabled: degree.enabled,
       intensityPercent: `${Math.round((degree.intensity ?? 0.22) * 100)}%`,
@@ -440,7 +442,7 @@ export class ScaleBoard {
   }
 
   _stepSequenceString() {
-    return this._stepEntries().map(entry => String(entry.degree)).join(' ');
+    return this._stepEntries().map(entry => midiToNoteName(entry.midi).display).join(' ');
   }
 
   _scaleDegreeCount() {
@@ -452,25 +454,69 @@ export class ScaleBoard {
     return Number.isInteger(parsed) && parsed > 0 && parsed <= 64 ? parsed : null;
   }
 
+  _normalizeStepMidi(midi) {
+    const parsed = parseInt(midi, 10);
+    return Number.isInteger(parsed) && parsed >= 0 && parsed <= 127 ? parsed : null;
+  }
+
+  _entryForStepDegree(degree) {
+    const normalized = this._normalizeStepDegree(degree);
+    if (!normalized) return null;
+    const midi = this._midiForStepDegree(normalized);
+    if (!Number.isInteger(midi)) return null;
+    return { degree: normalized, midi };
+  }
+
   _defaultStepEntries() {
-    return Array.from({ length: this._scaleDegreeCount() }, (_, index) => ({ degree: index + 1 }));
+    return Array.from({ length: this._scaleDegreeCount() }, (_, index) => this._entryForStepDegree(index + 1)).filter(Boolean);
   }
 
   _entriesFromDegreeString(value) {
     const degrees = (String(value || '').match(/\d+/g) || [])
       .map(token => parseInt(token, 10))
       .filter(degree => Number.isInteger(degree) && degree > 0 && degree <= 64);
-    return degrees.map(degree => ({ degree }));
+    return degrees.map(degree => this._entryForStepDegree(degree)).filter(Boolean);
   }
 
   _normalizeStepEntries(entries) {
     if (!Array.isArray(entries)) return [];
     return entries.map(entry => {
       const degree = this._normalizeStepDegree(entry?.degree ?? entry);
-      if (!degree) return null;
+      const midi = this._normalizeStepMidi(entry?.midi);
+      const resolvedMidi = midi ?? (degree ? this._midiForStepDegree(degree) : null);
+      if (!Number.isInteger(resolvedMidi)) return null;
+      const normalized = { midi: resolvedMidi };
+      if (degree) normalized.degree = degree;
+
       const alternateDegree = this._normalizeStepDegree(entry?.alternateDegree);
-      return alternateDegree ? { degree, alternateDegree } : { degree };
+      const alternateMidi = this._normalizeStepMidi(entry?.alternateMidi);
+      const resolvedAlternateMidi = alternateMidi ?? (alternateDegree ? this._midiForStepDegree(alternateDegree) : null);
+      if (Number.isInteger(resolvedAlternateMidi)) {
+        normalized.alternateMidi = resolvedAlternateMidi;
+        if (alternateDegree) normalized.alternateDegree = alternateDegree;
+      }
+      return normalized;
     }).filter(Boolean);
+  }
+
+  _upgradeStepPlayPattern() {
+    const settings = this.project?.settings;
+    if (!settings) return;
+    const hasPattern = Array.isArray(settings.stepPlayPattern) && settings.stepPlayPattern.length > 0;
+    const hasLegacySequence = typeof settings.stepPlaySequence === 'string' && settings.stepPlaySequence.trim().length > 0;
+    const needsMidi = hasPattern && settings.stepPlayPattern.some(entry => !Number.isInteger(this._normalizeStepMidi(entry?.midi)));
+    if (!hasPattern && !hasLegacySequence) return;
+    if (hasPattern && !needsMidi) return;
+
+    const source = hasPattern
+      ? settings.stepPlayPattern
+      : this._entriesFromDegreeString(settings.stepPlaySequence);
+    const upgraded = this._normalizeStepEntries(source);
+    if (!upgraded.length) return;
+    settings.stepPlayPattern = upgraded.map(entry => ({ ...entry }));
+    settings.stepPlaySequence = upgraded
+      .map(entry => entry.degree ? String(entry.degree) : midiToNoteName(entry.midi).display)
+      .join(' ');
   }
 
   _stepEntries() {
@@ -478,10 +524,6 @@ export class ScaleBoard {
     if (pattern.length) return pattern;
     const legacy = this._entriesFromDegreeString(this.project?.settings?.stepPlaySequence);
     return legacy.length ? legacy : this._defaultStepEntries();
-  }
-
-  _stepDegrees() {
-    return this._stepEntries().map(entry => entry.degree);
   }
 
   _stepScaleNotes(requiredCount = 32) {
@@ -499,13 +541,25 @@ export class ScaleBoard {
     return { degree, midi, note };
   }
 
+  _stepEntryLabel(entry) {
+    const normalized = this._normalizeStepEntries([entry])[0] || this._entryForStepDegree(1);
+    const midi = normalized?.midi ?? 60;
+    return {
+      ...normalized,
+      note: midiToNoteName(midi),
+      outOfScale: !this._degreeMetaForMidi(midi, { includeOutOfScale: true })?.inScale,
+    };
+  }
+
   _persistStepEntries(entries) {
     if (!this.project) return;
     if (!this.project.settings) this.project.settings = {};
     const normalized = this._normalizeStepEntries(entries);
     const next = normalized.length ? normalized : this._defaultStepEntries();
     this.project.settings.stepPlayPattern = next.map(entry => ({ ...entry }));
-    this.project.settings.stepPlaySequence = next.map(entry => entry.degree).join(' ');
+    this.project.settings.stepPlaySequence = next
+      .map(entry => entry.degree ? String(entry.degree) : midiToNoteName(entry.midi).display)
+      .join(' ');
     this._stepPointer = 0;
     this._stepLoopIndex = 0;
     if (this.onStepPlayChanged) this.onStepPlayChanged(this.project.settings.stepPlaySequence);
@@ -537,19 +591,22 @@ export class ScaleBoard {
   _renderStepChips() {
     const sequence = this._stepEntries();
     return sequence.map((entry, step) => {
-      const { midi, note } = this._stepLabel(entry.degree);
-      const alternate = entry.alternateDegree ? this._stepLabel(entry.alternateDegree) : null;
+      const label = this._stepEntryLabel(entry);
+      const { midi, note } = label;
+      const alternate = entry.alternateMidi ? this._stepEntryLabel({ midi: entry.alternateMidi, degree: entry.alternateDegree }) : null;
       const isCurrent = step === (this._stepPointer % Math.max(1, sequence.length));
       const degreeMeta = this._degreeMetaForMidi(midi);
       const degreeClass = degreeMeta?.colorEnabled ? ' step-play__chip--degree-color' : '';
+      const outClass = label.outOfScale ? ' step-play__chip--out' : '';
       const degreeStyle = degreeMeta?.colorEnabled
         ? ` style="--degree-color: ${this._escapeAttr(degreeMeta.color)}; --degree-intensity: ${this._escapeAttr(degreeMeta.intensityPercent)};"`
         : '';
       return `
-        <span class="step-play__chip${degreeClass}${isCurrent ? ' is-current' : ''}"${degreeStyle} data-step-chip="${step}">
-          <span>${entry.degree}</span>
+        <span class="step-play__chip${degreeClass}${outClass}${isCurrent ? ' is-current' : ''}"${degreeStyle} data-step-chip="${step}">
+          <span>${step + 1}</span>
           <small>${this._escapeHtml(note.display)}</small>
-          ${alternate ? `<em>⇄ ${entry.alternateDegree} ${this._escapeHtml(alternate.note.display)}</em>` : ''}
+          ${label.outOfScale ? '<b class="step-play__out-badge">OUT</b>' : ''}
+          ${alternate ? `<em>⇄ ${this._escapeHtml(alternate.note.display)}${alternate.outOfScale ? ' <b class="step-play__out-badge">OUT</b>' : ''}</em>` : ''}
         </span>
       `;
     }).join('');
@@ -836,20 +893,23 @@ export class ScaleBoard {
     const entries = this._stepEditorSequence || [];
     if (!entries.length) return '<p class="step-editor__empty">Tap notes above to build the sequence.</p>';
     return entries.map((entry, index) => {
-      const { midi, note } = this._stepLabel(entry.degree);
-      const alternate = entry.alternateDegree ? this._stepLabel(entry.alternateDegree) : null;
+      const label = this._stepEntryLabel(entry);
+      const { midi, note } = label;
+      const alternate = entry.alternateMidi ? this._stepEntryLabel({ midi: entry.alternateMidi, degree: entry.alternateDegree }) : null;
       const pickingAlt = this._stepEditorAltTarget === index;
       const degreeMeta = this._degreeMetaForMidi(midi);
       const degreeClass = degreeMeta?.colorEnabled ? ' step-editor__seq-chip--degree-color' : '';
+      const outClass = label.outOfScale ? ' step-editor__seq-chip--out' : '';
       const degreeStyle = degreeMeta?.colorEnabled
         ? ` style="--degree-color: ${this._escapeAttr(degreeMeta.color)}; --degree-intensity: ${this._escapeAttr(degreeMeta.intensityPercent)};"`
         : '';
       return `
         <div class="step-editor__seq-item${pickingAlt ? ' is-picking-alt' : ''}">
-          <button class="step-editor__seq-chip${degreeClass}"${degreeStyle} type="button" data-remove-step="${index}" title="Remove ${entry.degree}">
-            <span>${entry.degree}</span>
+          <button class="step-editor__seq-chip${degreeClass}${outClass}"${degreeStyle} type="button" data-remove-step="${index}" title="Remove ${note.display}">
+            <span>${index + 1}</span>
             <small>${this._escapeHtml(note.display)}</small>
-            ${alternate ? `<em>⇄ ${entry.alternateDegree} ${this._escapeHtml(alternate.note.display)}</em>` : ''}
+            ${label.outOfScale ? '<b class="step-play__out-badge">OUT</b>' : ''}
+            ${alternate ? `<em>⇄ ${this._escapeHtml(alternate.note.display)}${alternate.outOfScale ? ' <b class="step-play__out-badge">OUT</b>' : ''}</em>` : ''}
           </button>
           <button class="step-editor__seq-alt" type="button" data-alt-step="${index}">
             ${pickingAlt ? 'Pick note' : alternate ? 'Change alt' : 'Alt'}
@@ -949,12 +1009,15 @@ export class ScaleBoard {
         e.preventDefault();
         const degree = this._normalizeStepDegree(button.dataset.degree);
         if (!degree) return;
+        const nextEntry = this._entryForStepDegree(degree);
+        if (!nextEntry) return;
         this._pushStepEditorUndo();
         if (Number.isInteger(this._stepEditorAltTarget) && this._stepEditorSequence[this._stepEditorAltTarget]) {
-          this._stepEditorSequence[this._stepEditorAltTarget].alternateDegree = degree;
+          this._stepEditorSequence[this._stepEditorAltTarget].alternateDegree = nextEntry.degree;
+          this._stepEditorSequence[this._stepEditorAltTarget].alternateMidi = nextEntry.midi;
           this._stepEditorAltTarget = null;
         } else {
-          this._stepEditorSequence.push({ degree });
+          this._stepEditorSequence.push(nextEntry);
         }
         this._refreshStepEditorSequence();
       });
@@ -1436,9 +1499,8 @@ export class ScaleBoard {
     if (!sequence.length) return false;
     const step = this._stepPointer % sequence.length;
     const entry = sequence[step];
-    const useAlternate = this._stepLoopIndex % 2 === 1 && entry.alternateDegree;
-    const degree = useAlternate ? entry.alternateDegree : entry.degree;
-    const midi = this._midiForStepDegree(degree);
+    const useAlternate = this._stepLoopIndex % 2 === 1 && Number.isInteger(entry.alternateMidi);
+    const midi = useAlternate ? entry.alternateMidi : entry.midi;
     if (midi === undefined) return false;
 
     this._releaseStepPlay();

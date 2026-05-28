@@ -320,12 +320,12 @@ Pad count follows the current scale unless a mode overrides it. Extensions
 continue scale degrees into the next octave for Single and normal Chords modes.
 
 Step Play is a Pads mode, not a top-level instrument. It renders a dedicated
-one-trigger surface plus a saved numeric sequence at
-`project.settings.stepPlaySequence`. The sequence is typed as scale-degree
-numbers (`1 3 5 8`), not visible pad indexes. Degrees continue upward through
-the active scale, so `8` is the next octave in a seven-note scale and `6` is the
-next octave in pentatonic. Invalid or unavailable numbers are ignored and an
-empty sequence falls back to the current scale's first octave. Each trigger
+one-trigger surface plus a saved note sequence. The editor's palette is
+scale-aware, but saved sequence steps are stable MIDI notes in
+`project.settings.stepPlayPattern`, not live degree formulas. Changing the
+project key, scale, or Pads octave must not rewrite a saved Step Play
+composition. If a saved MIDI note no longer belongs to the current scale, the UI
+marks it with an `OUT` badge and still plays the original note. Each trigger
 plays one single note for a short fixed gate, advances the pointer, and records
 the user's timing through the normal note callbacks.
 
@@ -458,6 +458,35 @@ active surface decides what the input does. If the performance key layout ever
 changes, update `PerformanceKeys.js` instead of duplicating labels in individual
 instruments.
 
+## Step Play Stable Notes 0.1.52
+
+Step Play pattern storage moved from "degree formulas that re-resolve every time
+the musical context changes" to "fixed MIDI notes picked from a scale-aware
+palette." The important details:
+
+- `project.settings.stepPlayPattern` entries now normalize to
+  `{ midi, degree? }` plus optional `{ alternateMidi, alternateDegree? }`.
+- `degree` and `alternateDegree` are source metadata for labels/history. They
+  are not the playback source once `midi` / `alternateMidi` exists.
+- Legacy `stepPlayPattern` entries without `midi`, and legacy
+  `stepPlaySequence` strings, are upgraded once by `_upgradeStepPlayPattern()`
+  using the current key/scale/octave at project load. After that, changing
+  key/scale/octave does not move those notes.
+- The editor palette still uses `_stepLabel(degree)` so users can keep picking
+  by scale degree. Clicking a palette note appends `{ degree, midi }`; setting
+  an alternate writes `{ alternateDegree, alternateMidi }`.
+- Playback in `triggerStepPlay()` reads `entry.midi` or `entry.alternateMidi`
+  directly. Do not reintroduce `_midiForStepDegree()` in the playback path.
+- Step chips render by sequence order (`1`, `2`, `3`, ...), not by scale degree,
+  because saved notes may be out of current degree order after musical-context
+  changes.
+- `_degreeMetaForMidi(midi, { includeOutOfScale: true })` is used to detect
+  whether a saved MIDI note belongs to the current key/scale. Out-of-scale notes
+  render with the red `OUT` badge and black badge outline but remain playable.
+
+Keep this distinction clear in future work: the palette is scale-aware; the
+composition is note-stable.
+
 ## Canvas
 
 Canvas stores clips on tracks with absolute tick positions. Meter changes should
@@ -528,8 +557,8 @@ This release makes two Create-mode performance-input changes.
 
 - `src/ui/PerformanceKeys.js` is now the shared source of truth for computer keyboard performance codes and display labels. `CreativeMode` imports `PERFORMANCE_KEYS` for routing, and `SketchKit` imports `performanceKeyLabel()` so drum pads can show the key that triggers each visible pad. Keep future keyboard-label UI wired to this module instead of duplicating the layout.
 - Kit keyboard mapping remains forward through visible drum pads. The label is visual/accessibility context only; it does not change `SketchKit.triggerVisiblePad()` or GM drum-note MIDI routing.
-- ScaleBoard gained `padMode === 'step'`. The renderer replaces the normal pad grid with a Step Play surface: one large trigger, a chip list for the active sequence, a sequence text field, and Reset. The sequence persists at `project.settings.stepPlaySequence` as human-readable pad numbers such as `1 3 5 8`.
-- Step Play sanitizes by parsing numbers and ignoring unavailable pad indexes. If the saved sequence is empty or invalid for the current scale/pad count, playback falls back to the current visible pad order. This lets users change key/scale without creating a dead surface.
+- ScaleBoard gained `padMode === 'step'`. The renderer replaces the normal pad grid with a Step Play surface: one large trigger, a chip list for the active sequence, Edit Sequence, and Reset. Current storage lives in `project.settings.stepPlayPattern`; older `stepPlaySequence` strings are legacy import/migration input.
+- Step Play sanitizes by normalizing saved MIDI notes and legacy degree entries. If the saved sequence is empty or invalid, playback falls back to the current scale's first octave. Saved MIDI notes stay stable across key/scale/octave changes.
 - Step Play always plays single notes for now. It uses a short fixed gate and releases the previous step before firing the next one, so one switch/key/MIDI note-on can advance the phrase while recording captures the user's rhythm through the normal note callbacks.
 - Creative keyboard routing treats any performance key as a Step Play trigger while Pads are in Step Play mode. Web MIDI note-on does the same; note-off is ignored because Step Play is not a held-note surface. Pointer clicks on the Step button use the same `triggerStepPlay()` path.
 
@@ -539,20 +568,22 @@ Step Play was tightened after QA showed that the inline sequence input stole
 computer-keyboard performance events. The main Step Play surface is now play
 first: it contains the Step trigger, wrapping sequence chips, Reset, and an Edit
 Sequence button. The Pad octave controls are hidden in Step Play mode because
-octave movement is expressed by degree continuation inside the sequence.
+the editor palette, not the global Pads octave controls, chooses which notes get
+saved into the Step Play composition.
 
 The editor is a modal with no visible X button, matching the app's newer picker
 language. It offers a row of scale-degree note buttons plus left/right arrows to
 move that row through higher scale octaves. Tapping a note appends that degree to
-the manual sequence field; sequence chips inside the modal can remove individual
-steps. Save writes the same `project.settings.stepPlaySequence` string, so this
-is an additive UI/storage refinement rather than a schema change.
+the editor sequence; sequence chips inside the modal can remove individual
+steps. Current Save writes stable MIDI note entries to
+`project.settings.stepPlayPattern` and keeps `stepPlaySequence` only as a legacy
+mirror.
 
-Important semantic change: Step Play numbers are now scale degrees over time,
-not indexes into `_notes`. `_midiForStepDegree(degree)` resolves degree `n` via
-`getScaleNotes(scaleName, rootNote, octave, n)`. This makes pentatonic `6`
-resolve to the next octave's first scale note and major `8` resolve to the next
-octave tonic. Keep future Step Play features on this degree-continuation model.
+Historical note: 0.1.49 introduced degree continuation in the palette, where
+pentatonic `6` resolves to the next octave's first scale note and major `8`
+resolves to the next octave tonic. As of 0.1.52 this degree continuation remains
+the picker behavior only. Once picked, a step stores the resolved MIDI note so
+later key/scale/octave changes do not rewrite the composition.
 
 ## Step Play Chip Editor And Alternates 0.1.50
 
@@ -560,17 +591,17 @@ Step Play no longer exposes a manual text input in the editor. The modal keeps a
 
 Persistence is now additive:
 
-- `project.settings.stepPlayPattern` is the richer source of truth when present. It is an array of `{ degree, alternateDegree? }` objects.
-- `project.settings.stepPlaySequence` is still written as a plain degree string for backward compatibility and simple inspection.
+- `project.settings.stepPlayPattern` is the richer source of truth when present. As of 0.1.52 it normalizes to `{ midi, degree? }` plus optional `{ alternateMidi, alternateDegree? }`.
+- `project.settings.stepPlaySequence` is still written as a plain legacy mirror for backward compatibility and simple inspection.
 - Old projects that only have `stepPlaySequence` are still parsed by `_entriesFromDegreeString()`.
 
-Alternate-step behavior is deliberately small: one optional alternate per sequence step. During playback, `_stepLoopIndex` starts at `0`; even-numbered passes play `degree`, odd-numbered passes play `alternateDegree` when present, then return to the primary degree on the next pass. This gives first-pass/second-pass variation without introducing a full pattern language yet.
+Alternate-step behavior is deliberately small: one optional alternate per sequence step. During playback, `_stepLoopIndex` starts at `0`; even-numbered passes play `midi`, odd-numbered passes play `alternateMidi` when present, then return to the primary note on the next pass. This gives first-pass/second-pass variation without introducing a full pattern language yet.
 
 Editor interaction rules:
 
-- Clicking a note in the available-note row appends a new primary step unless an Alt target is active.
+- Clicking a note in the available-note row appends a new primary `{ degree, midi }` step unless an Alt target is active.
 - Clicking a sequence chip removes that step.
-- Clicking a chip's Alt button arms that chip; the next available-note click sets or replaces its `alternateDegree`.
+- Clicking a chip's Alt button arms that chip; the next available-note click sets or replaces its `alternateDegree` and `alternateMidi`.
 - Clear removes the in-modal sequence only; saving an empty sequence falls back to the current scale's first octave through `_persistStepEntries()`.
 
 ## Step Play Degree Colors And Safer Editor 0.1.51
