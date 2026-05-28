@@ -8,7 +8,7 @@ Stay in beta-hardening mode first. Local export, local backup, Tone presets, and
 
 After that, the next visible work should be:
 
-1. Mobile Create layout and snippets drawer hardening.
+1. Mobile Create layout, BPM control, and snippets drawer hardening.
 2. Pre-DAW positioning pass.
 3. Track View prototype.
 4. Google Drive Backup.
@@ -113,13 +113,14 @@ Not in scope:
 - Mutating projects the user did not explicitly open or import.
 - Update prompts or forced client-side app updates.
 
-## 5. Mobile Create Layout And Snippets Drawer
+## 5. Mobile Create Layout, BPM Control, And Snippets Drawer
 
 Goal:
 
 Make Create mode usable on iPhone-sized screens without hiding core controls,
 forcing awkward horizontal drags, or letting the snippet tray eat the playable
-surface.
+surface. The BPM control should become touch-friendly instead of behaving like a
+tiny desktop counter.
 
 Observed problem:
 
@@ -128,7 +129,9 @@ tabs, Patch/Tone/AI/Controller/Layout row, Pad Mode row, pads, and snippets tray
 all compete vertically. Patch can become nearly unreadable, there is wasted
 space between Pad Mode and octave controls, and the snippets tray can leave the
 actual pads clipped offscreen. Horizontal rows with buttons such as AI/Layout can
-also feel impossible to drag because the first touch opens the button.
+also feel impossible to drag because the first touch opens the button. The inline
+BPM box is also too large and awkward for mobile, while still being too small to
+edit comfortably with touch.
 
 First pass:
 
@@ -142,9 +145,10 @@ First pass:
   `Snippets` header/count control to expand it when needed.
 - Add or tune horizontal drag thresholds on toolbar rows so dragging the row does
   not immediately activate AI, Controller, Layout, or other buttons.
-- Review the BPM control on mobile. Preferred direction: a compact `120 BPM`
-  button that opens a modal with direct numeric entry and small +/- controls,
-  instead of a cramped inline counter.
+- Replace or adapt the BPM control on mobile. Preferred direction: a compact
+  `120 BPM` button in the transport that opens a modal with direct numeric entry,
+  small +/- controls, and clear Save/Cancel behavior instead of a cramped inline
+  counter.
 
 Acceptance notes:
 
@@ -152,6 +156,8 @@ Acceptance notes:
   cutting off the main pad grid.
 - Patch, Pad Mode, and Snippets count should remain understandable without
   pinch-zooming.
+- BPM should be readable at a glance and editable by touch without fighting the
+  browser keyboard or tiny input steppers.
 - Tapping a toolbar button should still open it, but horizontal dragging across
   the row should scroll rather than fire the first touched button.
 - Collapsing the snippets tray should not delete or hide snippets permanently;
