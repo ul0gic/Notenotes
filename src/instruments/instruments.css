@@ -1837,12 +1837,11 @@
 
   .patch-selector {
     display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-columns: 56px minmax(180px, 1fr);
     gap: var(--space-xs);
     padding: var(--space-xs) var(--space-sm);
-    overflow-x: auto;
-    scrollbar-width: none;
-    touch-action: pan-x;
+    overflow-x: visible;
+    touch-action: auto;
   }
 
   .patch-selector::-webkit-scrollbar {
@@ -1854,7 +1853,7 @@
   }
 
   .patch-selector__picker {
-    min-width: 0;
+    min-width: 180px;
     max-width: none;
     width: 100%;
   }
@@ -1867,9 +1866,56 @@
   .patch-selector .tone-button {
     white-space: nowrap;
     min-height: 38px;
+    min-width: 0;
   }
 
   .instrument-container {
     min-height: 0;
+  }
+
+  .scaleboard {
+    padding: var(--space-sm);
+    gap: var(--space-sm);
+  }
+
+  .scaleboard__controls {
+    gap: var(--space-sm);
+    align-items: flex-end;
+  }
+
+  .scaleboard__control-group {
+    min-width: 0;
+  }
+
+  .scaleboard__select {
+    max-width: 100%;
+  }
+
+  .scaleboard__octave {
+    margin-left: 0;
+  }
+
+  .scaleboard__pads {
+    gap: 8px !important;
+    grid-auto-rows: minmax(48px, 1fr);
+  }
+
+  .scaleboard__pad {
+    min-height: 48px;
+    border-radius: 14px;
+    gap: 2px;
+  }
+
+  .scaleboard__pad-degree {
+    font-size: 2rem;
+  }
+
+  .scaleboard__pad-note {
+    font-size: 0.78rem;
+  }
+
+  .micropiano__key-label,
+  .sketchkit__key-label {
+    display: none;
   }
 }

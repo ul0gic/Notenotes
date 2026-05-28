@@ -685,3 +685,50 @@ The editor also keeps a bounded undo stack:
 Do not reintroduce manual text entry on the performance surface. The whole point
 of this Step Play shape is that keyboard/MIDI/controller input can always mean
 "play" on the main surface, while editing stays inside the explicit modal.
+
+## Mobile Create Layout Tightening 0.1.55
+
+This pass fixes three mobile regressions found on iPhone-class viewports:
+
+1. The Create patch picker was truncating to `C...` even when room existed.
+2. Pads felt clipped because desktop spacing consumed too much vertical space.
+3. Keyboard hotkey hint badges added visual noise on touch-first layouts.
+
+### Patch row behavior
+
+`src/instruments/instruments.css` mobile (`@media (max-width: 700px)`) now
+forces a stable two-column patch row:
+
+- `.patch-selector` uses `grid-template-columns: 56px minmax(180px, 1fr)`.
+- Horizontal overflow/drag behavior was removed for this row
+  (`overflow-x: visible`, `touch-action: auto`) so the picker can own real
+  width instead of collapsing.
+- `.patch-selector__picker` now has `min-width: 180px` on mobile.
+- `.patch-selector .tone-button` keeps `min-width: 0` to prevent button tracks
+  from pushing the picker narrower than intended.
+
+Result: the patch control stays readable first, action buttons wrap beneath it.
+
+### Pads density on mobile
+
+The ScaleBoard surface is compacted on mobile:
+
+- `.scaleboard` padding/gap reduced from desktop spacing.
+- `.scaleboard__controls` gap tightened.
+- `.scaleboard__pads` uses an explicit small gap and
+  `grid-auto-rows: minmax(48px, 1fr)`.
+- `.scaleboard__pad` minimum height reduced with tighter internal gap.
+- Degree and note typography slightly reduced for fit.
+
+This keeps more pads visible in the same viewport height while preserving
+tap targets.
+
+### Keyboard hint labels on touch layouts
+
+Hotkey badge labels are hidden at `max-width: 700px`:
+
+- `.micropiano__key-label { display: none; }`
+- `.sketchkit__key-label { display: none; }`
+
+Important: keyboard and MIDI input routing still works. Only the visual hint
+badges are hidden on small screens.
