@@ -8,9 +8,10 @@ Stay in beta-hardening mode first. Local export, local backup, Tone presets, and
 
 After that, the next visible work should be:
 
-1. Pre-DAW positioning pass.
-2. Track View prototype.
-3. Google Drive Backup.
+1. Mobile Create layout and snippets drawer hardening.
+2. Pre-DAW positioning pass.
+3. Track View prototype.
+4. Google Drive Backup.
 
 Release/deploy strategy is worth doing before a true `1.0.0`, but it does not need to block the beta hardening work unless accidental GitHub Pages deploys become a real problem.
 
@@ -112,7 +113,56 @@ Not in scope:
 - Mutating projects the user did not explicitly open or import.
 - Update prompts or forced client-side app updates.
 
-## 5. Pre-DAW Positioning Pass
+## 5. Mobile Create Layout And Snippets Drawer
+
+Goal:
+
+Make Create mode usable on iPhone-sized screens without hiding core controls,
+forcing awkward horizontal drags, or letting the snippet tray eat the playable
+surface.
+
+Observed problem:
+
+On iPhone 15-sized viewports, the transport, key/scale/meter row, instrument
+tabs, Patch/Tone/AI/Controller/Layout row, Pad Mode row, pads, and snippets tray
+all compete vertically. Patch can become nearly unreadable, there is wasted
+space between Pad Mode and octave controls, and the snippets tray can leave the
+actual pads clipped offscreen. Horizontal rows with buttons such as AI/Layout can
+also feel impossible to drag because the first touch opens the button.
+
+First pass:
+
+- Convert the Create toolbar into deliberate mobile rows instead of letting the
+  desktop layout squeeze itself.
+- Keep the active Patch selector visible and usable on mobile, likely as a
+  full-width or high-priority row.
+- Make Pad Mode and octave controls share a compact row with less empty middle
+  space.
+- Collapse the snippets tray on narrow screens by default, with a clear
+  `Snippets` header/count control to expand it when needed.
+- Add or tune horizontal drag thresholds on toolbar rows so dragging the row does
+  not immediately activate AI, Controller, Layout, or other buttons.
+- Review the BPM control on mobile. Preferred direction: a compact `120 BPM`
+  button that opens a modal with direct numeric entry and small +/- controls,
+  instead of a cramped inline counter.
+
+Acceptance notes:
+
+- On iPhone 15 Chrome/Safari, Pads should be playable without the bottom rows
+  cutting off the main pad grid.
+- Patch, Pad Mode, and Snippets count should remain understandable without
+  pinch-zooming.
+- Tapping a toolbar button should still open it, but horizontal dragging across
+  the row should scroll rather than fire the first touched button.
+- Collapsing the snippets tray should not delete or hide snippets permanently;
+  it is only a workspace visibility state.
+
+Expected scope:
+
+Small to medium. This is a responsive-layout pass, not an audio or data-model
+change.
+
+## 6. Pre-DAW Positioning Pass
 
 Goal:
 
@@ -129,7 +179,7 @@ Expected scope:
 
 Small writing pass.
 
-## 6. Track View Prototype
+## 7. Track View Prototype
 
 Goal:
 
@@ -154,7 +204,7 @@ Expected scope:
 
 Medium. Likely 2-3 day prototype plus polish.
 
-## 7. Google Drive Backup
+## 8. Google Drive Backup
 
 Goal:
 
@@ -178,7 +228,7 @@ Expected scope:
 
 Large.
 
-## 8. Optional Later: Audio File Import
+## 9. Optional Later: Audio File Import
 
 Goal:
 
@@ -194,7 +244,7 @@ Expected scope:
 
 Small to medium.
 
-## 9. Custom Instrument Patches / Sample Instruments
+## 10. Custom Instrument Patches / Sample Instruments
 
 Goal:
 
