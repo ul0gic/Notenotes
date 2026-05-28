@@ -553,3 +553,22 @@ not indexes into `_notes`. `_midiForStepDegree(degree)` resolves degree `n` via
 `getScaleNotes(scaleName, rootNote, octave, n)`. This makes pentatonic `6`
 resolve to the next octave's first scale note and major `8` resolve to the next
 octave tonic. Keep future Step Play features on this degree-continuation model.
+
+## Step Play Chip Editor And Alternates 0.1.50
+
+Step Play no longer exposes a manual text input in the editor. The modal keeps an in-memory `this._stepEditorSequence` array while open, renders each step as a removable chip, and only writes project settings when Save is clicked. This fixes the earlier state bug where editing the text field and then clicking note pills could rebuild the chip list from stale text.
+
+Persistence is now additive:
+
+- `project.settings.stepPlayPattern` is the richer source of truth when present. It is an array of `{ degree, alternateDegree? }` objects.
+- `project.settings.stepPlaySequence` is still written as a plain degree string for backward compatibility and simple inspection.
+- Old projects that only have `stepPlaySequence` are still parsed by `_entriesFromDegreeString()`.
+
+Alternate-step behavior is deliberately small: one optional alternate per sequence step. During playback, `_stepLoopIndex` starts at `0`; even-numbered passes play `degree`, odd-numbered passes play `alternateDegree` when present, then return to the primary degree on the next pass. This gives first-pass/second-pass variation without introducing a full pattern language yet.
+
+Editor interaction rules:
+
+- Clicking a note in the available-note row appends a new primary step unless an Alt target is active.
+- Clicking a sequence chip removes that step.
+- Clicking a chip's Alt button arms that chip; the next available-note click sets or replaces its `alternateDegree`.
+- Clear removes the in-modal sequence only; saving an empty sequence falls back to the current scale's first octave through `_persistStepEntries()`.

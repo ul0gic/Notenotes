@@ -60,6 +60,9 @@ export class ScaleBoard {
     this._stepEditorOverlay = null;
     this._stepEditorOctave = 0;
     this._stepEditorKeyHandler = null;
+    this._stepEditorSequence = [];
+    this._stepEditorAltTarget = null;
+    this._stepLoopIndex = 0;
 
     // Voice mode state
     this._voicePhrase = '';        // raw user-typed string
@@ -436,23 +439,48 @@ export class ScaleBoard {
   }
 
   _stepSequenceString() {
-    const saved = this.project?.settings?.stepPlaySequence;
-    if (typeof saved === 'string' && saved.trim()) return saved;
-    return Array.from({ length: this._scaleDegreeCount() }, (_, index) => String(index + 1)).join(' ');
+    return this._stepEntries().map(entry => String(entry.degree)).join(' ');
   }
 
   _scaleDegreeCount() {
     return SCALES[this.scaleName]?.intervals?.length || 7;
   }
 
-  _stepDegrees() {
-    const tokens = this._stepSequenceString().match(/\d+/g) || [];
-    const degrees = tokens
+  _normalizeStepDegree(degree) {
+    const parsed = parseInt(degree, 10);
+    return Number.isInteger(parsed) && parsed > 0 && parsed <= 64 ? parsed : null;
+  }
+
+  _defaultStepEntries() {
+    return Array.from({ length: this._scaleDegreeCount() }, (_, index) => ({ degree: index + 1 }));
+  }
+
+  _entriesFromDegreeString(value) {
+    const degrees = (String(value || '').match(/\d+/g) || [])
       .map(token => parseInt(token, 10))
       .filter(degree => Number.isInteger(degree) && degree > 0 && degree <= 64);
-    return degrees.length
-      ? degrees
-      : Array.from({ length: this._scaleDegreeCount() }, (_, index) => index + 1);
+    return degrees.map(degree => ({ degree }));
+  }
+
+  _normalizeStepEntries(entries) {
+    if (!Array.isArray(entries)) return [];
+    return entries.map(entry => {
+      const degree = this._normalizeStepDegree(entry?.degree ?? entry);
+      if (!degree) return null;
+      const alternateDegree = this._normalizeStepDegree(entry?.alternateDegree);
+      return alternateDegree ? { degree, alternateDegree } : { degree };
+    }).filter(Boolean);
+  }
+
+  _stepEntries() {
+    const pattern = this._normalizeStepEntries(this.project?.settings?.stepPlayPattern);
+    if (pattern.length) return pattern;
+    const legacy = this._entriesFromDegreeString(this.project?.settings?.stepPlaySequence);
+    return legacy.length ? legacy : this._defaultStepEntries();
+  }
+
+  _stepDegrees() {
+    return this._stepEntries().map(entry => entry.degree);
   }
 
   _stepScaleNotes(requiredCount = 32) {
@@ -470,12 +498,20 @@ export class ScaleBoard {
     return { degree, midi, note };
   }
 
-  _persistStepSequence(value) {
+  _persistStepEntries(entries) {
     if (!this.project) return;
     if (!this.project.settings) this.project.settings = {};
-    this.project.settings.stepPlaySequence = String(value || '').trim();
+    const normalized = this._normalizeStepEntries(entries);
+    const next = normalized.length ? normalized : this._defaultStepEntries();
+    this.project.settings.stepPlayPattern = next.map(entry => ({ ...entry }));
+    this.project.settings.stepPlaySequence = next.map(entry => entry.degree).join(' ');
     this._stepPointer = 0;
+    this._stepLoopIndex = 0;
     if (this.onStepPlayChanged) this.onStepPlayChanged(this.project.settings.stepPlaySequence);
+  }
+
+  _persistStepSequence(value) {
+    this._persistStepEntries(this._entriesFromDegreeString(value));
   }
 
   _renderStepPlay() {
@@ -498,14 +534,16 @@ export class ScaleBoard {
   }
 
   _renderStepChips() {
-    const sequence = this._stepDegrees();
-    return sequence.map((degree, step) => {
-      const { note } = this._stepLabel(degree);
+    const sequence = this._stepEntries();
+    return sequence.map((entry, step) => {
+      const { note } = this._stepLabel(entry.degree);
+      const alternate = entry.alternateDegree ? this._stepLabel(entry.alternateDegree) : null;
       const isCurrent = step === (this._stepPointer % Math.max(1, sequence.length));
       return `
         <span class="step-play__chip${isCurrent ? ' is-current' : ''}" data-step-chip="${step}">
-          <span>${degree}</span>
+          <span>${entry.degree}</span>
           <small>${this._escapeHtml(note.display)}</small>
+          ${alternate ? `<em>⇄ ${entry.alternateDegree} ${this._escapeHtml(alternate.note.display)}</em>` : ''}
         </span>
       `;
     }).join('');
@@ -704,8 +742,7 @@ export class ScaleBoard {
     });
     this.el.querySelector('#sb-step-reset')?.addEventListener('pointerdown', (e) => {
       e.preventDefault();
-      const next = Array.from({ length: this._scaleDegreeCount() }, (_, index) => String(index + 1)).join(' ');
-      this._persistStepSequence(next);
+      this._persistStepEntries(this._defaultStepEntries());
       this._refreshStepSequenceUi();
       showToast('Step Play sequence reset');
     });
@@ -723,6 +760,8 @@ export class ScaleBoard {
   _openStepEditor() {
     this._closeStepEditor();
     this._stepEditorOctave = 0;
+    this._stepEditorSequence = this._stepEntries().map(entry => ({ ...entry }));
+    this._stepEditorAltTarget = null;
     const overlay = document.createElement('div');
     overlay.className = 'step-editor-backdrop';
     overlay.innerHTML = this._renderStepEditor();
@@ -738,6 +777,8 @@ export class ScaleBoard {
     }
     this._stepEditorOverlay?.remove();
     this._stepEditorOverlay = null;
+    this._stepEditorSequence = [];
+    this._stepEditorAltTarget = null;
   }
 
   _renderStepEditor() {
@@ -753,10 +794,6 @@ export class ScaleBoard {
           <button class="btn btn--icon btn--ghost" id="step-editor-oct-up" type="button" aria-label="Higher note row">▶</button>
         </div>
         <div class="step-editor__sequence" id="step-editor-sequence">${this._renderStepEditorSequence()}</div>
-        <label class="step-editor__manual">
-          <span>Manual</span>
-          <input id="step-editor-input" type="text" inputmode="numeric" value="${this._escapeAttr(this._stepSequenceString())}" aria-label="Manual Step Play sequence">
-        </label>
         <div class="step-editor__actions">
           <button class="btn btn--ghost" id="step-editor-clear" type="button">Clear</button>
           <button class="btn btn--ghost" id="step-editor-cancel" type="button">Cancel</button>
@@ -782,13 +819,24 @@ export class ScaleBoard {
   }
 
   _renderStepEditorSequence() {
-    return this._stepDegrees().map((degree, index) => {
-      const { note } = this._stepLabel(degree);
+    const entries = this._stepEditorSequence || [];
+    if (!entries.length) return '<p class="step-editor__empty">Tap notes above to build the sequence.</p>';
+    return entries.map((entry, index) => {
+      const { note } = this._stepLabel(entry.degree);
+      const alternate = entry.alternateDegree ? this._stepLabel(entry.alternateDegree) : null;
+      const pickingAlt = this._stepEditorAltTarget === index;
       return `
-        <button class="step-editor__seq-chip" type="button" data-remove-step="${index}" title="Remove ${degree}">
-          <span>${degree}</span>
-          <small>${this._escapeHtml(note.display)}</small>
-        </button>
+        <div class="step-editor__seq-item${pickingAlt ? ' is-picking-alt' : ''}">
+          <button class="step-editor__seq-chip" type="button" data-remove-step="${index}" title="Remove ${entry.degree}">
+            <span>${entry.degree}</span>
+            <small>${this._escapeHtml(note.display)}</small>
+            ${alternate ? `<em>⇄ ${entry.alternateDegree} ${this._escapeHtml(alternate.note.display)}</em>` : ''}
+          </button>
+          <button class="step-editor__seq-alt" type="button" data-alt-step="${index}">
+            ${pickingAlt ? 'Pick note' : alternate ? 'Change alt' : 'Alt'}
+          </button>
+          ${alternate ? `<button class="step-editor__seq-clear-alt" type="button" data-clear-alt="${index}" aria-label="Clear alternate">Clear</button>` : ''}
+        </div>
       `;
     }).join('');
   }
@@ -796,25 +844,22 @@ export class ScaleBoard {
   _bindStepEditorEvents() {
     const overlay = this._stepEditorOverlay;
     if (!overlay) return;
-    const input = overlay.querySelector('#step-editor-input');
-    const syncSequence = () => {
-      overlay.querySelector('#step-editor-sequence').innerHTML = this._renderStepEditorSequenceFromValue(input.value);
-      this._bindStepEditorRemoveEvents();
-    };
+    const syncSequence = () => this._refreshStepEditorSequence();
     overlay.querySelector('#step-editor-cancel')?.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       this._closeStepEditor();
     });
     overlay.querySelector('#step-editor-save')?.addEventListener('pointerdown', (e) => {
       e.preventDefault();
-      this._persistStepSequence(input.value);
+      this._persistStepEntries(this._stepEditorSequence);
       this._refreshStepSequenceUi();
       this._closeStepEditor();
       showToast('Step Play sequence updated');
     });
     overlay.querySelector('#step-editor-clear')?.addEventListener('pointerdown', (e) => {
       e.preventDefault();
-      input.value = '';
+      this._stepEditorSequence = [];
+      this._stepEditorAltTarget = null;
       syncSequence();
     });
     overlay.querySelector('#step-editor-oct-down')?.addEventListener('pointerdown', (e) => {
@@ -829,7 +874,6 @@ export class ScaleBoard {
       overlay.querySelector('#step-editor-notes').innerHTML = this._renderStepEditorNotes();
       this._bindStepEditorNoteEvents();
     });
-    input?.addEventListener('input', syncSequence);
     overlay.addEventListener('pointerdown', (e) => {
       if (e.target === overlay) this._closeStepEditor();
     });
@@ -844,32 +888,28 @@ export class ScaleBoard {
     this._bindStepEditorRemoveEvents();
   }
 
-  _renderStepEditorSequenceFromValue(value) {
-    const degrees = (String(value || '').match(/\d+/g) || [])
-      .map(token => parseInt(token, 10))
-      .filter(degree => Number.isInteger(degree) && degree > 0 && degree <= 64);
-    return (degrees.length ? degrees : []).map((degree, index) => {
-      const { note } = this._stepLabel(degree);
-      return `
-        <button class="step-editor__seq-chip" type="button" data-remove-step="${index}" title="Remove ${degree}">
-          <span>${degree}</span>
-          <small>${this._escapeHtml(note.display)}</small>
-        </button>
-      `;
-    }).join('');
+  _refreshStepEditorSequence() {
+    const target = this._stepEditorOverlay?.querySelector('#step-editor-sequence');
+    if (!target) return;
+    target.innerHTML = this._renderStepEditorSequence();
+    this._bindStepEditorRemoveEvents();
   }
 
   _bindStepEditorNoteEvents() {
     const overlay = this._stepEditorOverlay;
     if (!overlay) return;
-    const input = overlay.querySelector('#step-editor-input');
     overlay.querySelectorAll('[data-degree]').forEach(button => {
       button.addEventListener('pointerdown', (e) => {
         e.preventDefault();
-        const degree = button.dataset.degree;
-        input.value = `${input.value.trim()} ${degree}`.trim();
-        overlay.querySelector('#step-editor-sequence').innerHTML = this._renderStepEditorSequenceFromValue(input.value);
-        this._bindStepEditorRemoveEvents();
+        const degree = this._normalizeStepDegree(button.dataset.degree);
+        if (!degree) return;
+        if (Number.isInteger(this._stepEditorAltTarget) && this._stepEditorSequence[this._stepEditorAltTarget]) {
+          this._stepEditorSequence[this._stepEditorAltTarget].alternateDegree = degree;
+          this._stepEditorAltTarget = null;
+        } else {
+          this._stepEditorSequence.push({ degree });
+        }
+        this._refreshStepEditorSequence();
       });
     });
   }
@@ -877,15 +917,33 @@ export class ScaleBoard {
   _bindStepEditorRemoveEvents() {
     const overlay = this._stepEditorOverlay;
     if (!overlay) return;
-    const input = overlay.querySelector('#step-editor-input');
     overlay.querySelectorAll('[data-remove-step]').forEach(button => {
       button.addEventListener('pointerdown', (e) => {
         e.preventDefault();
         const removeIndex = parseInt(button.dataset.removeStep, 10);
-        const degrees = (input.value.match(/\d+/g) || []).filter((_, index) => index !== removeIndex);
-        input.value = degrees.join(' ');
-        overlay.querySelector('#step-editor-sequence').innerHTML = this._renderStepEditorSequenceFromValue(input.value);
-        this._bindStepEditorRemoveEvents();
+        this._stepEditorSequence.splice(removeIndex, 1);
+        if (this._stepEditorAltTarget === removeIndex) this._stepEditorAltTarget = null;
+        else if (this._stepEditorAltTarget > removeIndex) this._stepEditorAltTarget -= 1;
+        this._refreshStepEditorSequence();
+      });
+    });
+    overlay.querySelectorAll('[data-alt-step]').forEach(button => {
+      button.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const index = parseInt(button.dataset.altStep, 10);
+        this._stepEditorAltTarget = this._stepEditorAltTarget === index ? null : index;
+        this._refreshStepEditorSequence();
+      });
+    });
+    overlay.querySelectorAll('[data-clear-alt]').forEach(button => {
+      button.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const index = parseInt(button.dataset.clearAlt, 10);
+        if (this._stepEditorSequence[index]) delete this._stepEditorSequence[index].alternateDegree;
+        if (this._stepEditorAltTarget === index) this._stepEditorAltTarget = null;
+        this._refreshStepEditorSequence();
       });
     });
   }
@@ -1325,15 +1383,22 @@ export class ScaleBoard {
 
   triggerStepPlay() {
     if (this.padMode !== 'step') return false;
-    const sequence = this._stepDegrees();
+    const sequence = this._stepEntries();
     if (!sequence.length) return false;
     const step = this._stepPointer % sequence.length;
-    const degree = sequence[step];
+    const entry = sequence[step];
+    const useAlternate = this._stepLoopIndex % 2 === 1 && entry.alternateDegree;
+    const degree = useAlternate ? entry.alternateDegree : entry.degree;
     const midi = this._midiForStepDegree(degree);
     if (midi === undefined) return false;
 
     this._releaseStepPlay();
-    this._stepPointer = (step + 1) % sequence.length;
+    if (step >= sequence.length - 1) {
+      this._stepPointer = 0;
+      this._stepLoopIndex += 1;
+    } else {
+      this._stepPointer = step + 1;
+    }
     this._activeStepMidis = [midi];
     this.el?.querySelector('#sb-step-trigger')?.classList.add('is-active');
     this._noteOn(midi);
