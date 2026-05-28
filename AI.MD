@@ -782,3 +782,43 @@ screen before the pad grid gets a fair chance.
 
 This lets finger drags scroll instrument/scale/tone picker lists on mobile
 instead of accidentally selecting the item touched at the start of the drag.
+
+## Canvas Touch Hardening 0.1.57
+
+Mobile QA found three Canvas touch problems:
+
+1. Clips already on the Canvas were hard to move by touch.
+2. The Canvas snippet dock was difficult to scroll horizontally.
+3. Track delete could take one or two taps depending on hover/visibility state.
+
+### Existing Canvas clips
+
+`CanvasMode._startClipDrag()` and `_startClipResize()` now call
+`preventDefault()`, capture the initiating pointer, ignore other pointers, and
+release capture on pointer up/cancel. `.canvas-clip` also uses
+`touch-action: none`.
+
+This makes the intended gesture explicit: touch and drag the clip itself to move
+it, without browser scrolling or text selection stealing the drag.
+
+### Canvas snippet dock
+
+The snippet dock now separates horizontal scroll from vertical drag:
+
+- `touchstart` stores a pending touch drag.
+- `touchmove` stays pending until movement crosses 10px.
+- If horizontal movement wins, the mode becomes `scroll` and no
+  `preventDefault()` happens.
+- If vertical movement wins, the mode becomes `drag`, `preventDefault()` starts,
+  and the floating clone follows the finger into the track area.
+
+CSS sets `touch-action: pan-x` on `.canvas-snippet-dock` and dock items so the
+browser is allowed to handle horizontal scrolling naturally.
+
+### Track delete
+
+Track remove buttons are visible on mobile (`max-width: 640px`) instead of
+depending on hover. `_removeTrack()` now asks for confirmation before deleting a
+track, including clip count when the track contains clips. This matches the
+existing "confirm before destructive snippet delete" direction and avoids
+ambiguous double-tap behavior.

@@ -322,7 +322,25 @@ Expected:
 - The clip is not forced to bar 1.
 - The playhead and sound feel aligned.
 
-### 3.3 Canvas WAV With Mixed Tracks
+### 3.3 Mobile Canvas Touch
+
+Steps:
+
+1. On iPhone 15 or mobile emulation, place several snippets in the Canvas snippet dock.
+2. Drag horizontally across the snippet dock.
+3. Drag one dock snippet upward into a matching track.
+4. Touch and drag an already-placed Canvas clip left/right.
+5. Tap a track delete button and cancel the confirmation.
+6. Tap it again and confirm.
+
+Expected:
+
+- The dock scrolls horizontally without accidentally starting a drag.
+- Dragging upward from a dock snippet still places the clip on a matching track.
+- Existing Canvas clips move when held and dragged.
+- Track delete buttons are visible on mobile and require one clear confirmation.
+
+### 3.4 Canvas WAV With Mixed Tracks
 
 Steps:
 

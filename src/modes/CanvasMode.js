@@ -1049,14 +1049,19 @@ export class CanvasMode {
 
   /** Handle clip drag-to-move */
   _startClipDrag(e, clip, el) {
+    e.preventDefault();
     const startX = e.clientX;
     const startLeft = parseInt(el.style.left, 10) || 0;
     const originalBar = clip.startBar;
     const track = this._trackForClip(clip);
+    const pointerId = e.pointerId;
 
     el.classList.add('is-dragging');
+    el.setPointerCapture?.(pointerId);
 
     const onMove = (me) => {
+      if (me.pointerId !== pointerId) return;
+      me.preventDefault();
       const dx = me.clientX - startX;
       const newLeft = Math.max(0, startLeft + dx);
       const desiredBar = this._barPositionFromPixels(newLeft, 'round');
@@ -1064,10 +1069,13 @@ export class CanvasMode {
       el.style.left = `${(resolvedBar ?? desiredBar) * this.barWidth}px`;
     };
 
-    const onUp = () => {
+    const onUp = (ue) => {
+      if (ue.pointerId !== pointerId) return;
       el.classList.remove('is-dragging');
+      el.releasePointerCapture?.(pointerId);
       document.removeEventListener('pointermove', onMove);
       document.removeEventListener('pointerup', onUp);
+      document.removeEventListener('pointercancel', onUp);
 
       const desiredBar = this._barPositionFromPixels(parseInt(el.style.left, 10), 'round');
       const newBar = this._resolveClipStart(track, clip, desiredBar, clip.durationBars);
@@ -1094,28 +1102,37 @@ export class CanvasMode {
 
     document.addEventListener('pointermove', onMove);
     document.addEventListener('pointerup', onUp);
+    document.addEventListener('pointercancel', onUp);
   }
 
   _startClipResize(e, clip, el) {
+    e.preventDefault();
     const startX = e.clientX;
     const startWidth = parseInt(el.style.width, 10) || clip.durationBars * this.barWidth;
     const originalBars = clip.durationBars;
     const track = this._trackForClip(clip);
     const maxBars = this._maxDurationForClip(track, clip);
+    const pointerId = e.pointerId;
 
     el.classList.add('is-dragging');
+    el.setPointerCapture?.(pointerId);
 
     const onMove = (me) => {
+      if (me.pointerId !== pointerId) return;
+      me.preventDefault();
       const dx = me.clientX - startX;
       const maxWidth = Number.isFinite(maxBars) ? maxBars * this.barWidth : startWidth;
       const newWidth = Math.max(this.beatWidth, Math.min(startWidth, maxWidth, startWidth + dx));
       el.style.width = `${newWidth}px`;
     };
 
-    const onUp = () => {
+    const onUp = (ue) => {
+      if (ue.pointerId !== pointerId) return;
       el.classList.remove('is-dragging');
+      el.releasePointerCapture?.(pointerId);
       document.removeEventListener('pointermove', onMove);
       document.removeEventListener('pointerup', onUp);
+      document.removeEventListener('pointercancel', onUp);
 
       const finalWidth = parseInt(el.style.width, 10);
       const newBeats = Math.max(1, Math.round(finalWidth / this.beatWidth));
@@ -1140,6 +1157,7 @@ export class CanvasMode {
 
     document.addEventListener('pointermove', onMove);
     document.addEventListener('pointerup', onUp);
+    document.addEventListener('pointercancel', onUp);
   }
 
   /** Render the snippet dock at the bottom */
@@ -1181,16 +1199,27 @@ export class CanvasMode {
           startX: e.touches[0].clientX,
           startY: e.touches[0].clientY,
           el: item,
+          mode: 'pending',
         };
       }, { passive: true });
 
       item.addEventListener('touchmove', (e) => {
         if (!this._touchDrag) return;
-        e.preventDefault();
         const t = e.touches[0];
         const dx = t.clientX - this._touchDrag.startX;
         const dy = t.clientY - this._touchDrag.startY;
-        if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+        const absX = Math.abs(dx);
+        const absY = Math.abs(dy);
+        if (absX < 10 && absY < 10) return;
+        if (this._touchDrag.mode === 'pending') {
+          if (absX > absY) {
+            this._touchDrag.mode = 'scroll';
+            return;
+          }
+          this._touchDrag.mode = 'drag';
+        }
+        if (this._touchDrag.mode !== 'drag') return;
+        e.preventDefault();
         if (!this._touchDrag.clone) {
           this._touchDrag.clone = item.cloneNode(true);
           this._touchDrag.clone.style.cssText = 'position:fixed;z-index:999;opacity:0.8;pointer-events:none;';
@@ -1198,7 +1227,7 @@ export class CanvasMode {
         }
         this._touchDrag.clone.style.left = `${t.clientX - 40}px`;
         this._touchDrag.clone.style.top = `${t.clientY - 10}px`;
-      });
+      }, { passive: false });
 
       item.addEventListener('touchend', (e) => {
         if (!this._touchDrag) return;
@@ -1298,6 +1327,13 @@ export class CanvasMode {
 
     const idx = this.project.tracks.findIndex(t => t.id === trackId);
     if (idx === -1) return;
+
+    const track = this.project.tracks[idx];
+    const clipCount = track.clips?.length || 0;
+    const message = clipCount
+      ? `Delete "${track.name}" and its ${clipCount} clip${clipCount === 1 ? '' : 's'}?`
+      : `Delete "${track.name}"?`;
+    if (!window.confirm(message)) return;
 
     const removed = this.project.tracks.splice(idx, 1)[0];
     this.store?.scheduleAutoSave(this.project);
