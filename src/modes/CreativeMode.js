@@ -7,9 +7,6 @@
 import '../modes/creative.css';
 import { WebAudioSynth, PRESETS, SOUND_TRAITS, normalizeSoundTraits } from '../instruments/WebAudioSynth.js';
 import {
-  DEFAULT_DEGREE_COLORS,
-  DEFAULT_DEGREE_HIGHLIGHTING,
-  degreeForMidi,
   normalizeDegreeHighlighting,
   normalizeMusicalContext,
   SCALES
@@ -34,6 +31,7 @@ import { ArpeggioManager, ARP_MODES } from '../engine/ArpeggioManager.js';
 import { GamepadInputManager } from '../engine/GamepadInputManager.js';
 import { PerformanceInputRouter } from './input/PerformanceInputRouter.js';
 import { ControllerMapperPopover, controllerTargetLabel } from '../ui/ControllerMapperPopover.js';
+import { CreateLayoutPopover } from '../ui/CreateLayoutPopover.js';
 import { showToast } from '../ui/Toast.js';
 
 const INSTRUMENTS = {
@@ -125,6 +123,29 @@ export class CreativeMode {
       },
       onBindingsChanged: () => this._onControllerBindingsChanged(),
     });
+    this.layoutPopover = new CreateLayoutPopover({
+      getProject: () => this.project,
+      getScaleBoard: () => this.scaleBoard,
+      getMicroPiano: () => this.microPiano,
+      getMusicalContext: () => this._ensureMusicalContext(),
+      getScaleIntervals: () => this._activeScaleIntervals(),
+      ensureDegreeHighlighting: () => this._ensureDegreeHighlighting(),
+      onBeforeOpen: () => {
+        this._closeTonePopover();
+        this._closeControllerMapperPopover();
+        this._closeAISeedPopover();
+      },
+      onScheduleSave: () => this.store?.scheduleAutoSave(this.project),
+      onPadsChanged: (count) => {
+        window.dispatchEvent(new CustomEvent('settings-pads-changed', { detail: { count } }));
+      },
+      onPianoChanged: () => {
+        window.dispatchEvent(new CustomEvent('settings-piano-changed'));
+      },
+      onDegreeChanged: () => {
+        window.dispatchEvent(new CustomEvent('project-degree-highlighting-changed'));
+      },
+    });
 
     // Recording
     this.recordingManager = new RecordingManager(transport, quantizer);
@@ -171,10 +192,6 @@ export class CreativeMode {
     this._instrumentPopover = null;
     this._instrumentClickOutsideHandler = null;
     this._patchPicker = null;
-    this._padsPopover = null;
-    this._padsClickOutsideHandler = null;
-    this._keysPopover = null;
-    this._keysClickOutsideHandler = null;
     this._heldControllerMidis = new Map();
     this._heldControllerPads = new Map();
     this._heldControllerFallback = new Map();
@@ -1593,213 +1610,11 @@ export class CreativeMode {
   }
 
   _togglePadsPopover(anchor, buttonEl) {
-    if (this._padsPopover) {
-      this._closePadsPopover();
-      return;
-    }
-    this._closeTonePopover();
-    this._closeKeysPopover();
-    this._closeControllerMapperPopover();
-
-    const count = this.project?.settings?.scalePadsCount || 7;
-    const showCustomCount = this.scaleBoard?.padMode === 'custom';
-    const popover = document.createElement('div');
-    popover.className = 'tone-popover create-control-popover';
-    popover.id = 'pads-popover';
-    popover.innerHTML = `
-      <div class="tone-popover__header">
-        <span>Pads</span>
-      </div>
-      ${showCustomCount ? `
-      <label class="create-control-popover__row create-control-popover__row--slider">
-        <span>Custom pad count</span>
-        <span class="create-control-popover__value" id="pads-count-value">${count}</span>
-        <input class="tone-row__slider" id="pads-count-slider" type="range" min="1" max="16" value="${count}" aria-label="Custom pad count">
-      </label>
-      <p class="create-control-popover__hint">Used by Pads Custom mode.</p>
-      ` : `<p class="create-control-popover__hint">Custom pad count appears here in Custom mode.</p>`}
-      ${this._renderDegreeControls()}
-    `;
-
-    anchor.appendChild(popover);
-    buttonEl?.setAttribute('aria-expanded', 'true');
-    this._padsPopover = popover;
-
-    const slider = popover.querySelector('#pads-count-slider');
-    slider?.addEventListener('input', (e) => {
-      const value = Math.max(1, Math.min(16, parseInt(e.target.value, 10) || 7));
-      this.project.settings ||= {};
-      this.project.settings.scalePadsCount = value;
-      popover.querySelector('#pads-count-value')?.replaceChildren(String(value));
-      this.store?.scheduleAutoSave(this.project);
-      window.dispatchEvent(new CustomEvent('settings-pads-changed', { detail: { count: value } }));
-    });
-    this._bindDegreeControls(popover);
-
-    const handleOutside = (e) => {
-      if (!this._padsPopover) return;
-      if (this._padsPopover.contains(e.target)) return;
-      if (buttonEl?.contains(e.target)) return;
-      this._closePadsPopover();
-    };
-    queueMicrotask(() => document.addEventListener('pointerdown', handleOutside, true));
-    this._padsClickOutsideHandler = handleOutside;
+    this.layoutPopover?.togglePads(anchor, buttonEl);
   }
 
   _toggleKeysPopover(anchor, buttonEl) {
-    if (this._keysPopover) {
-      this._closeKeysPopover();
-      return;
-    }
-    this._closeTonePopover();
-    this._closePadsPopover();
-    this._closeControllerMapperPopover();
-
-    const count = this.project?.settings?.pianoCount || 1;
-    const keys = this.project?.settings?.pianoKeys || 12;
-    const popover = document.createElement('div');
-    popover.className = 'tone-popover create-control-popover';
-    popover.id = 'keys-popover';
-    popover.innerHTML = `
-      <div class="tone-popover__header">
-        <span>Keys</span>
-      </div>
-      <label class="create-control-popover__row">
-        <span>Pianos</span>
-        <select class="create-control-popover__select" id="keys-piano-count" aria-label="Number of pianos">
-          <option value="1" ${count === 1 ? 'selected' : ''}>1</option>
-          <option value="2" ${count === 2 ? 'selected' : ''}>2</option>
-        </select>
-      </label>
-      <label class="create-control-popover__row create-control-popover__row--slider">
-        <span>Keys</span>
-        <span class="create-control-popover__value" id="keys-count-value">${keys}</span>
-        <input class="tone-row__slider" id="keys-count-slider" type="range" min="10" max="32" value="${keys}" aria-label="Piano key count">
-      </label>
-      ${this._renderDegreeControls()}
-    `;
-
-    anchor.appendChild(popover);
-    buttonEl?.setAttribute('aria-expanded', 'true');
-    this._keysPopover = popover;
-
-    popover.querySelector('#keys-piano-count')?.addEventListener('change', (e) => {
-      this.project.settings ||= {};
-      this.project.settings.pianoCount = parseInt(e.target.value, 10) || 1;
-      this.store?.scheduleAutoSave(this.project);
-      window.dispatchEvent(new CustomEvent('settings-piano-changed'));
-    });
-    popover.querySelector('#keys-count-slider')?.addEventListener('input', (e) => {
-      const value = Math.max(10, Math.min(32, parseInt(e.target.value, 10) || 12));
-      this.project.settings ||= {};
-      this.project.settings.pianoKeys = value;
-      popover.querySelector('#keys-count-value')?.replaceChildren(String(value));
-      this.store?.scheduleAutoSave(this.project);
-      window.dispatchEvent(new CustomEvent('settings-piano-changed'));
-    });
-    this._bindDegreeControls(popover);
-
-    const handleOutside = (e) => {
-      if (!this._keysPopover) return;
-      if (this._keysPopover.contains(e.target)) return;
-      if (buttonEl?.contains(e.target)) return;
-      this._closeKeysPopover();
-    };
-    queueMicrotask(() => document.addEventListener('pointerdown', handleOutside, true));
-    this._keysClickOutsideHandler = handleOutside;
-  }
-
-  _renderDegreeControls() {
-    const degree = this._ensureDegreeHighlighting();
-    const intervals = this._activeScaleIntervals();
-    const context = this._ensureMusicalContext();
-    return `
-      <div class="degree-controls" data-degree-controls>
-        <div class="degree-controls__head">
-          <span>Degree colors</span>
-          <button class="btn btn--ghost btn--sm" type="button" data-degree-reset>Reset</button>
-        </div>
-        <label class="degree-controls__check">
-          <input type="checkbox" data-degree-enabled ${degree.enabled ? 'checked' : ''}>
-          <span>Highlight scale degrees</span>
-        </label>
-        <label class="degree-controls__check">
-          <input type="checkbox" data-degree-labels ${degree.showLabels ? 'checked' : ''}>
-          <span>Show degree labels</span>
-        </label>
-        <label class="create-control-popover__row create-control-popover__row--slider">
-          <span>Color intensity</span>
-          <span class="create-control-popover__value" data-degree-intensity-value>${Math.round((degree.intensity ?? 0.22) * 100)}%</span>
-          <input class="tone-row__slider" type="range" min="5" max="75" value="${Math.round((degree.intensity ?? 0.22) * 100)}" data-degree-intensity aria-label="Degree color intensity">
-        </label>
-        <div class="degree-controls__swatches" aria-label="Degree colors for ${context.root} ${SCALES[context.scale]?.name || 'Major'}">
-          ${intervals.map(interval => {
-            const meta = degreeForMidi(60 + interval, { root: 'C', scale: 'chromatic' });
-            const label = meta?.label || String(interval);
-            const name = meta?.name || `Interval ${interval}`;
-            const color = degree.colors[interval] || DEFAULT_DEGREE_COLORS[interval];
-            return `
-              <label class="degree-controls__swatch" title="${this._escapeAttr(name)}">
-                <span>${this._escapeHtml(label)}</span>
-                <input type="color" value="${this._escapeAttr(color)}" data-degree-color="${interval}" aria-label="${this._escapeAttr(name)} color">
-              </label>
-            `;
-          }).join('')}
-        </div>
-      </div>
-    `;
-  }
-
-  _bindDegreeControls(popover) {
-    if (!popover) return;
-    const notify = () => {
-      this.store?.scheduleAutoSave(this.project);
-      this.scaleBoard?._refreshPads?.();
-      this.microPiano?.refreshDegreeHighlights?.();
-      window.dispatchEvent(new CustomEvent('project-degree-highlighting-changed'));
-    };
-    popover.querySelector('[data-degree-enabled]')?.addEventListener('change', (event) => {
-      this._ensureDegreeHighlighting().enabled = !!event.target.checked;
-      notify();
-    });
-    popover.querySelector('[data-degree-labels]')?.addEventListener('change', (event) => {
-      this._ensureDegreeHighlighting().showLabels = !!event.target.checked;
-      notify();
-    });
-    popover.querySelector('[data-degree-intensity]')?.addEventListener('input', (event) => {
-      const degree = this._ensureDegreeHighlighting();
-      degree.intensity = Math.max(0.05, Math.min(0.75, Number(event.target.value) / 100));
-      popover.querySelector('[data-degree-intensity-value]')?.replaceChildren(`${Math.round(degree.intensity * 100)}%`);
-      notify();
-    });
-    popover.querySelectorAll('[data-degree-color]').forEach(input => {
-      input.addEventListener('input', (event) => {
-        const interval = Number(event.target.dataset.degreeColor);
-        const degree = this._ensureDegreeHighlighting();
-        degree.colors[interval] = event.target.value;
-        notify();
-      });
-    });
-    popover.querySelector('[data-degree-reset]')?.addEventListener('pointerdown', (event) => {
-      event.preventDefault();
-      this.project.settings ||= {};
-      this.project.settings.degreeHighlighting = normalizeDegreeHighlighting({
-        enabled: DEFAULT_DEGREE_HIGHLIGHTING.enabled,
-        showLabels: DEFAULT_DEGREE_HIGHLIGHTING.showLabels,
-        intensity: DEFAULT_DEGREE_HIGHLIGHTING.intensity,
-        colors: { ...DEFAULT_DEGREE_COLORS },
-      });
-      notify();
-      const parent = popover.parentElement;
-      const isPads = popover.id === 'pads-popover';
-      if (isPads) {
-        this._closePadsPopover();
-        this._togglePadsPopover(parent, parent?.querySelector('#layout-button'));
-      } else {
-        this._closeKeysPopover();
-        this._toggleKeysPopover(parent, parent?.querySelector('#layout-button'));
-      }
-    });
+    this.layoutPopover?.toggleKeys(anchor, buttonEl);
   }
 
   _bindTonePresetControls() {
@@ -2009,22 +1824,10 @@ export class CreativeMode {
   }
 
   _closePadsPopover() {
-    if (this._padsClickOutsideHandler) {
-      document.removeEventListener('pointerdown', this._padsClickOutsideHandler, true);
-      this._padsClickOutsideHandler = null;
-    }
-    this._padsPopover?.remove();
-    this._padsPopover = null;
-    this.el?.querySelector('#layout-button')?.setAttribute('aria-expanded', 'false');
+    this.layoutPopover?.closePads();
   }
 
   _closeKeysPopover() {
-    if (this._keysClickOutsideHandler) {
-      document.removeEventListener('pointerdown', this._keysClickOutsideHandler, true);
-      this._keysClickOutsideHandler = null;
-    }
-    this._keysPopover?.remove();
-    this._keysPopover = null;
-    this.el?.querySelector('#layout-button')?.setAttribute('aria-expanded', 'false');
+    this.layoutPopover?.closeKeys();
   }
 }

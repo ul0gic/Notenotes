@@ -70,6 +70,7 @@ src/main.js
     ChoicePicker.js         shared categorized picker for large creative lists
     AISeedPopover.js        AI Seed popover lifecycle around AISeedPanel
     ControllerMapperPopover.js controller learn/list/preset popover UI
+    CreateLayoutPopover.js  Pads/Keys Layout popover and degree controls
     SettingsPanel.js        settings, export, backup, milestones, diagnostics
     SnippetTray.js          snippet strip
     Toast.js                notifications
@@ -483,6 +484,15 @@ label/normalization helpers. It receives explicit getters/setters from
 `CreativeMode`; it should not know about project save mechanics, recording, or
 instrument construction. `CreativeMode` remains the adapter that schedules saves
 and refreshes `ControllerMode` after bindings change.
+
+`src/ui/CreateLayoutPopover.js` owns the Create toolbar Layout popover for Pads
+and Piano. It renders the custom pad-count slider, piano count/key sliders, and
+the shared degree-color controls. It receives explicit callbacks from
+`CreativeMode` for project access, autosave scheduling, and event dispatch; the
+popover may update `project.settings.scalePadsCount`, `pianoCount`,
+`pianoKeys`, and `degreeHighlighting`, but it must not construct instruments,
+change the active surface, or own persistence. Keep shared clamp helpers pure so
+`tests/smoke.mjs` can guard their supported ranges without a DOM.
 
 ## AI Seed Boundaries
 

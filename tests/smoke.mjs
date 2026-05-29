@@ -8,6 +8,11 @@ import {
   controllerTargetLabel,
   normalizeControllerTarget,
 } from '../src/ui/ControllerMapperPopover.js';
+import {
+  clampCustomPadCount,
+  clampPianoKeyCount,
+  normalizePianoCount,
+} from '../src/ui/CreateLayoutPopover.js';
 import { padPerformanceIndex, pianoPerformanceIndex } from '../src/modes/input/PerformanceInputRouter.js';
 import {
   normalizeMeter,
@@ -106,6 +111,17 @@ test('controller mapper helpers normalize targets without sharing preset referen
   const cloned = cloneControllerBindings(original);
   cloned[0].nested.ok = false;
   assert.equal(original[0].nested.ok, true);
+});
+
+test('layout popover helpers clamp controls to supported ranges', () => {
+  assert.equal(clampCustomPadCount(0), 1);
+  assert.equal(clampCustomPadCount(99), 16);
+  assert.equal(clampCustomPadCount('bad'), 7);
+  assert.equal(clampPianoKeyCount(4), 10);
+  assert.equal(clampPianoKeyCount(99), 32);
+  assert.equal(clampPianoKeyCount('bad'), 12);
+  assert.equal(normalizePianoCount(2), 2);
+  assert.equal(normalizePianoCount(3), 1);
 });
 
 test('audio audit reports missing, orphaned, and backup readiness without mutating project', () => {
