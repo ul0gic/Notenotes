@@ -3,6 +3,11 @@ import assert from 'node:assert/strict';
 import { validateBackup, workspaceBackup } from '../src/export/BackupExporter.js';
 import { readAiSettings, writeAiSettings } from '../src/ai/aiSettings.js';
 import {
+  cloneControllerBindings,
+  controllerTargetLabel,
+  normalizeControllerTarget,
+} from '../src/ui/ControllerMapperPopover.js';
+import {
   normalizeMeter,
   pulseCountForMeter,
   quarterBpmForMeter,
@@ -55,6 +60,23 @@ test('AI non-secret settings persist on the project object', () => {
   writeAiSettings(project, { defaultLengthBars: 8, provider: 'mock' });
   assert.equal(readAiSettings(project).defaultLengthBars, 8);
   assert.equal(project.settings.aiSettings.defaultLengthBars, 8);
+});
+
+test('controller mapper helpers normalize targets without sharing preset references', () => {
+  const scale = normalizeControllerTarget({
+    type: 'scalePad',
+    padIndex: 8,
+    padAction: 'chord',
+    midi: 64,
+  });
+  assert.equal(scale.label, 'Chord 9');
+  assert.equal(controllerTargetLabel(scale), 'Chord 9');
+  assert.equal(controllerTargetLabel({ type: 'midi', midi: 61 }), 'C#4');
+
+  const original = { 0: { type: 'midi', midi: 60, nested: { ok: true } } };
+  const cloned = cloneControllerBindings(original);
+  cloned[0].nested.ok = false;
+  assert.equal(original[0].nested.ok, true);
 });
 
 test('audio audit reports missing, orphaned, and backup readiness without mutating project', () => {

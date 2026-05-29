@@ -67,6 +67,7 @@ src/main.js
   ui/
     TransportBar.js         top bar transport, key/scale/meter
     ChoicePicker.js         shared categorized picker for large creative lists
+    ControllerMapperPopover.js controller learn/list/preset popover UI
     SettingsPanel.js        settings, export, backup, milestones, diagnostics
     SnippetTray.js          snippet strip
     Toast.js                notifications
@@ -468,9 +469,16 @@ instruments.
 
 `src/modes/input/PerformanceInputRouter.js` owns the Create-mode keyboard,
 Web MIDI, and gamepad listener wiring. `CreativeMode` still owns instruments,
-recording state, controller binding storage/UI, snippets, AI, and project
+recording state, controller binding storage, snippets, AI, and project
 persistence. Keep that boundary: route raw performance input in the router, but
 do not let the router mutate project data or render controller/settings UI.
+
+`src/ui/ControllerMapperPopover.js` owns the Controller Mapper popover view
+state, learn/list screens, preset list controls, and pure controller binding
+label/normalization helpers. It receives explicit getters/setters from
+`CreativeMode`; it should not know about project save mechanics, recording, or
+instrument construction. `CreativeMode` remains the adapter that schedules saves
+and refreshes `ControllerMode` after bindings change.
 
 ## AI Seed Boundaries
 
@@ -508,7 +516,8 @@ from the health check unless a separate explicit user action is added.
 `npm run test:smoke` runs `tests/smoke.mjs` with Node and no extra test
 dependency. Keep this harness focused on pure module logic that does not need a
 browser, IndexedDB, Web Audio, or DOM rendering. It currently guards meter math,
-backup validation, and the pure audio storage audit. Browser-only behavior still
+backup validation, AI settings persistence helpers, controller binding helper
+normalization, and the pure audio storage audit. Browser-only behavior still
 belongs in Manual QA until a browser test harness exists.
 
 ## Mobile Create Layout Hardening 0.1.54

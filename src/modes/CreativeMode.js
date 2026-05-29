@@ -10,7 +10,6 @@ import {
   DEFAULT_DEGREE_COLORS,
   DEFAULT_DEGREE_HIGHLIGHTING,
   degreeForMidi,
-  midiToNoteName,
   normalizeDegreeHighlighting,
   normalizeMusicalContext,
   SCALES
@@ -31,8 +30,9 @@ import englishBaseVoice from '../instruments/voice/voices/english-base.json';
 import { LoopProgress } from '../ui/LoopProgress.js';
 import { TransportState } from '../engine/Transport.js';
 import { ArpeggioManager, ARP_MODES } from '../engine/ArpeggioManager.js';
-import { BINDABLE_GAMEPAD_BUTTONS, GamepadInputManager, gamepadButtonInfo } from '../engine/GamepadInputManager.js';
+import { GamepadInputManager } from '../engine/GamepadInputManager.js';
 import { PerformanceInputRouter } from './input/PerformanceInputRouter.js';
+import { ControllerMapperPopover, controllerTargetLabel } from '../ui/ControllerMapperPopover.js';
 import { showToast } from '../ui/Toast.js';
 
 const INSTRUMENTS = {
@@ -105,12 +105,24 @@ export class CreativeMode {
       getSketchKit: () => this.sketchKit,
       getControllerMode: () => this.controllerMode,
       isCreativeActive: () => this._isCreativeActive(),
-      isControllerMapperOpen: () => !!this._controllerMapperPopover,
+      isControllerMapperOpen: () => !!this.controllerMapper?.isOpen(),
       ensureAudioReady: () => this.ensureAudioReady(),
       shiftActiveInstrumentOctave: (delta) => this._shiftActiveInstrumentOctave(delta),
       refreshControllerMapperStatus: () => this._refreshControllerMapperStatus(),
       handleControllerButtonDown: (index) => this._handleControllerButtonDown(index),
       handleControllerButtonUp: (index) => this._handleControllerButtonUp(index),
+    });
+    this.controllerMapper = new ControllerMapperPopover({
+      gamepadInput: this.gamepadInput,
+      getBindings: () => this._ensureControllerBindings(),
+      setBindings: (bindings) => {
+        this.project.settings.controllerBindings = bindings;
+      },
+      getPresets: () => this._ensureControllerBindingPresets(),
+      setPresets: (presets) => {
+        this.project.settings.controllerBindingPresets = presets;
+      },
+      onBindingsChanged: () => this._onControllerBindingsChanged(),
     });
 
     // Recording
@@ -151,10 +163,6 @@ export class CreativeMode {
     this._padsClickOutsideHandler = null;
     this._keysPopover = null;
     this._keysClickOutsideHandler = null;
-    this._controllerMapperPopover = null;
-    this._controllerMapperClickOutsideHandler = null;
-    this._controllerMapperView = 'learn';
-    this._controllerLearningButton = null;
     this._heldControllerMidis = new Map();
     this._heldControllerPads = new Map();
     this._heldControllerFallback = new Map();
@@ -1146,7 +1154,7 @@ export class CreativeMode {
   }
 
   _handleControllerButtonDown(index) {
-    if (!this._isCreativeActive() || this._controllerMapperPopover) return;
+    if (!this._isCreativeActive() || this.controllerMapper?.isOpen()) return;
     if (this.activeInstrument === INSTRUMENTS.SCALEBOARD && this.scaleBoard?.padMode === 'voices') return;
     const binding = this._controllerBinding(index);
     if (binding) {
@@ -1177,6 +1185,11 @@ export class CreativeMode {
     return this.project.settings.controllerBindingPresets;
   }
 
+  _onControllerBindingsChanged() {
+    this.store?.scheduleAutoSave(this.project);
+    this.controllerMode?.refreshBindings?.();
+  }
+
   _controllerBinding(index) {
     return this._ensureControllerBindings()[String(index)] || null;
   }
@@ -1193,7 +1206,7 @@ export class CreativeMode {
       const bindingKey = `controller-${index}`;
       const played = this.scaleBoard.pressControllerPadBinding(bindingKey, binding);
       if (!played) {
-        showToast(`${this._controllerTargetLabel(binding)} is not available in the current Pads layout`);
+        showToast(`${controllerTargetLabel(binding)} is not available in the current Pads layout`);
         return;
       }
       this._heldControllerPads.set(index, bindingKey);
@@ -1570,7 +1583,7 @@ export class CreativeMode {
   }
 
   _toggleControllerMapperPopover(anchor, buttonEl) {
-    if (this._controllerMapperPopover) {
+    if (this.controllerMapper?.isOpen()) {
       this._closeControllerMapperPopover();
       return;
     }
@@ -1578,273 +1591,19 @@ export class CreativeMode {
     this._closePadsPopover();
     this._closeKeysPopover();
     this._closeAISeedPopover();
-
-    this._controllerMapperView = 'learn';
-    this._controllerLearningButton = null;
-    const popover = document.createElement('div');
-    popover.className = 'tone-popover controller-map-popover';
-    popover.id = 'controller-map-popover';
-    popover.innerHTML = this._renderControllerMapper();
-    anchor.appendChild(popover);
-    buttonEl?.setAttribute('aria-expanded', 'true');
-    this._controllerMapperPopover = popover;
-    this._controllerMapperAnchorButton = buttonEl;
-    this._bindControllerMapperEvents();
-    this._refreshControllerMapperStatus();
-
-    const handleOutside = (e) => {
-      if (!this._controllerMapperPopover) return;
-      if (this._controllerMapperPopover.contains(e.target)) return;
-      if (buttonEl && buttonEl.contains(e.target)) return;
-      if (this._controllerLearningButton !== null) return;
-      this._closeControllerMapperPopover();
-    };
-    queueMicrotask(() => document.addEventListener('pointerdown', handleOutside, true));
-    this._controllerMapperClickOutsideHandler = handleOutside;
-  }
-
-  _renderControllerMapper() {
-    if (this._controllerMapperView === 'list') return this._renderControllerBindingList();
-    const held = this.gamepadInput.heldBindableButton();
-    const info = held === null ? null : gamepadButtonInfo(held);
-    const learning = this._controllerLearningButton !== null ? gamepadButtonInfo(this._controllerLearningButton) : null;
-    return `
-      <div class="tone-popover__header">
-        <span>Controller Mapper</span>
-      </div>
-      <div class="controller-map">
-        <p class="controller-map__headline">${learning ? 'Now click any note, pad, or key' : 'Hold any button on your gamepad'}</p>
-        <p class="controller-map__status" id="controller-map-status">
-          Currently holding: ${info ? `<strong>${this._escapeHtml(info.label)}</strong> (${this._escapeHtml(info.detail)})` : 'None'}
-        </p>
-        <p class="controller-map__hint">${learning ? `${this._escapeHtml(learning.label)} is waiting for a sound target. The next Pads, Piano, or Kit press will bind instead of play.` : 'Triggers and analog sticks stay reserved for Tone, trigger notes, pitch, and modulation.'}</p>
-        <div class="controller-map__actions">
-          <button class="btn btn--primary controller-map__set" id="controller-map-set" type="button" ${held === null ? 'disabled' : ''}>Set</button>
-          <button class="btn btn--ghost" id="controller-map-list" type="button">List Current Bindings</button>
-        </div>
-      </div>
-    `;
-  }
-
-  _renderControllerBindingList() {
-    const bindings = this._ensureControllerBindings();
-    const presets = this._ensureControllerBindingPresets();
-    const entries = Object.entries(bindings).filter(([, binding]) => binding).sort(([a], [b]) => Number(a) - Number(b));
-    return `
-      <div class="tone-popover__header">
-        <span>Controller Bindings</span>
-      </div>
-      <div class="controller-map controller-map--list">
-        <div class="controller-map__preset-row">
-          <select class="settings-select" id="controller-preset-select" aria-label="Controller binding preset">
-            <option value="">Controller preset...</option>
-            ${presets.map(preset => `<option value="${this._escapeHtml(preset.id)}">${this._escapeHtml(preset.name || 'Untitled preset')}</option>`).join('')}
-          </select>
-          <button class="btn btn--ghost btn--sm" id="controller-preset-load" type="button" ${presets.length ? '' : 'disabled'}>Load</button>
-          <button class="btn btn--ghost btn--sm" id="controller-preset-save" type="button" ${entries.length ? '' : 'disabled'}>Save Current</button>
-          <button class="btn btn--ghost btn--sm" id="controller-preset-delete" type="button" ${presets.length ? '' : 'disabled'}>Delete</button>
-        </div>
-        ${entries.length ? entries.map(([index, binding]) => {
-          const info = gamepadButtonInfo(Number(index));
-          return `
-            <div class="controller-map__binding">
-              <span class="controller-map__button">${this._escapeHtml(info.label)}</span>
-              <span class="controller-map__arrow">to</span>
-              <span class="controller-map__target">${this._escapeHtml(this._controllerTargetLabel(binding))}</span>
-              <button class="btn btn--ghost btn--sm" data-controller-unbind="${index}" type="button">Unbind</button>
-            </div>
-          `;
-        }).join('') : '<p class="controller-map__empty">No custom bindings yet. Unbound buttons use the fallback scale layout.</p>'}
-        <div class="controller-map__actions">
-          <button class="btn btn--ghost" id="controller-map-back" type="button">Back</button>
-          <button class="btn btn--ghost" id="controller-map-clear-all" type="button" ${entries.length ? '' : 'disabled'}>Clear All Bindings</button>
-        </div>
-      </div>
-    `;
-  }
-
-  _bindControllerMapperEvents() {
-    const popover = this._controllerMapperPopover;
-    if (!popover) return;
-    popover.querySelector('#controller-map-set')?.addEventListener('click', (e) => {
-      e.preventDefault();
-      const held = this.gamepadInput.heldBindableButton();
-      if (held === null || !BINDABLE_GAMEPAD_BUTTONS.has(held)) return;
-      this._controllerLearningButton = held;
-      this._refreshControllerMapper();
-    });
-    popover.querySelector('#controller-map-list')?.addEventListener('click', (e) => {
-      e.preventDefault();
-      this._controllerMapperView = 'list';
-      this._controllerLearningButton = null;
-      this._refreshControllerMapper();
-    });
-    popover.querySelector('#controller-map-back')?.addEventListener('click', (e) => {
-      e.preventDefault();
-      this._controllerMapperView = 'learn';
-      this._refreshControllerMapper();
-    });
-    popover.querySelector('#controller-map-clear-all')?.addEventListener('click', (e) => {
-      e.preventDefault();
-      if (!window.confirm('Clear all controller bindings?')) return;
-      this.project.settings.controllerBindings = {};
-      this.store?.scheduleAutoSave(this.project);
-      this.controllerMode?.refreshBindings?.();
-      this._refreshControllerMapper();
-      showToast('Controller bindings cleared');
-    });
-    popover.querySelector('#controller-preset-save')?.addEventListener('click', (e) => {
-      e.preventDefault();
-      const bindings = this._ensureControllerBindings();
-      if (!Object.keys(bindings).length) return;
-      const name = window.prompt('Name this controller preset');
-      if (!name?.trim()) return;
-      const now = Date.now();
-      this._ensureControllerBindingPresets().push({
-        id: `controller-preset-${now}`,
-        name: name.trim(),
-        bindings: this._cloneControllerBindings(bindings),
-        createdAt: now,
-        updatedAt: now,
-      });
-      this.store?.scheduleAutoSave(this.project);
-      this._refreshControllerMapper();
-      showToast('Controller preset saved');
-    });
-    popover.querySelector('#controller-preset-load')?.addEventListener('click', (e) => {
-      e.preventDefault();
-      const presets = this._ensureControllerBindingPresets();
-      const presetId = popover.querySelector('#controller-preset-select')?.value || presets[0]?.id;
-      const preset = presets.find(item => item.id === presetId);
-      if (!preset) return;
-      this.project.settings.controllerBindings = this._cloneControllerBindings(preset.bindings || {});
-      this.store?.scheduleAutoSave(this.project);
-      this.controllerMode?.refreshBindings?.();
-      this._refreshControllerMapper();
-      showToast(`Controller preset loaded: ${preset.name}`);
-    });
-    popover.querySelector('#controller-preset-delete')?.addEventListener('click', (e) => {
-      e.preventDefault();
-      const presets = this._ensureControllerBindingPresets();
-      const presetId = popover.querySelector('#controller-preset-select')?.value || presets[0]?.id;
-      const preset = presets.find(item => item.id === presetId);
-      if (!preset || !window.confirm(`Delete controller preset "${preset.name}"?`)) return;
-      this.project.settings.controllerBindingPresets = presets.filter(item => item.id !== presetId);
-      this.store?.scheduleAutoSave(this.project);
-      this._refreshControllerMapper();
-      showToast('Controller preset deleted');
-    });
-    popover.querySelectorAll('[data-controller-unbind]').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        const index = btn.dataset.controllerUnbind;
-        delete this._ensureControllerBindings()[index];
-        this.store?.scheduleAutoSave(this.project);
-        this.controllerMode?.refreshBindings?.();
-        this._refreshControllerMapper();
-        showToast('Controller binding cleared');
-      });
-    });
-  }
-
-  _refreshControllerMapper() {
-    if (!this._controllerMapperPopover) return;
-    this._controllerMapperPopover.innerHTML = this._renderControllerMapper();
-    this._bindControllerMapperEvents();
-    this._refreshControllerMapperStatus();
+    this.controllerMapper.open(anchor, buttonEl);
   }
 
   _refreshControllerMapperStatus() {
-    const popover = this._controllerMapperPopover;
-    if (!popover || this._controllerMapperView !== 'learn' || this._controllerLearningButton !== null) return;
-    const held = this.gamepadInput.heldBindableButton();
-    const info = held === null ? null : gamepadButtonInfo(held);
-    const status = popover.querySelector('#controller-map-status');
-    if (status) status.innerHTML = `Currently holding: ${info ? `<strong>${this._escapeHtml(info.label)}</strong> (${this._escapeHtml(info.detail)})` : 'None'}`;
-    const set = popover.querySelector('#controller-map-set');
-    if (set) set.disabled = held === null;
+    this.controllerMapper?.refreshStatus();
   }
 
   _handleControllerLearnTarget(target) {
-    if (this._controllerLearningButton === null || !target || !this._controllerMapperPopover) return false;
-    const index = String(this._controllerLearningButton);
-    const button = gamepadButtonInfo(this._controllerLearningButton);
-    const binding = this._normalizeControllerTarget(target);
-    this._ensureControllerBindings()[index] = binding;
-    this._controllerLearningButton = null;
-    this.store?.scheduleAutoSave(this.project);
-    this.controllerMode?.refreshBindings?.();
-    this._refreshControllerMapper();
-    showToast(`${button.short} to ${binding.label} bound`);
-    return true;
-  }
-
-  _normalizeControllerTarget(target) {
-    if (target.type === 'drum') {
-      return {
-        type: 'drum',
-        padId: target.padId,
-        gmNote: target.gmNote || null,
-        label: target.label || target.padId || 'Drum',
-        source: target.source || 'kit',
-      };
-    }
-    if (target.type === 'scalePad') {
-      const padIndex = Number(target.padIndex);
-      return {
-        type: 'scalePad',
-        padIndex,
-        midi: Number.isFinite(target.midi) ? Number(target.midi) : null,
-        padMode: target.padMode || null,
-        padAction: target.padAction || null,
-        label: target.label || this._controllerPadBindingName({ padIndex, padAction: target.padAction }),
-        source: 'scale',
-      };
-    }
-    return {
-      type: 'midi',
-      midi: Number(target.midi),
-      label: target.label || midiToNoteName(Number(target.midi)).display,
-      source: target.source || 'midi',
-    };
-  }
-
-  _cloneControllerBindings(bindings = {}) {
-    return JSON.parse(JSON.stringify(bindings || {}));
-  }
-
-  _controllerTargetLabel(binding) {
-    if (binding?.type === 'drum') return binding.padId || 'Drum';
-    if (binding?.type === 'scalePad' && Number.isFinite(binding.padIndex)) {
-      return this._controllerPadBindingName(binding);
-    }
-    if (binding?.type === 'midi' && Number.isFinite(binding.midi)) return midiToNoteName(binding.midi).display;
-    return 'Unknown';
-  }
-
-  _controllerPadBindingName(binding = {}) {
-    const index = Number(binding.padIndex);
-    const action = binding.padAction || binding.padMode;
-    const prefix = action === 'chord' || action === 'chords'
-      ? 'Chord'
-      : action === 'root'
-        ? 'Root'
-        : 'Pad';
-    return `${prefix} ${Number.isFinite(index) ? index + 1 : '?'}`;
+    return this.controllerMapper?.handleLearnTarget(target) || false;
   }
 
   _closeControllerMapperPopover() {
-    if (this._controllerMapperClickOutsideHandler) {
-      document.removeEventListener('pointerdown', this._controllerMapperClickOutsideHandler, true);
-      this._controllerMapperClickOutsideHandler = null;
-    }
-    this._controllerMapperPopover?.remove();
-    this._controllerMapperPopover = null;
-    this._controllerLearningButton = null;
-    if (this._controllerMapperAnchorButton) {
-      this._controllerMapperAnchorButton.setAttribute('aria-expanded', 'false');
-      this._controllerMapperAnchorButton = null;
-    }
+    this.controllerMapper?.close();
   }
 
   _toggleTonePopover(anchor) {
