@@ -176,6 +176,91 @@ function walkCustomInstruments(projectOrSettings) {
   return projectOrSettings?.settings?.customInstruments || projectOrSettings?.customInstruments || [];
 }
 
+function audioRecordSize(record) {
+  return record?.size || record?.blob?.size || record?.arrayBuffer?.byteLength || 0;
+}
+
+export function auditProjectAudioAssets(project, storedAssets = []) {
+  const referenced = new Map();
+  const missing = [];
+  let audioSnippetCount = 0;
+  let unavailableCount = 0;
+  let customInstrumentSampleCount = 0;
+
+  for (const snippet of walkSnippets(project)) {
+    if (snippet?.type !== 'audio') continue;
+    audioSnippetCount++;
+    if (snippet.audioUnavailable) {
+      unavailableCount++;
+      if (!snippet.audioAssetId) {
+        missing.push({
+          kind: 'snippet',
+          id: snippet.id || '',
+          reason: snippet.audioUnavailableReason || 'Audio marked unavailable',
+        });
+      }
+    }
+    if (snippet.audioAssetId) {
+      referenced.set(snippet.audioAssetId, {
+        kind: 'snippet',
+        id: snippet.id || '',
+      });
+    }
+  }
+
+  for (const instrument of walkCustomInstruments(project)) {
+    if (!instrument?.audioAssetId) continue;
+    customInstrumentSampleCount++;
+    referenced.set(instrument.audioAssetId, {
+      kind: 'instrument',
+      id: instrument.id || instrument.name || '',
+    });
+  }
+
+  const stored = new Map();
+  for (const record of storedAssets || []) {
+    if (record?.audioAssetId) stored.set(record.audioAssetId, record);
+  }
+
+  let bytesReferenced = 0;
+  for (const [audioAssetId, ref] of referenced) {
+    const record = stored.get(audioAssetId);
+    if (!record) {
+      missing.push({
+        kind: ref.kind,
+        id: ref.id,
+        audioAssetId,
+        reason: 'Referenced audio asset is missing from browser storage',
+      });
+      continue;
+    }
+    bytesReferenced += audioRecordSize(record);
+  }
+
+  const orphanedAssets = [];
+  let bytesOrphaned = 0;
+  for (const [audioAssetId, record] of stored) {
+    if (referenced.has(audioAssetId)) continue;
+    orphanedAssets.push(audioAssetId);
+    bytesOrphaned += audioRecordSize(record);
+  }
+
+  return {
+    audioSnippetCount,
+    customInstrumentSampleCount,
+    referencedAssetCount: referenced.size,
+    storedAssetCount: stored.size,
+    missingAssetCount: missing.length,
+    unavailableCount,
+    orphanedAssetCount: orphanedAssets.length,
+    bytesReferenced,
+    bytesOrphaned,
+    backupReady: missing.length === 0,
+    missing,
+    orphanedAssets,
+  };
+}
+
 export class ProjectStore {
   constructor() {
     this._db = null;
@@ -690,6 +775,11 @@ export class ProjectStore {
       bytes,
       missing,
     };
+  }
+
+  async getAudioStorageAudit(value) {
+    const assets = await this._db.getAll(STORE_AUDIO_ASSETS);
+    return auditProjectAudioAssets(value, assets);
   }
 
   async garbageCollectAudioAssets() {

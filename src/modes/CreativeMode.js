@@ -32,8 +32,8 @@ import { LoopProgress } from '../ui/LoopProgress.js';
 import { TransportState } from '../engine/Transport.js';
 import { ArpeggioManager, ARP_MODES } from '../engine/ArpeggioManager.js';
 import { BINDABLE_GAMEPAD_BUTTONS, GamepadInputManager, gamepadButtonInfo } from '../engine/GamepadInputManager.js';
+import { PerformanceInputRouter } from './input/PerformanceInputRouter.js';
 import { showToast } from '../ui/Toast.js';
-import { PERFORMANCE_KEYS } from '../ui/PerformanceKeys.js';
 
 const INSTRUMENTS = {
   SCALEBOARD: 'scaleboard',
@@ -96,6 +96,22 @@ export class CreativeMode {
       this._setLiveSoundTraits(traits);
       this._updateToneTriggerIndicator(labels);
     };
+    this.performanceInput = new PerformanceInputRouter({
+      gamepadInput: this.gamepadInput,
+      instrumentIds: INSTRUMENTS,
+      getActiveInstrument: () => this.activeInstrument,
+      getScaleBoard: () => this.scaleBoard,
+      getMicroPiano: () => this.microPiano,
+      getSketchKit: () => this.sketchKit,
+      getControllerMode: () => this.controllerMode,
+      isCreativeActive: () => this._isCreativeActive(),
+      isControllerMapperOpen: () => !!this._controllerMapperPopover,
+      ensureAudioReady: () => this.ensureAudioReady(),
+      shiftActiveInstrumentOctave: (delta) => this._shiftActiveInstrumentOctave(delta),
+      refreshControllerMapperStatus: () => this._refreshControllerMapperStatus(),
+      handleControllerButtonDown: (index) => this._handleControllerButtonDown(index),
+      handleControllerButtonUp: (index) => this._handleControllerButtonUp(index),
+    });
 
     // Recording
     this.recordingManager = new RecordingManager(transport, quantizer);
@@ -126,11 +142,6 @@ export class CreativeMode {
     this._aiSeedPanelInstance = null;
 
     this._initialized = false;
-    this._heldScaleKeyPads = new Map();
-    this._heldPianoKeyIndexes = new Map();
-    this._midiBound = false;
-    this._midiAccess = null;
-    this._activeMidiNotes = new Map();
     this._tonePopover = null;
     this._toneClickOutsideHandler = null;
     this._instrumentPopover = null;
@@ -220,9 +231,8 @@ export class CreativeMode {
     this.scaleBoard.setControllerLearnCallback((target) => this._handleControllerLearnTarget(target));
     this.microPiano.setControllerLearnCallback((target) => this._handleControllerLearnTarget(target));
     this.sketchKit.setControllerLearnCallback((target) => this._handleControllerLearnTarget(target));
-    this._bindGamepadInput();
-    this.gamepadInput.start();
-    this._initMidiInput();
+    this.performanceInput.startGamepad();
+    this.performanceInput.initMidiInput();
 
     // When snippets are created
     this.recordingManager.onSnippetCreated((snippet) => {
@@ -467,7 +477,7 @@ export class CreativeMode {
 
     // Sync context-specific toolbar buttons once the instruments exist.
     this._syncCreateToolbarButtons();
-    this._bindKeyboardPerformance();
+    this.performanceInput.bindKeyboardPerformance();
 
     return this.el;
   }
@@ -1131,183 +1141,8 @@ export class CreativeMode {
     this._instrumentPopover = null;
   }
 
-  _bindKeyboardPerformance() {
-    if (this._keyboardBound) return;
-    this._keyboardBound = true;
-
-    document.addEventListener('keydown', (e) => {
-      if (!this._isCreativeActive() || this._isTextInput(e.target) || e.repeat) return;
-
-      if (e.code === 'ArrowUp' || e.code === 'ArrowDown') {
-        if (this._shiftActiveInstrumentOctave(e.code === 'ArrowUp' ? 1 : -1)) {
-          e.preventDefault();
-          e.stopPropagation();
-        }
-        return;
-      }
-
-      if (this.activeInstrument === INSTRUMENTS.SCALEBOARD) {
-        if (this.scaleBoard?.padMode === 'step') {
-          if (!PERFORMANCE_KEYS.includes(e.code)) return;
-          e.preventDefault();
-          e.stopPropagation();
-          this.ensureAudioReady();
-          this.scaleBoard.triggerStepPlay();
-          return;
-        }
-        const idx = this._performanceIndexForSurface(e.code, this.scaleBoard._notes.length, { reverse: true });
-        if (idx === -1) return;
-
-        e.preventDefault();
-        e.stopPropagation();
-        this.ensureAudioReady();
-        this._heldScaleKeyPads.set(e.code, idx);
-        this.scaleBoard.pressPad(idx);
-        return;
-      }
-
-      if (this.activeInstrument === INSTRUMENTS.PIANO) {
-        const idx = this._performanceIndexForSurface(e.code, this.microPiano.visibleMidis().length, { reverse: true });
-        if (idx === -1) return;
-
-        e.preventDefault();
-        e.stopPropagation();
-        this.ensureAudioReady();
-        this._heldPianoKeyIndexes.set(e.code, idx);
-        this.microPiano.pressVisibleKey(idx);
-        return;
-      }
-
-      if (this.activeInstrument === INSTRUMENTS.KIT) {
-        const idx = this._performanceIndexForSurface(e.code, this.sketchKit.visiblePadIds().length, { reverse: false });
-        if (idx === -1) return;
-
-        e.preventDefault();
-        e.stopPropagation();
-        this.ensureAudioReady();
-        this.sketchKit.triggerVisiblePad(idx);
-      }
-    }, true);
-
-    document.addEventListener('keyup', (e) => {
-      if (this._heldScaleKeyPads.has(e.code)) {
-        e.preventDefault();
-        e.stopPropagation();
-        const idx = this._heldScaleKeyPads.get(e.code);
-        this.scaleBoard.releasePad(idx);
-        this._heldScaleKeyPads.delete(e.code);
-        return;
-      }
-
-      if (this._heldPianoKeyIndexes.has(e.code)) {
-        e.preventDefault();
-        e.stopPropagation();
-        const idx = this._heldPianoKeyIndexes.get(e.code);
-        this.microPiano.releaseVisibleKey(idx);
-        this._heldPianoKeyIndexes.delete(e.code);
-      }
-    }, true);
-  }
-
   handlesPerformanceKey(code) {
-    if (!this._isCreativeActive()) return false;
-    if (this.activeInstrument === INSTRUMENTS.SCALEBOARD) {
-      if (this.scaleBoard?.padMode === 'step') return PERFORMANCE_KEYS.includes(code);
-      return this._performanceIndexForSurface(code, this.scaleBoard?._notes?.length || 0, { reverse: true }) !== -1;
-    }
-    if (this.activeInstrument === INSTRUMENTS.PIANO) {
-      return this._performanceIndexForSurface(code, this.microPiano?.visibleMidis?.().length || 0, { reverse: true }) !== -1;
-    }
-    if (this.activeInstrument === INSTRUMENTS.KIT) {
-      return this._performanceIndexForSurface(code, this.sketchKit?.visiblePadIds?.().length || 0, { reverse: false }) !== -1;
-    }
-    return false;
-  }
-
-  _performanceIndexForSurface(code, count, { reverse = false } = {}) {
-    const keyIndex = PERFORMANCE_KEYS.indexOf(code);
-    if (keyIndex < 0 || keyIndex >= count) return -1;
-    return reverse ? count - 1 - keyIndex : keyIndex;
-  }
-
-  async _initMidiInput() {
-    if (this._midiBound || typeof navigator === 'undefined' || !navigator.requestMIDIAccess) return;
-    this._midiBound = true;
-    try {
-      this._midiAccess = await navigator.requestMIDIAccess({ sysex: false });
-      this._bindMidiInputs();
-      this._midiAccess.onstatechange = () => this._bindMidiInputs();
-      if (this._midiAccess.inputs.size) showToast('MIDI input ready');
-    } catch (err) {
-      console.warn('[CreativeMode] MIDI input unavailable:', err);
-      showToast('MIDI input unavailable or blocked');
-    }
-  }
-
-  _bindMidiInputs() {
-    if (!this._midiAccess) return;
-    for (const input of this._midiAccess.inputs.values()) {
-      input.onmidimessage = (event) => this._handleMidiMessage(event);
-    }
-  }
-
-  _handleMidiMessage(event) {
-    if (!this._isCreativeActive() || this._controllerMapperPopover) return;
-    const [status, note, velocity] = event.data || [];
-    const command = status & 0xf0;
-    if (command === 0x90 && velocity > 0) {
-      this._handleMidiNoteOn(note, velocity / 127);
-    } else if (command === 0x80 || (command === 0x90 && velocity === 0)) {
-      this._handleMidiNoteOff(note);
-    }
-  }
-
-  _handleMidiNoteOn(note, velocity = 0.8) {
-    if (!Number.isFinite(note) || this._activeMidiNotes.has(note)) return;
-    this.ensureAudioReady();
-
-    if (this.activeInstrument === INSTRUMENTS.SCALEBOARD) {
-      const bindingKey = `midi-${note}`;
-      if (this.scaleBoard.pressMidiInput(note, bindingKey, velocity)) {
-        this._activeMidiNotes.set(note, { type: 'scale', bindingKey });
-      }
-      return;
-    }
-
-    if (this.activeInstrument === INSTRUMENTS.PIANO) {
-      this.microPiano.pressControllerMidi(note, velocity);
-      this._activeMidiNotes.set(note, { type: 'piano', midi: note });
-      return;
-    }
-
-    if (this.activeInstrument === INSTRUMENTS.KIT) {
-      this.sketchKit.triggerMidiInput(note, velocity);
-    }
-  }
-
-  _handleMidiNoteOff(note) {
-    const held = this._activeMidiNotes.get(note);
-    if (!held) return;
-    if (held.type === 'scale') this.scaleBoard.releaseControllerPadBinding(held.bindingKey);
-    else if (held.type === 'piano') this.microPiano.releaseControllerMidi(held.midi);
-    this._activeMidiNotes.delete(note);
-  }
-
-  _bindGamepadInput() {
-    if (this._gamepadInputBound) return;
-    this._gamepadInputBound = true;
-    this.gamepadInput.on('buttonDown', ({ index, bindable }) => {
-      if (!bindable) return;
-      this._refreshControllerMapperStatus();
-      this._handleControllerButtonDown(index);
-    });
-    this.gamepadInput.on('buttonUp', ({ index, bindable }) => {
-      if (!bindable) return;
-      this._refreshControllerMapperStatus();
-      this._handleControllerButtonUp(index);
-    });
-    this.gamepadInput.on('buttons', () => this._refreshControllerMapperStatus());
-    this.gamepadInput.on('state', () => this._refreshControllerMapperStatus());
+    return this.performanceInput?.handlesPerformanceKey(code) || false;
   }
 
   _handleControllerButtonDown(index) {
@@ -1420,10 +1255,6 @@ export class CreativeMode {
 
   _isCreativeActive() {
     return !!this.el?.closest('.mode-view.is-active');
-  }
-
-  _isTextInput(target) {
-    return ['INPUT', 'TEXTAREA', 'SELECT'].includes(target?.tagName) || target?.isContentEditable;
   }
 
   _shiftActiveInstrumentOctave(delta) {
@@ -1613,6 +1444,7 @@ export class CreativeMode {
           detail: { section: 'settings', focus: 'ai' },
         }));
       },
+      onSettingsChanged: () => this.store?.scheduleAutoSave(this.project),
     });
     popover.appendChild(this._aiSeedPanelInstance.render());
 
@@ -1656,18 +1488,15 @@ export class CreativeMode {
   }
 
   _releaseKeyboardPerformance() {
-    for (const idx of this._heldScaleKeyPads.values()) {
-      this.scaleBoard.releasePad(idx);
-    }
-    for (const idx of this._heldPianoKeyIndexes.values()) {
-      this.microPiano.releaseVisibleKey(idx);
-    }
-    this._heldScaleKeyPads.clear();
-    this._heldPianoKeyIndexes.clear();
-    for (const note of [...this._activeMidiNotes.keys()]) this._handleMidiNoteOff(note);
-    for (const index of [...this._heldControllerMidis.keys()]) this._releaseControllerBinding(index);
-    for (const index of [...this._heldControllerPads.keys()]) this._releaseControllerBinding(index);
-    for (const index of [...this._heldControllerFallback.keys()]) this._playControllerFallbackUp(index);
+    this.performanceInput?.releaseAll({
+      releaseControllerBinding: () => {
+        for (const index of [...this._heldControllerMidis.keys()]) this._releaseControllerBinding(index);
+        for (const index of [...this._heldControllerPads.keys()]) this._releaseControllerBinding(index);
+      },
+      releaseControllerFallback: () => {
+        for (const index of [...this._heldControllerFallback.keys()]) this._playControllerFallbackUp(index);
+      },
+    });
   }
 
   _ensureSoundTraits() {

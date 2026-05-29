@@ -436,6 +436,11 @@ export class SettingsPanel {
             <span class="settings-value" id="storage-backup-status">Checking...</span>
           </div>
           <p class="settings-desc" id="storage-advice">Checking storage...</p>
+          <div class="settings-row">
+            <label class="settings-label">Health audit</label>
+            <button class="btn btn--ghost" id="storage-health-check" style="font-size:0.75rem;min-height:30px;padding:2px 10px;">Check Storage Health</button>
+          </div>
+          <div class="version-list__empty" id="storage-health-report">Run a storage health check to find missing audio assets or orphaned local audio.</div>
         </div>
         <div class="settings-group">
           <h3 class="settings-group__title">Backups</h3>
@@ -977,6 +982,40 @@ export class SettingsPanel {
     }
   }
 
+  async _runStorageHealthAudit() {
+    const reportEl = this.el?.querySelector('#storage-health-report');
+    const btn = this.el?.querySelector('#storage-health-check');
+    if (!reportEl || !this.project || !this.store?.getAudioStorageAudit) return;
+    if (btn) btn.disabled = true;
+    reportEl.textContent = 'Checking audio assets...';
+    try {
+      const audit = await this.store.getAudioStorageAudit(this.project);
+      const status = audit.backupReady
+        ? 'Ready for backup'
+        : `${audit.missingAssetCount} missing/unavailable item${audit.missingAssetCount === 1 ? '' : 's'}`;
+      const orphanText = audit.orphanedAssetCount
+        ? `${audit.orphanedAssetCount} orphaned asset${audit.orphanedAssetCount === 1 ? '' : 's'} (${formatBytes(audit.bytesOrphaned)})`
+        : 'No orphaned audio assets';
+      const missingDetail = audit.missingAssetCount
+        ? ` Missing: ${audit.missing.slice(0, 3).map(item => item.id || item.audioAssetId || item.kind).join(', ')}${audit.missing.length > 3 ? '...' : ''}.`
+        : '';
+      reportEl.textContent =
+        `${status}. ${audit.audioSnippetCount} audio clip${audit.audioSnippetCount === 1 ? '' : 's'}, ` +
+        `${audit.customInstrumentSampleCount} custom sample${audit.customInstrumentSampleCount === 1 ? '' : 's'}, ` +
+        `${audit.referencedAssetCount} referenced asset${audit.referencedAssetCount === 1 ? '' : 's'} (${formatBytes(audit.bytesReferenced)}). ` +
+        `${orphanText}.${missingDetail}`;
+      reportEl.classList.toggle('is-danger', !audit.backupReady);
+      reportEl.classList.toggle('is-warning', audit.backupReady && audit.orphanedAssetCount > 0);
+      showToast(audit.backupReady ? 'Storage health check complete' : 'Storage health found missing audio');
+    } catch (err) {
+      console.error('[Settings] Storage health audit failed:', err);
+      reportEl.textContent = 'Storage health check failed. Save a workspace backup before making risky changes.';
+      showToast('Storage health check failed');
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
   async _checkLatestVersion() {
     const body = this.el?.querySelector('#settings-body');
     const statusEl = body?.querySelector('#setting-version-status');
@@ -1244,6 +1283,11 @@ export class SettingsPanel {
       if (desc) desc.textContent = this._backupContentsDescription(e.target.value);
       this.store?.scheduleAutoSave(this.project);
       this._loadStorageStatus();
+    });
+
+    body.querySelector('#storage-health-check')?.addEventListener('pointerdown', async (e) => {
+      e.preventDefault();
+      await this._runStorageHealthAudit();
     });
 
     body.querySelector('#version-history-limit')?.addEventListener('change', async (e) => {

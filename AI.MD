@@ -44,6 +44,12 @@ src/main.js
     MusicTheory.js          notes, scales, degree metadata
     ScaleChords.js          curated chord recipes for non-tertian scales
     GamepadInputManager.js  gamepad polling and bindable buttons
+  ai/
+    AIController.js         constrained snippet-generation orchestration
+    aiSettings.js           non-secret project AI settings + live-only keys
+    PromptBuilder.js        prompt contract and allowed AI sequence lengths
+    SequenceValidator.js    schema/range checks before execution
+    SequenceExecutor.js     converts validated AI events into snippets
   instruments/
     WebAudioSynth.js        synth patches, Tone chain, sample branch
     ScaleBoard.js           Pads, Root, Chords, Voice Sketch, Compass
@@ -54,6 +60,8 @@ src/main.js
     voice/VoiceEngine.js    formant voice engine
   modes/
     CreativeMode.js         Create mode composition and recording
+    input/
+      PerformanceInputRouter.js keyboard, MIDI, and gamepad event routing
     CanvasMode.js           timeline/arrangement
     EditMode.js             Inspect mode for MIDI, drum, audio snippets
   ui/
@@ -457,6 +465,51 @@ Keep computer-keyboard, MIDI, and controller routing conceptually aligned: the
 active surface decides what the input does. If the performance key layout ever
 changes, update `PerformanceKeys.js` instead of duplicating labels in individual
 instruments.
+
+`src/modes/input/PerformanceInputRouter.js` owns the Create-mode keyboard,
+Web MIDI, and gamepad listener wiring. `CreativeMode` still owns instruments,
+recording state, controller binding storage/UI, snippets, AI, and project
+persistence. Keep that boundary: route raw performance input in the router, but
+do not let the router mutate project data or render controller/settings UI.
+
+## AI Seed Boundaries
+
+AI Seed is intentionally narrow. `AIController` builds a snippet through the
+validated sequence contract only; it must not change project key, scale, meter,
+tempo, instrument definitions, backups, or transport state. Provider API keys
+remain live-only in `aiSettings.js` and must never be written to IndexedDB,
+project JSON, backups, or logs. Non-secret settings, including provider/model
+selection and default length in bars, live in `project.settings.aiSettings` and
+must be saved when changed.
+
+`referencedSnippet` plumbing exists in the AI prompt/controller layer, but there
+is no current user-facing UI that supplies it. Treat it as dormant/deferred
+context support, not an active feature. If a future UI exposes it, document the
+calling surface and keep the user in control of which snippet is referenced.
+
+## Storage Health Audit
+
+`ProjectStore.auditProjectAudioAssets(project, storedAssets)` is a pure,
+non-mutating audit helper. The instance method `getAudioStorageAudit(project)`
+feeds it real `audioAssets` records from IndexedDB. The Settings Save tab uses
+this to report:
+
+- audio snippets and custom instrument samples that reference stored audio;
+- referenced audio assets missing from browser storage;
+- snippets already marked unavailable;
+- orphaned stored audio assets and their estimated byte cost;
+- whether the current workspace is ready for a complete audio-bearing backup.
+
+The audit is diagnostic by default. Do not delete, repair, or rewrite assets
+from the health check unless a separate explicit user action is added.
+
+## Smoke Tests
+
+`npm run test:smoke` runs `tests/smoke.mjs` with Node and no extra test
+dependency. Keep this harness focused on pure module logic that does not need a
+browser, IndexedDB, Web Audio, or DOM rendering. It currently guards meter math,
+backup validation, and the pure audio storage audit. Browser-only behavior still
+belongs in Manual QA until a browser test harness exists.
 
 ## Mobile Create Layout Hardening 0.1.54
 

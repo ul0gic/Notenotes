@@ -199,15 +199,16 @@ Steps:
 5. Switch to Kit and confirm the same keyboard rows trigger visible kit pads in pad order.
 6. Connect a MIDI keyboard in a browser that supports Web MIDI.
 7. Play MIDI notes while viewing Pads, Piano, and Kit.
-8. Return to Pads, set Pad Mode to Step Play, and confirm the octave controls are hidden.
-9. Open Edit Sequence, add notes from the note row, use the arrow buttons to move between octave rows, and save a short sequence.
-10. Press the Step button, then press a few computer keyboard performance keys, then press a few MIDI notes.
-11. Switch to a pentatonic scale, edit the Step Play sequence, use the right arrow to reach the next octave row, and add its first note.
-12. Reopen Edit Sequence, click a sequence chip to remove it, then add it back.
-13. Use a chip's Alt button, pick a different note from the note row, save, and step through the sequence twice.
-14. Change the project key and scale, then return to Step Play.
-15. Open Layout, enable Highlight scale degrees, return to Step Play, and reopen Edit Sequence.
-16. Add and remove a few chips, press Undo, then tap outside the editor backdrop and press Escape.
+8. Switch between Pads, Piano, Kit, and Controller while holding a keyboard or MIDI note.
+9. Return to Pads, set Pad Mode to Step Play, and confirm the octave controls are hidden.
+10. Open Edit Sequence, add notes from the note row, use the arrow buttons to move between octave rows, and save a short sequence.
+11. Press the Step button, then press a few computer keyboard performance keys, then press a few MIDI notes.
+12. Switch to a pentatonic scale, edit the Step Play sequence, use the right arrow to reach the next octave row, and add its first note.
+13. Reopen Edit Sequence, click a sequence chip to remove it, then add it back.
+14. Use a chip's Alt button, pick a different note from the note row, save, and step through the sequence twice.
+15. Change the project key and scale, then return to Step Play.
+16. Open Layout, enable Highlight scale degrees, return to Step Play, and reopen Edit Sequence.
+17. Add and remove a few chips, press Undo, then tap outside the editor backdrop and press Escape.
 
 Expected:
 
@@ -215,6 +216,7 @@ Expected:
 - Pads and Piano keyboard notes hold until keyup; Kit hits fire immediately.
 - Kit pads show the keyboard key that triggers each visible pad.
 - MIDI notes route through the active surface: nearest visible Pads target, exact Piano MIDI, and Kit drum mapping.
+- Held keyboard, MIDI, and controller notes release cleanly when switching surfaces; no stuck notes remain.
 - Step Play uses chips in the modal instead of manual text entry; clicking a sequence chip removes it.
 - Step Play's editor note row moves through app octaves 1-6 only. It should never show extremely high note names such as D10, D11, or D12.
 - Step Play chips and editor note buttons use the same degree colors as Pads when Highlight scale degrees is enabled.
@@ -463,10 +465,13 @@ Steps:
 3. Save a workspace backup.
 4. Make a small edit, such as renaming the project or adding a snippet.
 5. Return to Settings, then Save.
+6. Click Check Storage Health.
 
 Expected:
 
 - Browser storage shows Persistent, Best effort, Unknown, or an honest failure state.
+- Storage Health reports the number of audio clips, custom samples, referenced audio assets, orphaned local audio assets, and whether any audio is missing.
+- Storage Health does not delete or repair anything just by running the check.
 - Workspace backup status says there is no workspace backup before the first backup.
 - The top backup status shortcut opens Settings directly to the Save tab.
 - After saving a workspace backup, the status shows the latest backup time.
@@ -846,6 +851,19 @@ Expected:
 - Turning Debug logs off prints that debug logs were disabled.
 
 ## 11. General Smoke Test
+
+### 11.0 Automated Pure Smoke
+
+Steps:
+
+1. Run `npm run test:smoke`.
+
+Expected:
+
+- Meter math, backup validation, and pure storage-audit tests pass.
+- These tests do not require a browser, Web Audio, IndexedDB, or network access.
+
+### 11.1 Manual App Smoke
 
 Steps:
 

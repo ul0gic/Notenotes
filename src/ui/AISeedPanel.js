@@ -17,7 +17,7 @@
  */
 
 import { ALLOWED_LENGTHS_BARS } from '../ai/PromptBuilder.js';
-import { readAiSettings } from '../ai/aiSettings.js';
+import { readAiSettings, writeAiSettings } from '../ai/aiSettings.js';
 import { AI_INSTRUMENTS } from '../ai/sequence-schema.js';
 
 const SUGGESTIONS_BY_INSTRUMENT = {
@@ -57,8 +57,9 @@ export class AISeedPanel {
    *   off `reason`. Defaults to always-available.
    * @param {() => void} [deps.onClose]  Called when the user wants to close the popover (e.g., Escape).
    * @param {() => void} [deps.onOpenSettings] Called when the user wants to change AI settings.
+   * @param {() => void} [deps.onSettingsChanged] Called after non-secret AI settings change.
    */
-  constructor({ controller, getProject, onSnippetCreated, getActiveInstrumentId, getAvailability, onClose, onOpenSettings }) {
+  constructor({ controller, getProject, onSnippetCreated, getActiveInstrumentId, getAvailability, onClose, onOpenSettings, onSettingsChanged }) {
     this.controller = controller;
     this._getProject = getProject;
     this._onSnippetCreated = onSnippetCreated;
@@ -66,6 +67,7 @@ export class AISeedPanel {
     this._getAvailability = getAvailability || (() => ({ available: true }));
     this._onClose = onClose;
     this._onOpenSettings = onOpenSettings;
+    this._onSettingsChanged = onSettingsChanged;
 
     this.el = null;
     this._lengthBars = 4;
@@ -209,8 +211,8 @@ export class AISeedPanel {
         const n = parseInt(btn.dataset.length, 10);
         if (!Number.isFinite(n)) return;
         this._lengthBars = n;
-        const project = this._getProject();
-        if (project?.settings?.aiSettings) project.settings.aiSettings.defaultLengthBars = n;
+        writeAiSettings(this._getProject(), { defaultLengthBars: n });
+        this._onSettingsChanged?.();
         this.refresh();
       });
     });
