@@ -38,7 +38,7 @@ import { CreateInstrumentPopover } from '../ui/CreateInstrumentPopover.js';
 import { showToast } from '../ui/Toast.js';
 import { StageEventStream } from '../stage/StageEventStream.js';
 import { CanvasStageRenderer } from '../stage/CanvasStageRenderer.js';
-import { stageUnitTicksForMeter } from '../stage/StageModel.js';
+import { STAGE_LIVE_LANE_LIMIT, stageUnitTicksForMeter } from '../stage/StageModel.js';
 
 const INSTRUMENTS = {
   SCALEBOARD: 'scaleboard',
@@ -1162,7 +1162,7 @@ export class CreativeMode {
 
   _stageLaneCount() {
     if (this.activeInstrument === INSTRUMENTS.PIANO) {
-      return Math.max(1, Math.min(32, this.microPiano?.visibleMidis?.().length || 12));
+      return Math.max(1, Math.min(STAGE_LIVE_LANE_LIMIT, this.microPiano?.visibleMidis?.().length || 12));
     }
     if (this.activeInstrument === INSTRUMENTS.KIT) {
       return Math.max(1, Math.min(10, this.sketchKit?._visibleSounds?.().length || 10));
@@ -1188,7 +1188,7 @@ export class CreativeMode {
       const label = this._stageLaneLabel(index);
       if (this.activeInstrument === INSTRUMENTS.KIT) {
         const drum = this.sketchKit?._visibleSounds?.()[index];
-        return { label, color: this._stageColorForDrum(drum?.id || label) };
+        return { label: this._stageKitInputLabel(drum, label), color: this._stageColorForDrum(drum?.id || label) };
       }
       const midi = this.activeInstrument === INSTRUMENTS.PIANO
         ? this.microPiano?.visibleMidis?.()[index]
@@ -1201,6 +1201,22 @@ export class CreativeMode {
     return this.gamepadInput?.state?.().connected
       ? 'Controller connected. Tap lanes too.'
       : 'No controller detected. Tap lanes here.';
+  }
+
+  _stageKitInputLabel(drum = {}, fallback = '') {
+    const labels = {
+      kick: 'KICK',
+      snare: 'SNARE',
+      clap: 'CLAP',
+      hihat: 'HAT',
+      cymbal: 'CYM',
+      tomlo: 'TOM L',
+      tommid: 'TOM M',
+      tomhi: 'TOM H',
+      rim: 'RIM',
+      shaker: 'SHAKE',
+    };
+    return labels[drum?.id] || String(drum?.label || fallback || '').toUpperCase();
   }
 
   _stageInputDown(index) {
@@ -1317,6 +1333,7 @@ export class CreativeMode {
       eventStream: this.stageEvents,
       getLaneCount: () => this._stageLaneCount(),
       getLaneLabel: (index) => this._stageLaneLabel(index),
+      maxLanes: STAGE_LIVE_LANE_LIMIT,
       getNowTick: () => this.transport?.currentTick || 0,
       getUnitTicks: () => stageUnitTicksForMeter(this.transport),
       getInputItems: () => this._stageInputItems(),

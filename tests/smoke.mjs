@@ -27,6 +27,8 @@ import {
 } from '../src/engine/Meter.js';
 import { StageEventStream } from '../src/stage/StageEventStream.js';
 import {
+  STAGE_CANVAS_TRACK_LIMIT,
+  STAGE_LIVE_LANE_LIMIT,
   STAGE_TRACK_LIMIT,
   stageEventsForCanvasTracks,
   stageIntensityForUnits,
@@ -172,6 +174,9 @@ test('stage event stream mirrors live notes without depending on recording', () 
 });
 
 test('stage model caps canvas tracks and scales intensity by musical units', () => {
+  assert.equal(STAGE_TRACK_LIMIT, STAGE_CANVAS_TRACK_LIMIT);
+  assert.ok(STAGE_LIVE_LANE_LIMIT >= 32);
+
   const tracks = Array.from({ length: STAGE_TRACK_LIMIT + 5 }, (_, index) => ({
     id: `track-${index}`,
     name: `Track ${index}`,

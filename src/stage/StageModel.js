@@ -1,6 +1,8 @@
 import { midiToNoteName } from '../engine/MusicTheory.js';
 
-export const STAGE_TRACK_LIMIT = 20;
+export const STAGE_CANVAS_TRACK_LIMIT = 20;
+export const STAGE_LIVE_LANE_LIMIT = 64;
+export const STAGE_TRACK_LIMIT = STAGE_CANVAS_TRACK_LIMIT;
 
 export function stageIntensityForUnits(units = 0) {
   const value = Math.max(0, Number(units) || 0);
@@ -16,8 +18,8 @@ export function stageIntensityForUnits(units = 0) {
   return { units: value, tier: 'spark', opacity: 0.35, weight: 0.28, glow: 0.12 };
 }
 
-export function stageTracksForCanvas(tracks = [], { maxTracks = STAGE_TRACK_LIMIT } = {}) {
-  const limit = Math.max(1, Math.floor(Number(maxTracks) || STAGE_TRACK_LIMIT));
+export function stageTracksForCanvas(tracks = [], { maxTracks = STAGE_CANVAS_TRACK_LIMIT } = {}) {
+  const limit = Math.max(1, Math.floor(Number(maxTracks) || STAGE_CANVAS_TRACK_LIMIT));
   const hasSolo = tracks.some(track => track?.solo && !track?.muted);
   return tracks
     .filter(track => track && !track.muted)

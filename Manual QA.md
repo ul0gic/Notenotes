@@ -197,18 +197,20 @@ Steps:
 3. Confirm `1` plays pad 1, `2` plays pad 2, and `Q` continues after the number row on extended Pad layouts.
 4. Switch to Piano and confirm `1` plays the highest visible key and later keys move downward through visible keys.
 5. Switch to Kit and confirm the same keyboard rows trigger visible kit pads in pad order.
-6. Connect a MIDI keyboard in a browser that supports Web MIDI.
-7. Play MIDI notes while viewing Pads, Piano, and Kit.
-8. Switch between Pads, Piano, Kit, and Controller while holding a keyboard or MIDI note.
-9. Return to Pads, set Pad Mode to Step Play, and confirm the octave controls are hidden.
-10. Open Edit Sequence, add notes from the note row, use the arrow buttons to move between octave rows, and save a short sequence.
-11. Press the Step button, then press a few computer keyboard performance keys, then press a few MIDI notes.
-12. Switch to a pentatonic scale, edit the Step Play sequence, use the right arrow to reach the next octave row, and add its first note.
-13. Reopen Edit Sequence, click a sequence chip to remove it, then add it back.
-14. Use a chip's Alt button, pick a different note from the note row, save, and step through the sequence twice.
-15. Change the project key and scale, then return to Step Play.
-16. Open Layout, enable Highlight scale degrees, return to Step Play, and reopen Edit Sequence.
-17. Add and remove a few chips, press Undo, then tap outside the editor backdrop and press Escape.
+6. While viewing Piano, hold `M` and `R` as performance keys.
+7. Confirm `M` does not toggle the metronome and `R` does not start recording. Space and Enter should still control transport.
+8. Connect a MIDI keyboard in a browser that supports Web MIDI.
+9. Play MIDI notes while viewing Pads, Piano, and Kit.
+10. Switch between Pads, Piano, Kit, and Controller while holding a keyboard or MIDI note.
+11. Return to Pads, set Pad Mode to Step Play, and confirm the octave controls are hidden.
+12. Open Edit Sequence, add notes from the note row, use the arrow buttons to move between octave rows, and save a short sequence.
+13. Press the Step button, then press a few computer keyboard performance keys, then press a few MIDI notes.
+14. Switch to a pentatonic scale, edit the Step Play sequence, use the right arrow to reach the next octave row, and add its first note.
+15. Reopen Edit Sequence, click a sequence chip to remove it, then add it back.
+16. Use a chip's Alt button, pick a different note from the note row, save, and step through the sequence twice.
+17. Change the project key and scale, then return to Step Play.
+18. Open Layout, enable Highlight scale degrees, return to Step Play, and reopen Edit Sequence.
+19. Add and remove a few chips, press Undo, then tap outside the editor backdrop and press Escape.
 
 Expected:
 
@@ -233,11 +235,13 @@ Steps:
 1. Open Create > Pads and click Stage.
 2. Play several pads, including held notes and quick taps.
 3. Switch to Piano, open Stage, and play visible keys.
-4. Switch to Kit, open Stage, and hit several drum pads.
-5. Create a MIDI snippet, a drum snippet, and an Audio In snippet, then place them on separate Canvas tracks with different track colors.
-6. Open Canvas and click Stage.
-7. Press Play and watch the Canvas Stage lanes while clips pass the playhead.
-8. Close Stage and confirm normal app controls are usable again.
+4. Set Piano to its maximum key count, reopen Stage, and confirm each visible key gets a distinct lane/pill instead of sharing with another key.
+5. Switch to Kit, open Stage, and hit several drum pads.
+6. On a phone-width viewport, confirm Kit Stage lane pills use short readable labels and do not overlap.
+7. Create a MIDI snippet, a drum snippet, and an Audio In snippet, then place them on separate Canvas tracks with different track colors.
+8. Open Canvas and click Stage.
+9. Press Play and watch the Canvas Stage lanes while clips pass the playhead.
+10. Close Stage and confirm normal app controls are usable again.
 
 Expected:
 

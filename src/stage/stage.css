@@ -112,6 +112,14 @@
   box-shadow: 0 0 14px rgba(255, 255, 255, 0.08);
 }
 
+.stage-overlay__input span {
+  display: block;
+  max-width: 78px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .stage-overlay__input.is-active {
   background: var(--stage-input-color, #7bd88f);
   color: #050607;
@@ -146,9 +154,14 @@
   }
 
   .stage-overlay__input {
-    min-width: 46px;
+    min-width: 58px;
     min-height: 34px;
     padding-inline: 9px;
+    font-size: 0.72rem;
+  }
+
+  .stage-overlay__input span {
+    max-width: 66px;
   }
 
   .stage-overlay__subtitle {

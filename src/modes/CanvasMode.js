@@ -14,7 +14,7 @@ import { showToast } from '../ui/Toast.js';
 import { ChoicePicker } from '../ui/ChoicePicker.js';
 import { renderToneBadges, toneBadgeItemsForClip } from '../ui/ToneBadges.js';
 import { CanvasStageRenderer } from '../stage/CanvasStageRenderer.js';
-import { stageEventsForCanvasTracks, stageTracksForCanvas, stageUnitTicksForMeter } from '../stage/StageModel.js';
+import { STAGE_CANVAS_TRACK_LIMIT, stageEventsForCanvasTracks, stageTracksForCanvas, stageUnitTicksForMeter } from '../stage/StageModel.js';
 
 /** Pixels per bar at default zoom */
 const DEFAULT_BAR_WIDTH = 120;
@@ -1750,12 +1750,13 @@ export class CanvasMode {
       title: 'Canvas Stage',
       subtitle: "A bird's-eye performance view of audible canvas tracks.",
       mode: 'canvas',
+      maxLanes: STAGE_CANVAS_TRACK_LIMIT,
       getLaneCount: () => this._canvasStageTracks().length || 1,
       getLaneLabel: (index) => this._canvasStageTracks()[index]?.name || `Track ${index + 1}`,
       getNowTick: () => this.transport?.currentTick || 0,
       getUnitTicks: () => stageUnitTicksForMeter(this.transport),
       getEvents: () => stageEventsForCanvasTracks(this.project?.tracks || [], {
-        maxTracks: 20,
+        maxTracks: STAGE_CANVAS_TRACK_LIMIT,
         ticksPerBar: this.transport?.ticksPerBar || 1920,
         unitTicks: stageUnitTicksForMeter(this.transport),
       }),

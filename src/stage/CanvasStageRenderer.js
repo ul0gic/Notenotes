@@ -1,6 +1,6 @@
 import './stage.css';
 
-import { STAGE_TRACK_LIMIT } from './StageModel.js';
+import { STAGE_CANVAS_TRACK_LIMIT, STAGE_LIVE_LANE_LIMIT } from './StageModel.js';
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -52,6 +52,8 @@ export class CanvasStageRenderer {
     this.onInputDown = options.onInputDown || null;
     this.onInputUp = options.onInputUp || null;
     this.onClose = options.onClose || null;
+    const fallbackLimit = this.mode === 'canvas' ? STAGE_CANVAS_TRACK_LIMIT : STAGE_LIVE_LANE_LIMIT;
+    this.maxLanes = Math.max(1, Math.floor(Number(options.maxLanes) || fallbackLimit));
 
     this.el = null;
     this.canvas = null;
@@ -92,7 +94,7 @@ export class CanvasStageRenderer {
   }
 
   _renderInputStrip() {
-    const items = (this.getInputItems() || []).slice(0, STAGE_TRACK_LIMIT);
+    const items = (this.getInputItems() || []).slice(0, this.maxLanes);
     if (!items.length) return '';
     const notice = this.getInputNotice?.() || 'Tap these lanes or connect a controller.';
     return `
@@ -241,7 +243,7 @@ export class CanvasStageRenderer {
   }
 
   _laneGeometry(width, height) {
-    const laneCount = clamp(Math.floor(Number(this.getLaneCount()) || 1), 1, STAGE_TRACK_LIMIT);
+    const laneCount = clamp(Math.floor(Number(this.getLaneCount()) || 1), 1, this.maxLanes);
     const horizonY = height * 0.18;
     const bottomY = height * 0.88;
     const topWidth = width * 0.18;
@@ -295,7 +297,7 @@ export class CanvasStageRenderer {
   }
 
   _canvasMapGeometry(width, height) {
-    const laneCount = clamp(Math.floor(Number(this.getLaneCount()) || 1), 1, STAGE_TRACK_LIMIT);
+    const laneCount = clamp(Math.floor(Number(this.getLaneCount()) || 1), 1, this.maxLanes);
     const top = Math.max(56, height * 0.08);
     const bottom = height - Math.max(42, height * 0.08);
     const labelWidth = clamp(width * 0.18, 86, 180);

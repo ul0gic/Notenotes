@@ -464,6 +464,11 @@ the input meaning:
 - Global digit modulation shortcuts must yield when the active Create surface
   can play that key. `main.js` asks `creativeMode.handlesPerformanceKey(code)`
   before starting pitch/mod ramps.
+- Global single-key transport shortcuts are intentionally narrow. Space toggles
+  play/pause and Enter stops, but `M` and `R` are not global metronome/record
+  commands because they are part of `PERFORMANCE_KEYS` and must be safe to hold
+  while playing Piano, Pads, Kit, or Step Play. Record/metronome remain available
+  through the visible transport controls.
 - Web MIDI input is requested when Creative audio initializes. Incoming MIDI is
   routed to the active Create surface: Pads map the MIDI note to the nearest
   visible pad and then play the current Pad Mode action, Piano plays the exact
@@ -526,19 +531,23 @@ moving musical input or transport logic.
   events, and `activeEvents()` returns cloned active events. This stream is
   intentionally independent of `RecordingManager` so Stage can visualize play
   while idle, armed, or actively recording.
-- `src/stage/StageModel.js` holds pure visual-model helpers. `STAGE_TRACK_LIMIT`
-  defaults Canvas Stage to 20 audible lanes, `stageTracksForCanvas()` filters
-  muted tracks, honors solo, caps lanes, and preserves track color/type, while
-  `stageIntensityForUnits()` maps contextual length units into `spark`,
-  `solid`, `bright`, and `sustain` tiers. `stageEventsForCanvasTracks()` maps
-  Canvas clips into absolute tick events per lane. MIDI notes keep their pitch
-  labels, drum hits become short lane events, and audio clips become sustained
-  blocks so Canvas Stage does not silently omit recordings. Events also carry
-  `subLane` and `subLaneCount`; MIDI tracks get stable pitch sublanes sorted
-  low-to-high, drum tracks get stable hit sublanes, and audio clips get their
-  own block lane. This is what lets Canvas Stage show what is happening inside a
-  track instead of only showing that the track exists. Future Free mode can feed
-  seconds as units; metered mode can feed pulse/beat units.
+- `src/stage/StageModel.js` holds pure visual-model helpers. Canvas and live
+  Stage have separate limits: `STAGE_CANVAS_TRACK_LIMIT` is 20 audible Canvas
+  tracks, while `STAGE_LIVE_LANE_LIMIT` is 64 live Create lanes so maximum Piano
+  layouts do not alias two playable keys into the same visual lane. The legacy
+  `STAGE_TRACK_LIMIT` export aliases the Canvas limit for older helper callers.
+  `stageTracksForCanvas()` filters muted tracks, honors solo, caps lanes, and
+  preserves track color/type, while `stageIntensityForUnits()` maps contextual
+  length units into `spark`, `solid`, `bright`, and `sustain` tiers.
+  `stageEventsForCanvasTracks()` maps Canvas clips into absolute tick events per
+  lane. MIDI notes keep their pitch labels, drum hits become short lane events,
+  and audio clips become sustained blocks so Canvas Stage does not silently omit
+  recordings. Events also carry `subLane` and `subLaneCount`; MIDI tracks get
+  stable pitch sublanes sorted low-to-high, drum tracks get stable hit sublanes,
+  and audio clips get their own block lane. This is what lets Canvas Stage show
+  what is happening inside a track instead of only showing that the track exists.
+  Future Free mode can feed seconds as units; metered mode can feed pulse/beat
+  units.
 - `src/stage/CanvasStageRenderer.js` owns the current visual layer. It renders a
   fixed full-screen overlay with a design-language-friendly Close Stage button,
   not a corner X. In `live` mode it renders the Create performance highway,
@@ -560,7 +569,9 @@ moving musical input or transport logic.
   `MicroPiano.pressVisibleKey/releaseVisibleKey`, or `SketchKit.triggerVisiblePad`).
   This is required because the full-screen Stage overlay covers the underlying
   pads on mobile; do not remove it unless another mobile input surface replaces
-  it.
+  it. Kit input-strip labels are deliberately shortened (`HAT`, `TOM M`, `CYM`,
+  etc.) and CSS-truncated on narrow screens so drum names do not wrap into each
+  other.
 - `CreativeMode` owns Create Stage wiring. Scale/Piano/Controller note callbacks
   now emit Stage note start/end events before they pass through the existing
   recording manager; Sketch Kit hit callbacks emit Stage hit events before drum

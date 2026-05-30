@@ -718,18 +718,6 @@ class App {
         }
       }
 
-      // R â†’ Toggle recording
-      if (e.code === 'KeyR' && !e.ctrlKey && !e.metaKey) {
-        e.preventDefault();
-        if (this._initialized) {
-          if (this.transport.state === TransportState.RECORDING) {
-            this.transport.pause();
-          } else {
-            this.transport.record();
-          }
-        }
-      }
-
       // Ctrl+Z → Undo
       if (e.ctrlKey && !e.shiftKey && e.code === 'KeyZ') {
         e.preventDefault();
@@ -754,13 +742,6 @@ class App {
           this.store.saveVersion(this.project);
           showToast('Project saved');
         }
-      }
-
-      // M → Toggle metronome
-      if (e.code === 'KeyM' && !e.ctrlKey) {
-        const active = this.metronome.toggle();
-        document.querySelector('#metronome-toggle')?.classList.toggle('is-active', active);
-        showToast(active ? 'Metronome on' : 'Metronome off');
       }
 
       // 1/3/4/6/7/9 → Pitch bend / Modulation (hold to ramp)
@@ -831,8 +812,6 @@ class App {
         <table style="width:100%;font-size:var(--font-size-sm);border-collapse:collapse;">
           <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Space</td><td style="padding:4px 8px;color:var(--text-secondary);">Play / Pause</td></tr>
           <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Enter</td><td style="padding:4px 8px;color:var(--text-secondary);">Stop</td></tr>
-          <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">R</td><td style="padding:4px 8px;color:var(--text-secondary);">Toggle Recording</td></tr>
-          <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">M</td><td style="padding:4px 8px;color:var(--text-secondary);">Toggle Metronome</td></tr>
           <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Ctrl+Z</td><td style="padding:4px 8px;color:var(--text-secondary);">Undo</td></tr>
           <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Ctrl+Shift+Z</td><td style="padding:4px 8px;color:var(--text-secondary);">Redo</td></tr>
           <tr><td style="padding:4px 8px;color:var(--accent-light);font-weight:var(--font-weight-semibold);">Ctrl+S</td><td style="padding:4px 8px;color:var(--text-secondary);">Save Project</td></tr>
