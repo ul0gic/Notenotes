@@ -25,6 +25,12 @@ import {
   secondsPerTickForMeter,
   ticksPerBarForMeter,
 } from '../src/engine/Meter.js';
+import { StageEventStream } from '../src/stage/StageEventStream.js';
+import {
+  STAGE_TRACK_LIMIT,
+  stageIntensityForUnits,
+  stageTracksForCanvas,
+} from '../src/stage/StageModel.js';
 import { auditProjectAudioAssets } from '../src/data/ProjectStore.js';
 
 function test(name, fn) {
@@ -135,6 +141,55 @@ test('custom instrument popover helpers render stable labels and root options', 
   assert.ok(options.includes('value="60" selected>C4</option>'));
   assert.ok(options.includes('value="95" >B6</option>'));
   assert.equal((options.match(/<option/g) || []).length, 72);
+});
+
+test('stage event stream mirrors live notes without depending on recording', () => {
+  const stream = new StageEventStream();
+  const seen = [];
+  const unsubscribe = stream.subscribe(event => seen.push(event));
+
+  const id = stream.beginNote({
+    source: 'pads',
+    pitch: 60,
+    lane: 0,
+    startTick: 120,
+    color: '#ff0000',
+    accentColor: '#00ff00',
+    label: 'C4',
+  });
+  assert.equal(stream.activeEvents().length, 1);
+  assert.equal(stream.activeEvents()[0].endTick, null);
+
+  const completed = stream.endNote(id, { endTick: 600 });
+  assert.equal(completed.durationTick, 480);
+  assert.equal(stream.activeEvents().length, 0);
+  assert.equal(seen.map(event => event.kind).join(','), 'start,end');
+
+  unsubscribe();
+  stream.hit({ source: 'kit', drum: 'kick', lane: 0, startTick: 720, color: '#ffffff' });
+  assert.equal(seen.length, 2);
+});
+
+test('stage model caps canvas tracks and scales intensity by musical units', () => {
+  const tracks = Array.from({ length: STAGE_TRACK_LIMIT + 5 }, (_, index) => ({
+    id: `track-${index}`,
+    name: `Track ${index}`,
+    color: index === 0 ? '#ff0000' : undefined,
+    muted: index === 1,
+    solo: index === 3,
+  }));
+  const lanes = stageTracksForCanvas(tracks);
+  assert.equal(lanes.length, 1);
+  assert.equal(lanes[0].id, 'track-3');
+
+  const capped = stageTracksForCanvas(tracks.map(track => ({ ...track, solo: false })));
+  assert.equal(capped.length, STAGE_TRACK_LIMIT);
+  assert.equal(capped.some(track => track.id === 'track-1'), false);
+
+  assert.deepEqual(stageIntensityForUnits(0.2).tier, 'spark');
+  assert.deepEqual(stageIntensityForUnits(1).tier, 'solid');
+  assert.deepEqual(stageIntensityForUnits(2.5).tier, 'bright');
+  assert.deepEqual(stageIntensityForUnits(4).tier, 'sustain');
 });
 
 test('audio audit reports missing, orphaned, and backup readiness without mutating project', () => {

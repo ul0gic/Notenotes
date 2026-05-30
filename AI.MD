@@ -75,6 +75,9 @@ src/main.js
     SettingsPanel.js        settings, export, backup, milestones, diagnostics
     SnippetTray.js          snippet strip
     Toast.js                notifications
+  stage/
+    StageEventStream.js     renderer-agnostic live/visual performance events
+    StageModel.js           Stage lane limits, intensity tiers, track mapping
   data/
     ProjectStore.js         IndexedDB, audio assets, backup, history
   export/
@@ -508,6 +511,30 @@ note options, Patch/Kit visibility toggles, and brightness/gain live labels.
 custom instrument list mutation, patch/kit selection, and all toasts. Keep that
 division intact: the popover gathers form input and calls `onSave(popover)`,
 while CreativeMode decides what the form means for project data.
+
+## Stage / Performance Visual Foundation
+
+Stage is the planned full-screen visual performance layer for live Create input
+and Canvas playback. Keep it renderer-agnostic. The first committed foundation
+does not mount UI yet; it defines the event/model contract that a Canvas 2D
+renderer or a later Three.js renderer can consume.
+
+- `src/stage/StageEventStream.js` is a small pub/sub stream for live visual
+  events. `beginNote()` emits a note start and stores the active line,
+  `endNote()` completes it with `durationTick`, `hit()` emits drum/instant
+  events, and `activeEvents()` returns cloned active events. This stream is
+  intentionally independent of `RecordingManager` so Stage can visualize play
+  while idle, armed, or actively recording.
+- `src/stage/StageModel.js` holds pure visual-model helpers. `STAGE_TRACK_LIMIT`
+  defaults Canvas Stage to 20 audible lanes, `stageTracksForCanvas()` filters
+  muted tracks, honors solo, caps lanes, and preserves track color/type, while
+  `stageIntensityForUnits()` maps contextual length units into `spark`,
+  `solid`, `bright`, and `sustain` tiers. Future Free mode can feed seconds as
+  units; metered mode can feed pulse/beat units.
+- Do not let Stage drive audio. Stage renderers may read transport time and
+  consume events, but audio remains scheduled by existing Web Audio/Transport
+  paths. If Three.js is added, it should sit behind the same Stage event/model
+  API rather than replacing the musical routing.
 
 ## AI Seed Boundaries
 
