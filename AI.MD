@@ -533,15 +533,22 @@ moving musical input or transport logic.
   `solid`, `bright`, and `sustain` tiers. `stageEventsForCanvasTracks()` maps
   Canvas clips into absolute tick events per lane. MIDI notes keep their pitch
   labels, drum hits become short lane events, and audio clips become sustained
-  blocks so Canvas Stage does not silently omit recordings. Future Free mode can
-  feed seconds as units; metered mode can feed pulse/beat units.
+  blocks so Canvas Stage does not silently omit recordings. Events also carry
+  `subLane` and `subLaneCount`; MIDI tracks get stable pitch sublanes sorted
+  low-to-high, drum tracks get stable hit sublanes, and audio clips get their
+  own block lane. This is what lets Canvas Stage show what is happening inside a
+  track instead of only showing that the track exists. Future Free mode can feed
+  seconds as units; metered mode can feed pulse/beat units.
 - `src/stage/CanvasStageRenderer.js` owns the current visual layer. It renders a
-  fixed full-screen highway overlay with a design-language-friendly Close Stage
-  button, not a corner X. In `live` mode it subscribes to `StageEventStream` and
-  keeps a short recent-event tail so idle playing, armed recording, and active
-  recording all visualize the same way. In `canvas` mode it reads project tracks
-  and `transport.currentTick` each frame, drawing upcoming/active clip events in
-  the capped audible-lane set.
+  fixed full-screen overlay with a design-language-friendly Close Stage button,
+  not a corner X. In `live` mode it renders the Create performance highway,
+  subscribes to `StageEventStream`, and keeps a short recent-event tail so idle
+  playing, armed recording, and active recording all visualize the same way. In
+  `canvas` mode it switches to a horizontal track map rather than the highway:
+  each audible Canvas track is a row, internal sublanes show individual notes or
+  drum sounds, audio clips render as sustained blocks, and a vertical playhead
+  anchors the motion. Keep this split unless a later Three.js renderer can show
+  dense Canvas detail without turning into track-level visual noise.
 - `CreativeMode` owns Create Stage wiring. Scale/Piano/Controller note callbacks
   now emit Stage note start/end events before they pass through the existing
   recording manager; Sketch Kit hit callbacks emit Stage hit events before drum

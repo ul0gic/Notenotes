@@ -61,6 +61,57 @@ function clipDurationTick(clip, snippet, ticksPerBar) {
   return ticksPerBar;
 }
 
+const DRUM_SUBLANE_ORDER = [
+  'kick',
+  'snare',
+  'clap',
+  'hihat',
+  'cymbal',
+  'tomlo',
+  'tommid',
+  'tomhi',
+  'rim',
+  'shaker',
+];
+
+function hitLabel(hit = {}) {
+  return hit.drum || hit.drumName || hit.hitType || 'Hit';
+}
+
+function trackSubLaneMap(track = {}) {
+  const noteMidis = new Set();
+  const hits = new Set();
+  let hasAudio = false;
+  for (const clip of (track.clips || [])) {
+    const snippet = clip?.snippet || {};
+    for (const note of (snippet.notes || [])) {
+      const midi = Number(note.midi);
+      if (Number.isFinite(midi)) noteMidis.add(midi);
+    }
+    for (const hit of (snippet.hits || [])) {
+      hits.add(hitLabel(hit));
+    }
+    if (snippet.type === 'audio' || (!snippet.notes?.length && !snippet.hits?.length && track.type === 'audio')) {
+      hasAudio = true;
+    }
+  }
+
+  const keys = [
+    ...[...noteMidis].sort((a, b) => a - b).map(midi => `note:${midi}`),
+    ...[...hits].sort((a, b) => {
+      const aIdx = DRUM_SUBLANE_ORDER.indexOf(String(a).toLowerCase());
+      const bIdx = DRUM_SUBLANE_ORDER.indexOf(String(b).toLowerCase());
+      if (aIdx !== -1 || bIdx !== -1) {
+        return (aIdx === -1 ? 999 : aIdx) - (bIdx === -1 ? 999 : bIdx);
+      }
+      return String(a).localeCompare(String(b));
+    }).map(label => `hit:${label}`),
+    ...(hasAudio ? ['clip:audio'] : []),
+  ];
+  const map = new Map(keys.map((key, index) => [key, index]));
+  return { map, count: Math.max(1, keys.length) };
+}
+
 export function stageEventsForCanvasTracks(tracks = [], options = {}) {
   const ticksPerBar = Math.max(1, Number(options.ticksPerBar) || 1920);
   const unitTicks = Math.max(1, Number(options.unitTicks) || 480);
@@ -69,6 +120,7 @@ export function stageEventsForCanvasTracks(tracks = [], options = {}) {
 
   lanes.forEach((laneInfo, laneIndex) => {
     const track = laneInfo.sourceTrack || {};
+    const subLanes = trackSubLaneMap(track);
     for (const clip of (track.clips || [])) {
       const snippet = clip?.snippet || {};
       const clipTick = clipStartTick(clip, ticksPerBar);
@@ -85,6 +137,8 @@ export function stageEventsForCanvasTracks(tracks = [], options = {}) {
           type: 'note',
           source,
           lane: laneIndex,
+          subLane: subLanes.map.get(`note:${Number(note.midi)}`) ?? 0,
+          subLaneCount: subLanes.count,
           pitch: Number(note.midi),
           startTick,
           endTick,
@@ -101,13 +155,15 @@ export function stageEventsForCanvasTracks(tracks = [], options = {}) {
         const startTick = clipTick + Math.max(0, Math.round(Number(hit.startTick) || 0));
         const duration = Math.max(1, Math.round(Number(hit.durationTicks) || unitTicks * 0.25));
         const endTick = startTick + duration;
-        const label = hit.drum || hit.drumName || hit.hitType || 'Hit';
+        const label = hitLabel(hit);
         events.push({
           id: `${source}:hit:${events.length}`,
           type: 'hit',
           source,
           drum: label,
           lane: laneIndex,
+          subLane: subLanes.map.get(`hit:${label}`) ?? 0,
+          subLaneCount: subLanes.count,
           startTick,
           endTick,
           durationTick: duration,
@@ -127,6 +183,8 @@ export function stageEventsForCanvasTracks(tracks = [], options = {}) {
           type: 'clip',
           source,
           lane: laneIndex,
+          subLane: subLanes.map.get('clip:audio') ?? 0,
+          subLaneCount: subLanes.count,
           startTick,
           endTick,
           durationTick: fallbackDuration,
@@ -140,5 +198,5 @@ export function stageEventsForCanvasTracks(tracks = [], options = {}) {
     }
   });
 
-  return events.sort((a, b) => a.startTick - b.startTick || a.lane - b.lane);
+  return events.sort((a, b) => a.startTick - b.startTick || a.lane - b.lane || a.subLane - b.subLane);
 }

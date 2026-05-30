@@ -24,6 +24,8 @@ function normalizeEvent(event = {}) {
   return {
     ...event,
     lane: Math.max(0, Math.floor(Number(event.lane) || 0)),
+    subLane: Math.max(0, Math.floor(Number(event.subLane) || 0)),
+    subLaneCount: Math.max(1, Math.floor(Number(event.subLaneCount) || 1)),
     startTick: Math.max(0, Math.floor(Number(event.startTick) || 0)),
     endTick: event.endTick == null ? null : Math.max(0, Math.floor(Number(event.endTick) || 0)),
     durationTick: event.durationTick == null ? null : Math.max(1, Math.floor(Number(event.durationTick) || 1)),
@@ -160,6 +162,11 @@ export class CanvasStageRenderer {
     const ctx = this.ctx;
     ctx.clearRect(0, 0, width, height);
     this._drawBackground(ctx, width, height);
+    if (this.mode === 'canvas') {
+      this._drawCanvasTrackMap(ctx, width, height);
+      this._raf = requestAnimationFrame(this._draw);
+      return;
+    }
     this._drawHighway(ctx, width, height);
     this._drawEvents(ctx, width, height);
     this._raf = requestAnimationFrame(this._draw);
@@ -233,6 +240,173 @@ export class CanvasStageRenderer {
       ctx.fillText(String(label).slice(0, 14), x, geom.bottomY + 22);
     }
     ctx.restore();
+  }
+
+  _canvasMapGeometry(width, height) {
+    const laneCount = clamp(Math.floor(Number(this.getLaneCount()) || 1), 1, STAGE_TRACK_LIMIT);
+    const top = Math.max(56, height * 0.08);
+    const bottom = height - Math.max(42, height * 0.08);
+    const labelWidth = clamp(width * 0.18, 86, 180);
+    const rightPad = 24;
+    const playheadX = labelWidth + Math.max(96, (width - labelWidth - rightPad) * 0.28);
+    const timelineLeft = labelWidth;
+    const timelineRight = width - rightPad;
+    const rowGap = clamp(height * 0.01, 5, 12);
+    const rowHeight = Math.max(28, (bottom - top - rowGap * (laneCount - 1)) / laneCount);
+    const rowTop = (lane) => top + lane * (rowHeight + rowGap);
+    return {
+      laneCount,
+      top,
+      bottom,
+      labelWidth,
+      rightPad,
+      playheadX,
+      timelineLeft,
+      timelineRight,
+      rowGap,
+      rowHeight,
+      rowTop,
+      timelineWidth: timelineRight - playheadX,
+    };
+  }
+
+  _drawCanvasTrackMap(ctx, width, height) {
+    const geom = this._canvasMapGeometry(width, height);
+    const nowTick = Math.max(0, Math.floor(Number(this.getNowTick()) || 0));
+    const unitTicks = Math.max(1, Number(this.getUnitTicks()) || 480);
+    const pastTicks = unitTicks * 3;
+    const futureTicks = unitTicks * 18;
+    const events = this._eventsForFrame();
+    const tickToX = (tick) => {
+      const delta = tick - nowTick;
+      if (delta >= 0) return geom.playheadX + (delta / futureTicks) * geom.timelineWidth;
+      return geom.playheadX + (delta / pastTicks) * (geom.playheadX - geom.timelineLeft);
+    };
+
+    ctx.save();
+    ctx.font = '700 11px system-ui, sans-serif';
+    ctx.textBaseline = 'middle';
+
+    for (let lane = 0; lane < geom.laneCount; lane++) {
+      const y = geom.rowTop(lane);
+      const label = String(this.getLaneLabel(lane) || `Track ${lane + 1}`);
+      const trackEvents = events.filter(event => event.lane === lane);
+      const laneColor = trackEvents[0]?.color || '#7bd88f';
+      const subLaneCount = Math.max(1, ...trackEvents.map(event => event.subLaneCount || 1));
+
+      const rowGrad = ctx.createLinearGradient(geom.timelineLeft, y, geom.timelineRight, y);
+      rowGrad.addColorStop(0, rgba(laneColor, 0.22));
+      rowGrad.addColorStop(0.22, 'rgba(255,255,255,0.035)');
+      rowGrad.addColorStop(1, rgba(laneColor, 0.08));
+      ctx.fillStyle = rowGrad;
+      this._roundedRect(ctx, geom.timelineLeft, y, geom.timelineRight - geom.timelineLeft, geom.rowHeight, 10);
+      ctx.fill();
+
+      ctx.strokeStyle = rgba(laneColor, 0.35);
+      ctx.lineWidth = 1;
+      this._roundedRect(ctx, geom.timelineLeft, y, geom.timelineRight - geom.timelineLeft, geom.rowHeight, 10);
+      ctx.stroke();
+
+      ctx.fillStyle = rgba(laneColor, 0.22);
+      this._roundedRect(ctx, 14, y, geom.labelWidth - 22, geom.rowHeight, 8);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.82)';
+      ctx.textAlign = 'left';
+      ctx.fillText(label.slice(0, 18), 24, y + geom.rowHeight * 0.5);
+
+      for (let sub = 1; sub < subLaneCount; sub++) {
+        const subY = y + (sub / subLaneCount) * geom.rowHeight;
+        ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(geom.timelineLeft + 4, subY);
+        ctx.lineTo(geom.timelineRight - 4, subY);
+        ctx.stroke();
+      }
+    }
+
+    for (let step = -3; step <= 18; step++) {
+      const x = step < 0
+        ? geom.playheadX + (step / 3) * (geom.playheadX - geom.timelineLeft)
+        : geom.playheadX + (step / 18) * geom.timelineWidth;
+      const strong = step === 0 || step % 4 === 0;
+      ctx.strokeStyle = step === 0 ? 'rgba(255,255,255,0.8)' : `rgba(255,255,255,${strong ? 0.18 : 0.08})`;
+      ctx.lineWidth = step === 0 ? 2 : (strong ? 1.2 : 0.7);
+      ctx.beginPath();
+      ctx.moveTo(x, geom.top - 12);
+      ctx.lineTo(x, geom.bottom + 10);
+      ctx.stroke();
+    }
+
+    for (const event of events) {
+      const startX = tickToX(event.startTick);
+      const endX = tickToX(event.endTick ?? event.startTick + unitTicks * 0.35);
+      const minX = Math.min(startX, endX);
+      const maxX = Math.max(startX, endX);
+      if (maxX < geom.timelineLeft || minX > geom.timelineRight) continue;
+      this._drawCanvasEvent(ctx, geom, event, minX, maxX);
+    }
+
+    ctx.fillStyle = 'rgba(255,255,255,0.88)';
+    ctx.textAlign = 'center';
+    ctx.font = '800 10px system-ui, sans-serif';
+    ctx.fillText('NOW', geom.playheadX, geom.top - 24);
+    ctx.restore();
+  }
+
+  _drawCanvasEvent(ctx, geom, event, minX, maxX) {
+    const rowTop = geom.rowTop(event.lane);
+    const subCount = Math.max(1, event.subLaneCount || 1);
+    const sub = clamp(event.subLane || 0, 0, subCount - 1);
+    const subHeight = geom.rowHeight / subCount;
+    const padY = Math.min(5, subHeight * 0.18);
+    const y = rowTop + sub * subHeight + padY;
+    const h = Math.max(6, subHeight - padY * 2);
+    const width = Math.max(event.type === 'hit' ? 10 : 16, maxX - minX);
+    const x = clamp(minX, geom.timelineLeft, geom.timelineRight);
+    const w = Math.min(width, geom.timelineRight - x);
+    if (w <= 0) return;
+
+    const alpha = event.type === 'clip' ? 0.38 : 0.58 + (event.velocity || 0.8) * 0.32;
+    const glow = event.intensity?.glow ?? 0.35;
+    ctx.save();
+    ctx.shadowColor = rgba(event.accentColor, 0.82);
+    ctx.shadowBlur = event.type === 'clip' ? 8 : 10 + glow * 18;
+    const grad = ctx.createLinearGradient(x, y, x + w, y);
+    grad.addColorStop(0, rgba(event.color, 0.18));
+    grad.addColorStop(0.45, rgba(event.color, alpha));
+    grad.addColorStop(1, rgba(event.accentColor, Math.min(1, alpha + 0.14)));
+    ctx.fillStyle = grad;
+    ctx.strokeStyle = rgba(event.accentColor, 0.85);
+    ctx.lineWidth = event.type === 'hit' ? 2 : 1.25;
+    this._roundedRect(ctx, x, y, w, h, Math.min(8, h / 2));
+    ctx.fill();
+    ctx.stroke();
+
+    if (event.label && w > 34 && h > 12) {
+      ctx.shadowBlur = 0;
+      ctx.font = '750 10px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      ctx.fillText(String(event.label).slice(0, 9), x + w / 2, y + h / 2);
+    }
+    ctx.restore();
+  }
+
+  _roundedRect(ctx, x, y, width, height, radius) {
+    const r = Math.min(radius, width / 2, height / 2);
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + width - r, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+    ctx.lineTo(x + width, y + height - r);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+    ctx.lineTo(x + r, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
   }
 
   _eventsForFrame() {

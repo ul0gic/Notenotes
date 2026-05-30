@@ -245,7 +245,9 @@ Expected:
 - Create Stage shows lane activity while playing, whether or not recording is armed.
 - Pads/Piano lanes use degree colors when degree highlighting is enabled; otherwise they use the surface fallback colors.
 - Kit hits appear as short lane bursts.
+- Canvas Stage uses a horizontal track map rather than the Create highway.
 - Canvas Stage respects muted/soloed tracks, caps to the audible lane set, keeps track colors, and shows audio clips as sustained blocks instead of omitting them.
+- Multiple notes or drum sounds inside the same Canvas track appear on separate internal sublanes. A chord should not collapse into one undifferentiated block.
 - Stage does not start, stop, or alter audio playback. It only mirrors input and transport state.
 
 ## 2. Audio In Recording

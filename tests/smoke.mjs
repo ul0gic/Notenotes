@@ -233,6 +233,8 @@ test('stage model maps canvas clips into absolute lane events', () => {
       type: event.type,
       source: event.source,
       lane: event.lane,
+      subLane: event.subLane,
+      subLaneCount: event.subLaneCount,
       startTick: event.startTick,
       endTick: event.endTick,
       color: event.color,
@@ -244,6 +246,8 @@ test('stage model maps canvas clips into absolute lane events', () => {
         type: 'clip',
         source: 'audio-track',
         lane: 1,
+        subLane: 0,
+        subLaneCount: 1,
         startTick: 960,
         endTick: 3840,
         color: '#ff8844',
@@ -254,12 +258,47 @@ test('stage model maps canvas clips into absolute lane events', () => {
         type: 'note',
         source: 'midi-track',
         lane: 0,
+        subLane: 0,
+        subLaneCount: 1,
         startTick: 3960,
         endTick: 4320,
         color: '#44ccff',
         label: 'C4',
         tier: 'spark',
       },
+    ]
+  );
+});
+
+test('stage model gives same canvas track events internal sublanes', () => {
+  const tracks = [
+    {
+      id: 'harmony',
+      color: '#aabbcc',
+      type: 'midi',
+      clips: [
+        {
+          startBar: 0,
+          snippet: {
+            notes: [
+              { midi: 67, startTick: 0, durationTicks: 480 },
+              { midi: 60, startTick: 0, durationTicks: 960 },
+              { midi: 67, startTick: 960, durationTicks: 480 },
+            ],
+            hits: [],
+          },
+        },
+      ],
+    },
+  ];
+
+  const events = stageEventsForCanvasTracks(tracks, { ticksPerBar: 1920, unitTicks: 480 });
+  assert.deepEqual(
+    events.map(event => [event.label, event.subLane, event.subLaneCount]),
+    [
+      ['C4', 0, 2],
+      ['G4', 1, 2],
+      ['G4', 1, 2],
     ]
   );
 });
