@@ -101,6 +101,7 @@
 .settings-panel__body {
   flex: 1;
   overflow-y: auto;
+  scrollbar-gutter: stable;
   padding: var(--space-md) var(--space-lg);
 }
 
@@ -141,6 +142,7 @@
   justify-content: space-between;
   gap: var(--space-md);
   min-height: 36px;
+  min-width: 0;
 }
 
 .settings-label {
@@ -152,7 +154,14 @@
 .settings-value {
   font-size: var(--font-size-sm);
   color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  min-width: 12ch;
+  overflow-wrap: anywhere;
   text-align: right;
+}
+
+.settings-value#backup-folder-status {
+  min-width: 18ch;
 }
 
 .settings-row--version {
@@ -242,6 +251,21 @@
   gap: var(--space-sm);
   font-size: var(--font-size-xs);
   color: var(--text-tertiary);
+}
+
+.storage-meter__stats span {
+  min-width: 0;
+}
+
+#storage-meter-quota {
+  min-width: 10ch;
+  text-align: right;
+}
+
+@supports not (scrollbar-gutter: stable) {
+  .settings-panel__body {
+    overflow-y: scroll;
+  }
 }
 
 /* --- Version History --- */

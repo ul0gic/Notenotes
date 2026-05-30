@@ -494,6 +494,12 @@ popover may update `project.settings.scalePadsCount`, `pianoCount`,
 change the active surface, or own persistence. Keep shared clamp helpers pure so
 `tests/smoke.mjs` can guard their supported ranges without a DOM.
 
+Settings drawer layout stability matters because Save/backup status text
+updates asynchronously after the panel opens. `src/ui/settings.css` reserves a
+stable scrollbar gutter on `.settings-panel__body` and minimum widths for
+dynamic `.settings-value` cells so storage and backup status updates do not make
+the text column shift while checks resolve.
+
 ## AI Seed Boundaries
 
 AI Seed is intentionally narrow. `AIController` builds a snippet through the
