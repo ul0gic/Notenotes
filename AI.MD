@@ -71,6 +71,7 @@ src/main.js
     AISeedPopover.js        AI Seed popover lifecycle around AISeedPanel
     ControllerMapperPopover.js controller learn/list/preset popover UI
     CreateLayoutPopover.js  Pads/Keys Layout popover and degree controls
+    CreateInstrumentPopover.js Create/Edit Instrument popover UI
     SettingsPanel.js        settings, export, backup, milestones, diagnostics
     SnippetTray.js          snippet strip
     Toast.js                notifications
@@ -499,6 +500,14 @@ updates asynchronously after the panel opens. `src/ui/settings.css` reserves a
 stable scrollbar gutter on `.settings-panel__body` and minimum widths for
 dynamic `.settings-value` cells so storage and backup status updates do not make
 the text column shift while checks resolve.
+
+`src/ui/CreateInstrumentPopover.js` owns the Create/Edit Instrument popover DOM,
+including the existing-instrument selector, file/snippet source fields, root
+note options, Patch/Kit visibility toggles, and brightness/gain live labels.
+`CreativeMode` still owns the actual save operation, audio asset persistence,
+custom instrument list mutation, patch/kit selection, and all toasts. Keep that
+division intact: the popover gathers form input and calls `onSave(popover)`,
+while CreativeMode decides what the form means for project data.
 
 ## AI Seed Boundaries
 

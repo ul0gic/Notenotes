@@ -13,6 +13,10 @@ import {
   clampPianoKeyCount,
   normalizePianoCount,
 } from '../src/ui/CreateLayoutPopover.js';
+import {
+  customInstrumentTypeLabel,
+  rootNoteOptions,
+} from '../src/ui/CreateInstrumentPopover.js';
 import { padPerformanceIndex, pianoPerformanceIndex } from '../src/modes/input/PerformanceInputRouter.js';
 import {
   normalizeMeter,
@@ -122,6 +126,15 @@ test('layout popover helpers clamp controls to supported ranges', () => {
   assert.equal(clampPianoKeyCount('bad'), 12);
   assert.equal(normalizePianoCount(2), 2);
   assert.equal(normalizePianoCount(3), 1);
+});
+
+test('custom instrument popover helpers render stable labels and root options', () => {
+  assert.equal(customInstrumentTypeLabel({ type: 'kit' }), 'Kit');
+  assert.equal(customInstrumentTypeLabel({ type: 'patch' }), 'Patch');
+  const options = rootNoteOptions(60);
+  assert.ok(options.includes('value="60" selected>C4</option>'));
+  assert.ok(options.includes('value="95" >B6</option>'));
+  assert.equal((options.match(/<option/g) || []).length, 72);
 });
 
 test('audio audit reports missing, orphaned, and backup readiness without mutating project', () => {

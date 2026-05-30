@@ -32,6 +32,7 @@ import { GamepadInputManager } from '../engine/GamepadInputManager.js';
 import { PerformanceInputRouter } from './input/PerformanceInputRouter.js';
 import { ControllerMapperPopover, controllerTargetLabel } from '../ui/ControllerMapperPopover.js';
 import { CreateLayoutPopover } from '../ui/CreateLayoutPopover.js';
+import { CreateInstrumentPopover } from '../ui/CreateInstrumentPopover.js';
 import { showToast } from '../ui/Toast.js';
 
 const INSTRUMENTS = {
@@ -146,6 +147,20 @@ export class CreativeMode {
         window.dispatchEvent(new CustomEvent('project-degree-highlighting-changed'));
       },
     });
+    this.createInstrumentPopover = new CreateInstrumentPopover({
+      getProject: () => this.project,
+      getCustomInstruments: () => this._customInstruments(),
+      getSelectedInstrument: () => this._selectedCustomInstrument(),
+      getDefaultType: () => this.activeInstrument === INSTRUMENTS.KIT ? 'kit' : 'patch',
+      onBeforeOpen: () => {
+        this._closeTonePopover();
+        this._closePadsPopover();
+        this._closeKeysPopover();
+        this._closeControllerMapperPopover();
+        this._closeAISeedPopover();
+      },
+      onSave: (popover) => this._saveCustomInstrument(popover),
+    });
 
     // Recording
     this.recordingManager = new RecordingManager(transport, quantizer);
@@ -189,8 +204,6 @@ export class CreativeMode {
     this._initialized = false;
     this._tonePopover = null;
     this._toneClickOutsideHandler = null;
-    this._instrumentPopover = null;
-    this._instrumentClickOutsideHandler = null;
     this._patchPicker = null;
     this._heldControllerMidis = new Map();
     this._heldControllerPads = new Map();
@@ -753,161 +766,7 @@ export class CreativeMode {
   }
 
   _toggleCreateInstrumentPopover(anchor) {
-    if (this._instrumentPopover) {
-      this._closeCreateInstrumentPopover();
-      return;
-    }
-
-    const customInstruments = this._customInstruments();
-    const editingInstrument = this._selectedCustomInstrument();
-    const defaultType = editingInstrument?.type || (this.activeInstrument === INSTRUMENTS.KIT ? 'kit' : 'patch');
-    const audioSnippets = (this.project?.snippets || []).filter(snippet => snippet.type === 'audio' && snippet.audioAssetId);
-    const popover = document.createElement('div');
-    popover.className = 'tone-popover custom-instrument-popover';
-    popover.id = 'custom-instrument-popover';
-    popover.innerHTML = `
-      <div class="tone-popover__header">
-        <span id="ci-title">${editingInstrument ? 'Edit Instrument' : 'Create Instrument'}</span>
-      </div>
-      <div class="custom-instrument-form" data-editing-id="${this._escapeAttr(editingInstrument?.id || '')}">
-        ${customInstruments.length ? `
-          <label class="custom-instrument-field">
-            <span>Instrument</span>
-            <select id="ci-existing" aria-label="Instrument to edit">
-              <option value="">New instrument</option>
-              ${customInstruments.map(instrument => `
-                <option value="${this._escapeAttr(instrument.id)}" ${instrument.id === editingInstrument?.id ? 'selected' : ''}>
-                  ${this._escapeHtml(instrument.type === 'kit' ? 'Kit' : 'Patch')}: ${this._escapeHtml(instrument.name || 'Untitled')}
-                </option>
-              `).join('')}
-            </select>
-          </label>
-        ` : ''}
-        <label class="custom-instrument-field">
-          <span>Name</span>
-          <input id="ci-name" type="text" placeholder="My sample patch" value="${this._escapeAttr(editingInstrument?.name || '')}" aria-label="Instrument name">
-        </label>
-        <label class="custom-instrument-field">
-          <span>Type</span>
-          <select id="ci-type" aria-label="Instrument type">
-            <option value="patch" ${defaultType !== 'kit' ? 'selected' : ''}>Patch</option>
-            <option value="kit" ${defaultType === 'kit' ? 'selected' : ''}>Kit</option>
-          </select>
-        </label>
-        <label class="custom-instrument-field">
-          <span>Audio snippet</span>
-          <select id="ci-snippet" aria-label="Audio snippet source">
-            <option value="">Use imported file...</option>
-            ${audioSnippets.map(snippet => `<option value="${snippet.id}">${snippet.name || 'Audio in recording'}</option>`).join('')}
-          </select>
-        </label>
-        <label class="custom-instrument-field">
-          <span>Audio file</span>
-          <input id="ci-file" type="file" accept="audio/*" aria-label="Audio file source">
-        </label>
-        <label class="custom-instrument-field ci-patch-only">
-          <span>Root note</span>
-          <select id="ci-root" aria-label="Root note">
-            ${this._rootNoteOptions(editingInstrument?.rootMidi ?? 60)}
-          </select>
-          <small>The note your original sample already sounds like. That note plays unshifted; other notes pitch it up or down.</small>
-        </label>
-        <label class="custom-instrument-field ci-patch-only">
-          <span>Playback</span>
-          <select id="ci-playback" aria-label="Playback mode">
-            <option value="gated" ${editingInstrument?.playbackMode !== 'oneShot' ? 'selected' : ''}>Gated</option>
-            <option value="oneShot" ${editingInstrument?.playbackMode === 'oneShot' ? 'selected' : ''}>One-shot</option>
-          </select>
-        </label>
-        <label class="custom-instrument-field">
-          <span>Brightness <b id="ci-brightness-value">${Math.round((editingInstrument?.brightness ?? 0.7) * 100)}%</b></span>
-          <input id="ci-brightness" type="range" min="0" max="100" value="${Math.round((editingInstrument?.brightness ?? 0.7) * 100)}" aria-label="Brightness">
-        </label>
-        <label class="custom-instrument-field">
-          <span>Gain <b id="ci-gain-value">${Math.round((editingInstrument?.gain ?? 0.55) * 100)}%</b></span>
-          <input id="ci-gain" type="range" min="10" max="100" value="${Math.round((editingInstrument?.gain ?? 0.55) * 100)}" aria-label="Gain">
-        </label>
-        <p class="custom-instrument-note" id="ci-kit-note" hidden>Kit instruments are saved now; live Kit playback is the next wiring step.</p>
-        <div class="tone-preset__row">
-          <button class="btn btn--ghost" id="ci-save" type="button">${editingInstrument ? 'Update Instrument' : 'Save Instrument'}</button>
-        </div>
-      </div>
-    `;
-
-    anchor.appendChild(popover);
-    this._instrumentPopover = popover;
-
-    const syncType = () => {
-      const isKit = popover.querySelector('#ci-type')?.value === 'kit';
-      popover.querySelectorAll('.ci-patch-only').forEach(el => { el.hidden = isKit; });
-      const note = popover.querySelector('#ci-kit-note');
-      if (note) note.hidden = !isKit;
-    };
-    const syncSlider = (id) => {
-      const slider = popover.querySelector(`#ci-${id}`);
-      const label = popover.querySelector(`#ci-${id}-value`);
-      if (slider && label) label.textContent = `${slider.value}%`;
-    };
-    const loadInstrumentIntoForm = (instrument) => {
-      const form = popover.querySelector('.custom-instrument-form');
-      if (form) form.dataset.editingId = instrument?.id || '';
-      const title = popover.querySelector('#ci-title');
-      if (title) title.textContent = instrument ? 'Edit Instrument' : 'Create Instrument';
-      const save = popover.querySelector('#ci-save');
-      if (save) save.textContent = instrument ? 'Update Instrument' : 'Save Instrument';
-      const name = popover.querySelector('#ci-name');
-      if (name) name.value = instrument?.name || '';
-      const type = popover.querySelector('#ci-type');
-      if (type) type.value = instrument?.type || (this.activeInstrument === INSTRUMENTS.KIT ? 'kit' : 'patch');
-      const snippet = popover.querySelector('#ci-snippet');
-      if (snippet) snippet.value = instrument?.sourceSnippetId || '';
-      const file = popover.querySelector('#ci-file');
-      if (file) file.value = '';
-      const root = popover.querySelector('#ci-root');
-      if (root) root.value = String(instrument?.rootMidi ?? 60);
-      const playback = popover.querySelector('#ci-playback');
-      if (playback) playback.value = instrument?.playbackMode || 'gated';
-      const brightness = popover.querySelector('#ci-brightness');
-      if (brightness) brightness.value = String(Math.round((instrument?.brightness ?? 0.7) * 100));
-      const gain = popover.querySelector('#ci-gain');
-      if (gain) gain.value = String(Math.round((instrument?.gain ?? 0.55) * 100));
-      syncType();
-      syncSlider('brightness');
-      syncSlider('gain');
-    };
-
-    const handleOutside = (e) => {
-      if (!this._instrumentPopover) return;
-      if (this._instrumentPopover.contains(e.target)) return;
-      if (anchor.contains(e.target)) return;
-      this._closeCreateInstrumentPopover();
-    };
-    queueMicrotask(() => document.addEventListener('pointerdown', handleOutside, true));
-    this._instrumentClickOutsideHandler = handleOutside;
-    popover.querySelector('#ci-existing')?.addEventListener('change', (event) => {
-      const instrument = customInstruments.find(item => item.id === event.target.value) || null;
-      loadInstrumentIntoForm(instrument);
-    });
-    popover.querySelector('#ci-type')?.addEventListener('change', syncType);
-    popover.querySelector('#ci-brightness')?.addEventListener('input', () => syncSlider('brightness'));
-    popover.querySelector('#ci-gain')?.addEventListener('input', () => syncSlider('gain'));
-    popover.querySelector('#ci-save')?.addEventListener('pointerdown', async (e) => {
-      e.preventDefault();
-      await this._saveCustomInstrument(popover);
-    });
-    syncType();
-  }
-
-  _rootNoteOptions(selectedMidi = 60) {
-    const notes = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-    const options = [];
-    for (let octave = 1; octave <= 6; octave++) {
-      for (let i = 0; i < notes.length; i++) {
-        const midi = (octave + 1) * 12 + i;
-        options.push(`<option value="${midi}" ${midi === selectedMidi ? 'selected' : ''}>${notes[i]}${octave}</option>`);
-      }
-    }
-    return options.join('');
+    this.createInstrumentPopover?.toggle(anchor);
   }
 
   async _saveCustomInstrument(root) {
@@ -1007,17 +866,6 @@ export class CreativeMode {
       : (this._activePatchId || '');
     if (!selected.startsWith('custom:')) return null;
     return this._customInstruments().find(item => item.id === selected.slice(7)) || null;
-  }
-
-  _escapeAttr(value = '') {
-    return this._escapeHtml(value).replace(/"/g, '&quot;');
-  }
-
-  _escapeHtml(value = '') {
-    return String(value)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
   }
 
   async _deleteSelectedCustomInstrument() {
@@ -1149,12 +997,7 @@ export class CreativeMode {
   }
 
   _closeCreateInstrumentPopover() {
-    if (this._instrumentClickOutsideHandler) {
-      document.removeEventListener('pointerdown', this._instrumentClickOutsideHandler, true);
-      this._instrumentClickOutsideHandler = null;
-    }
-    this._instrumentPopover?.remove();
-    this._instrumentPopover = null;
+    this.createInstrumentPopover?.close();
   }
 
   handlesPerformanceKey(code) {
