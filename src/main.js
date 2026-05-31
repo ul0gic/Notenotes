@@ -508,8 +508,8 @@ class App {
     prompt.innerHTML = `
       <span class="audio-unlock-prompt__dot" aria-hidden="true"></span>
       <span class="audio-unlock-prompt__copy">
-        <strong>Enable audio</strong>
-        <small>Tap once if iOS is silent</small>
+        <strong>Tap to enable sound</strong>
+        <small>No microphone permission needed</small>
       </span>
     `;
     prompt.addEventListener('pointerdown', async (event) => {
@@ -558,8 +558,8 @@ class App {
     this._audioUnlockPrompt.setAttribute('aria-label', needsUnlock ? 'Enable audio engine' : 'Audio engine ready');
     if (this._audioUnlockStatus) {
       this._audioUnlockStatus.textContent = state === 'suspended'
-        ? 'Tap to wake suspended sound'
-        : 'Tap once if iOS is silent';
+        ? 'Tap to resume Web Audio'
+        : 'No microphone permission needed';
     }
   }
 

@@ -114,8 +114,8 @@ and should only ask when the user is recording Audio In.
 - `_initializeAudioFromGesture()` creates/resumes `AudioEngine`, initializes the
   metronome, Creative mode, and Canvas playback engine, then calls
   `AudioEngine.unlockGesture()` before and after resume.
-- `_buildAudioUnlockPrompt()` adds the floating `Enable audio` prompt. It stays
-  visible while the app has not initialized audio or while
+- `_buildAudioUnlockPrompt()` adds the floating `Tap to enable sound` prompt.
+  It stays visible while the app has not initialized audio or while
   `engine.ctx.state !== 'running'`, and hides only after Web Audio reports a
   running context.
 - `_bindAudioContextState()` and the `notenotes-audio-state-changed` event keep
@@ -528,6 +528,13 @@ label/normalization helpers. It receives explicit getters/setters from
 instrument construction. `CreativeMode` remains the adapter that schedules saves
 and refreshes `ControllerMode` after bindings change.
 
+The Create toolbar exposes Controller Mapper through `Labs`, not as its own wide
+button. `CreativeMode._toggleLabsPopover()` owns that small menu and currently
+routes to Stage and Controller Mapper. Keep this as the home for experimental
+performance/control surfaces that are global to Create but not normal sound
+settings. Do not add more top-level toolbar buttons for every new lab unless the
+tool becomes core enough to deserve permanent space.
+
 `src/ui/CreateLayoutPopover.js` owns the Create toolbar Layout popover for Pads
 and Piano. It renders the custom pad-count slider, piano count/key sliders, and
 the shared degree-color controls. It receives explicit callbacks from
@@ -615,12 +622,15 @@ moving musical input or transport logic.
   that opens a bird's-eye track overlay. The renderer reads `project.tracks`,
   track mute/solo/color state, `transport.ticksPerBar`, and
   `transport.currentTick`; it does not mutate clips and does not drive playback.
+- Create Stage opens from the `Labs` popover in Pads, Piano, Controller, and
+  Kit. The former separate Controller and Stage toolbar buttons were folded into
+  Labs to keep mobile Create controls from turning into a crowded strip.
 - Do not let Stage drive audio. Stage renderers may read transport time and
   consume events, but audio remains scheduled by existing Web Audio/Transport
   paths. If Three.js is added, it should sit behind the same Stage event/model
   API rather than replacing the musical routing.
 
-Mobile toolbar panels: Create toolbar controls (`Tone`, `Controller`, `Layout`,
+Mobile toolbar panels: Create toolbar controls (`Tone`, `Labs`, `Layout`,
 `Create/Edit Instrument`, and AI Seed) are desktop popovers but become fixed
 viewport modals under 700px wide. The mobile CSS lives in
 `src/instruments/instruments.css` for `.tone-popover` descendants and

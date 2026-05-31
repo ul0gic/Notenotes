@@ -94,8 +94,7 @@ export class CreativeMode {
     this.sketchKit.onDeleteInstrument = () => this._deleteSelectedCustomInstrument();
     this.sketchKit.onKitChanged = () => this.store?.scheduleAutoSave(this.project);
     this.sketchKit.onAISeedClick = (anchor, buttonEl) => this._toggleAISeedPopover(anchor, buttonEl);
-    this.sketchKit.onControllerMapperClick = (anchor, buttonEl) => this._toggleControllerMapperPopover(anchor, buttonEl);
-    this.sketchKit.onStageClick = () => this._toggleStageOverlay();
+    this.sketchKit.onLabsClick = (anchor, buttonEl) => this._toggleLabsPopover(anchor, buttonEl);
     this.micRecorder = new MicRecorder();
     this.controllerMode = new ControllerMode(this.synth, this.project, modManager, this.gamepadInput);
     this.controllerMode.onToneAssignmentChanged = () => this.store?.scheduleAutoSave(this.project);
@@ -142,6 +141,7 @@ export class CreativeMode {
         this._closeTonePopover();
         this._closeControllerMapperPopover();
         this._closeAISeedPopover();
+        this._closeLabsPopover();
       },
       onScheduleSave: () => this.store?.scheduleAutoSave(this.project),
       onPadsChanged: (count) => {
@@ -165,6 +165,7 @@ export class CreativeMode {
         this._closeKeysPopover();
         this._closeControllerMapperPopover();
         this._closeAISeedPopover();
+        this._closeLabsPopover();
       },
       onSave: (popover) => this._saveCustomInstrument(popover),
     });
@@ -211,6 +212,8 @@ export class CreativeMode {
     this._initialized = false;
     this._tonePopover = null;
     this._toneClickOutsideHandler = null;
+    this._labsPopover = null;
+    this._labsClickOutsideHandler = null;
     this._patchPicker = null;
     this._heldControllerMidis = new Map();
     this._heldControllerPads = new Map();
@@ -492,9 +495,8 @@ export class CreativeMode {
       <button class="tone-button" id="delete-instrument-button" type="button">Delete</button>
       <button class="tone-button" id="tone-button" type="button" aria-expanded="false" aria-controls="tone-popover">Tone</button>
       <button class="tone-button ai-seed-button" id="ai-seed-button" type="button" aria-expanded="false" aria-controls="ai-seed-popover" title="Seed a snippet with AI">AI</button>
-      <button class="tone-button controller-map-button" id="controller-map-button" type="button" aria-expanded="false" aria-controls="controller-map-popover" title="Learn gamepad bindings">Controller</button>
       <button class="tone-button" id="layout-button" type="button" aria-expanded="false" aria-controls="layout-popover">Layout</button>
-      <button class="tone-button stage-button" id="stage-button" type="button" aria-pressed="false" title="Open the performance visual layer">Stage</button>
+      <button class="tone-button labs-button" id="labs-button" type="button" aria-expanded="false" aria-controls="labs-popover" title="Performance and controller tools">Labs</button>
       <span class="tone-trigger-indicator" id="tone-trigger-indicator" aria-live="polite"></span>
     `;
     this._bindToolbarTap(patchSel.querySelector('#patch-picker-button'), (button) => {
@@ -513,16 +515,13 @@ export class CreativeMode {
     this._bindToolbarTap(patchSel.querySelector('#ai-seed-button'), () => {
       this._toggleAISeedPopover(patchSel, patchSel.querySelector('#ai-seed-button'));
     });
-    this._bindToolbarTap(patchSel.querySelector('#controller-map-button'), () => {
-      this._toggleControllerMapperPopover(patchSel, patchSel.querySelector('#controller-map-button'));
-    });
     this._bindToolbarTap(patchSel.querySelector('#layout-button'), (button) => {
       if (button.disabled) return;
       if (this.activeInstrument === INSTRUMENTS.SCALEBOARD) this._togglePadsPopover(patchSel, button);
       else if (this.activeInstrument === INSTRUMENTS.PIANO) this._toggleKeysPopover(patchSel, button);
     });
-    this._bindToolbarTap(patchSel.querySelector('#stage-button'), () => {
-      this._toggleStageOverlay();
+    this._bindToolbarTap(patchSel.querySelector('#labs-button'), (button) => {
+      this._toggleLabsPopover(patchSel, button);
     });
     this.el.appendChild(patchSel);
     this._syncInstrumentButtons();
@@ -1328,6 +1327,7 @@ export class CreativeMode {
       this._stageOverlay.close();
       return;
     }
+    this._closeLabsPopover();
     const title = this.activeInstrument === INSTRUMENTS.KIT
       ? 'Kit Stage'
       : (this.activeInstrument === INSTRUMENTS.PIANO ? 'Piano Stage' : 'Pad Stage');
@@ -1355,9 +1355,8 @@ export class CreativeMode {
   }
 
   _syncStageButton() {
-    this.el?.querySelectorAll('.stage-button').forEach(btn => {
+    this.el?.querySelectorAll('.labs-button').forEach(btn => {
       btn.classList.toggle('is-active', !!this._stageOverlay);
-      btn.setAttribute('aria-pressed', String(!!this._stageOverlay));
     });
   }
 
@@ -1383,6 +1382,7 @@ export class CreativeMode {
       this._closeTonePopover();
       this._closePadsPopover();
       this._closeKeysPopover();
+      this._closeLabsPopover();
     }
     this._closeControllerMapperPopover();
     this._syncInstrumentButtons();
@@ -1430,7 +1430,7 @@ export class CreativeMode {
 
   _syncCreateToolbarButtons() {
     this._syncAISeedButtonVisibility();
-    this._syncControllerMapperButtonVisibility();
+    this._syncLabsButtonVisibility();
     this._syncStageButton();
     const layoutBtn = this.el?.querySelector('#layout-button');
     if (layoutBtn) {
@@ -1446,17 +1446,17 @@ export class CreativeMode {
     }
   }
 
-  _syncControllerMapperButtonVisibility() {
-    const patchBtn = this.el?.querySelector('#controller-map-button');
-    if (patchBtn) {
-      const show = this.activeInstrument === INSTRUMENTS.SCALEBOARD
-        || this.activeInstrument === INSTRUMENTS.PIANO
-        || this.activeInstrument === INSTRUMENTS.CONTROLLER;
-      const hiddenForVoice = this.activeInstrument === INSTRUMENTS.SCALEBOARD
-        && this.scaleBoard?.padMode === 'voices';
-      patchBtn.style.display = show && !hiddenForVoice ? '' : 'none';
-      if (!show || hiddenForVoice) this._closeControllerMapperPopover();
-    }
+  _syncLabsButtonVisibility() {
+    const patchBtn = this.el?.querySelector('#labs-button');
+    if (!patchBtn) return;
+    const show = this.activeInstrument === INSTRUMENTS.SCALEBOARD
+      || this.activeInstrument === INSTRUMENTS.PIANO
+      || this.activeInstrument === INSTRUMENTS.CONTROLLER;
+    patchBtn.style.display = show ? '' : 'none';
+    if (!show) this._closeLabsPopover();
+    const hiddenForVoice = this.activeInstrument === INSTRUMENTS.SCALEBOARD
+      && this.scaleBoard?.padMode === 'voices';
+    if (hiddenForVoice) this._closeControllerMapperPopover();
   }
 
   setRecordArmed(armed, options = {}) {
@@ -1509,6 +1509,7 @@ export class CreativeMode {
    *   handler when re-clicking the button itself.
    */
   _toggleAISeedPopover(anchor, buttonEl = null) {
+    this._closeLabsPopover();
     this.aiSeedPopover?.toggle(anchor, buttonEl);
   }
 
@@ -1609,6 +1610,7 @@ export class CreativeMode {
     this._closePadsPopover();
     this._closeKeysPopover();
     this._closeAISeedPopover();
+    this._closeLabsPopover();
     this.controllerMapper.open(anchor, buttonEl);
   }
 
@@ -1624,12 +1626,81 @@ export class CreativeMode {
     this.controllerMapper?.close();
   }
 
+  _toggleLabsPopover(anchor, buttonEl = null) {
+    if (this._labsPopover) {
+      this._closeLabsPopover();
+      return;
+    }
+    this._closeTonePopover();
+    this._closePadsPopover();
+    this._closeKeysPopover();
+    this._closeAISeedPopover();
+    this._closeControllerMapperPopover();
+
+    const controllerDisabled = this.activeInstrument === INSTRUMENTS.SCALEBOARD
+      && this.scaleBoard?.padMode === 'voices';
+    const popover = document.createElement('div');
+    popover.className = 'tone-popover labs-popover';
+    popover.id = 'labs-popover';
+    popover.innerHTML = `
+      <div class="tone-popover__header">
+        <span>Labs</span>
+      </div>
+      <div class="labs-popover__list">
+        <button class="labs-popover__item" type="button" data-labs-action="stage">
+          <strong>${this._stageOverlay ? 'Close Stage' : 'Open Stage'}</strong>
+          <span>Fullscreen performance highway for the active surface.</span>
+        </button>
+        <button class="labs-popover__item" type="button" data-labs-action="controller" ${controllerDisabled ? 'disabled' : ''}>
+          <strong>Controller Mapper</strong>
+          <span>${controllerDisabled ? 'Unavailable in Voice Sketch mode.' : 'Learn buttons, list bindings, and manage presets.'}</span>
+        </button>
+      </div>
+    `;
+
+    anchor.appendChild(popover);
+    buttonEl?.setAttribute('aria-expanded', 'true');
+    this._labsPopover = popover;
+
+    const handleOutside = (e) => {
+      if (!this._labsPopover) return;
+      if (this._labsPopover.contains(e.target)) return;
+      if (anchor.contains(e.target)) return;
+      this._closeLabsPopover();
+    };
+    queueMicrotask(() => document.addEventListener('pointerdown', handleOutside, true));
+    this._labsClickOutsideHandler = handleOutside;
+
+    popover.querySelector('[data-labs-action="stage"]')?.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      this._toggleStageOverlay();
+    });
+
+    popover.querySelector('[data-labs-action="controller"]')?.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      if (controllerDisabled) return;
+      this._closeLabsPopover();
+      this._toggleControllerMapperPopover(anchor, null);
+    });
+  }
+
+  _closeLabsPopover() {
+    if (this._labsClickOutsideHandler) {
+      document.removeEventListener('pointerdown', this._labsClickOutsideHandler, true);
+      this._labsClickOutsideHandler = null;
+    }
+    this._labsPopover?.remove();
+    this._labsPopover = null;
+    this.el?.querySelectorAll('.labs-button').forEach(btn => btn.setAttribute('aria-expanded', 'false'));
+  }
+
   _toggleTonePopover(anchor) {
     if (this._tonePopover) {
       this._closeTonePopover();
       return;
     }
     this._closeControllerMapperPopover();
+    this._closeLabsPopover();
 
     const traits = this._ensureSoundTraits();
     const popover = document.createElement('div');

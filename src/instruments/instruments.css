@@ -149,6 +149,45 @@
   gap: var(--space-xs);
 }
 
+.labs-popover__list {
+  display: grid;
+  gap: var(--space-xs);
+}
+
+.labs-popover__item {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: var(--space-sm);
+  color: var(--text-secondary);
+  text-align: left;
+  background: var(--surface-2);
+  border: var(--border-subtle);
+  border-radius: var(--radius-sm);
+  font: inherit;
+}
+
+.labs-popover__item:hover:not(:disabled) {
+  color: var(--accent-light);
+  background: var(--surface-3);
+  border-color: var(--accent-dim);
+}
+
+.labs-popover__item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.labs-popover__item strong {
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+}
+
+.labs-popover__item span {
+  font-size: var(--font-size-xs);
+  line-height: 1.35;
+}
+
 .create-control-popover {
   width: min(300px, calc(100vw - 32px));
 }
@@ -1894,18 +1933,13 @@
     grid-column: 4;
   }
 
-  #controller-map-button,
-  #sk-controller-map-button {
-    grid-column: 1 / span 2;
-  }
-
   #layout-button {
-    grid-column: 3;
+    grid-column: 5;
   }
 
-  #stage-button,
-  #sk-stage-button {
-    grid-column: 4 / span 2;
+  #labs-button,
+  #sk-labs-button {
+    grid-column: 1 / span 2;
   }
 
   .tone-popover {
