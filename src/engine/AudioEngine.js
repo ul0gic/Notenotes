@@ -91,14 +91,16 @@ export class AudioEngine {
       this.ctx.resume().catch(() => {});
     }
     try {
-      const source = this.ctx.createBufferSource();
-      source.buffer = this.ctx.createBuffer(1, 1, this.ctx.sampleRate);
+      const source = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
-      gain.gain.value = 0.0001;
+      const now = this.ctx.currentTime;
+      source.frequency.value = 440;
+      gain.gain.setValueAtTime(0.00001, now);
+      gain.gain.exponentialRampToValueAtTime(0.000001, now + 0.04);
       source.connect(gain);
       gain.connect(this.ctx.destination);
-      source.start(0);
-      source.stop(this.ctx.currentTime + 0.01);
+      source.start(now);
+      source.stop(now + 0.04);
     } catch (e) { /* non-critical unlock nudge */ }
   }
 

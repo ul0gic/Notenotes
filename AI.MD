@@ -528,12 +528,13 @@ label/normalization helpers. It receives explicit getters/setters from
 instrument construction. `CreativeMode` remains the adapter that schedules saves
 and refreshes `ControllerMode` after bindings change.
 
-The Create toolbar exposes Controller Mapper through `Labs`, not as its own wide
-button. `CreativeMode._toggleLabsPopover()` owns that small menu and currently
-routes to Stage and Controller Mapper. Keep this as the home for experimental
-performance/control surfaces that are global to Create but not normal sound
-settings. Do not add more top-level toolbar buttons for every new lab unless the
-tool becomes core enough to deserve permanent space.
+The old top-level `Ctrl` tab is now labeled `Labs`. It still renders
+`ControllerMode` for the gamepad picture, trigger assignments, connection
+status, fallback scale, and current binding readout; that screen is the first
+Labs resident because it is lower-frequency setup/control work rather than a
+core note surface. The Create toolbar `Controller` button remains the global
+Controller Mapper entry point for learning/clearing bindings. Do not bury the
+mapper inside Labs unless product direction changes.
 
 `src/ui/CreateLayoutPopover.js` owns the Create toolbar Layout popover for Pads
 and Piano. It renders the custom pad-count slider, piano count/key sliders, and
@@ -622,15 +623,15 @@ moving musical input or transport logic.
   that opens a bird's-eye track overlay. The renderer reads `project.tracks`,
   track mute/solo/color state, `transport.ticksPerBar`, and
   `transport.currentTick`; it does not mutate clips and does not drive playback.
-- Create Stage opens from the `Labs` popover in Pads, Piano, Controller, and
-  Kit. The former separate Controller and Stage toolbar buttons were folded into
-  Labs to keep mobile Create controls from turning into a crowded strip.
+- Create Stage opens from the Stage toolbar button in Pads, Piano, Labs, and
+  Kit. Labs is the renamed home for the old Controller screen; it is not the
+  Controller Mapper popover.
 - Do not let Stage drive audio. Stage renderers may read transport time and
   consume events, but audio remains scheduled by existing Web Audio/Transport
   paths. If Three.js is added, it should sit behind the same Stage event/model
   API rather than replacing the musical routing.
 
-Mobile toolbar panels: Create toolbar controls (`Tone`, `Labs`, `Layout`,
+Mobile toolbar panels: Create toolbar controls (`Tone`, `Controller`, `Layout`,
 `Create/Edit Instrument`, and AI Seed) are desktop popovers but become fixed
 viewport modals under 700px wide. The mobile CSS lives in
 `src/instruments/instruments.css` for `.tone-popover` descendants and

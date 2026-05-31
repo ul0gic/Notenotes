@@ -123,6 +123,11 @@ export class ControllerMode {
     this.el.id = 'controller-mode';
 
     this.el.innerHTML = `
+      <div class="ctrlmode__lab-header">
+        <span>Labs</span>
+        <strong>Controller</strong>
+        <p>Gamepad triggers, sticks, fallback notes, and live binding status.</p>
+      </div>
       <div class="ctrlmode__controls">
         <div class="ctrlmode__control-group">
           <label class="ctrlmode__label">Pad Mode</label>

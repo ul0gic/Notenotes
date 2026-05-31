@@ -236,11 +236,11 @@ Expected:
 
 Steps:
 
-1. Open Create > Pads and click Labs > Stage.
+1. Open Create > Pads and click Stage.
 2. Play several pads, including held notes and quick taps.
-3. Switch to Piano, open Labs > Stage, and play visible keys.
+3. Switch to Piano, open Stage, and play visible keys.
 4. Set Piano to its maximum key count, reopen Stage, and confirm each visible key gets a distinct lane/pill instead of sharing with another key.
-5. Switch to Kit, open Labs > Stage, and hit several drum pads.
+5. Switch to Kit, open Stage, and hit several drum pads.
 6. On a phone-width viewport, confirm Kit Stage lane pills use short readable labels and do not overlap.
 7. Create a MIDI snippet, a drum snippet, and an Audio In snippet, then place them on separate Canvas tracks with different track colors.
 8. Open Canvas and click Stage.
@@ -265,10 +265,10 @@ Expected:
 Steps:
 
 1. Open Create on an iPhone 15-width viewport.
-2. Confirm the Patch row shows `Patch` plus a readable picker on the first row, with Create/Edit Instrument, Tone, AI, Layout, and Labs arranged as compact action buttons below it.
+2. Confirm the Patch row shows `Patch` plus a readable picker on the first row, with Create/Edit Instrument, Tone, AI, Controller, Layout, and Stage arranged as compact action buttons below it.
 3. Open Pads, enable Extensions, and confirm all 13 pads can be reached without the snippets tray permanently hiding the final row.
 4. Drag vertically inside the pad grid and horizontally through the instrument tabs/snippet tray.
-5. Open Tone, AI, Labs, Layout, and Create/Edit Instrument from the mobile action row; from Labs, open both Stage and Controller Mapper.
+5. Open Tone, AI, Controller, Layout, Stage, and Create/Edit Instrument from the mobile action row.
 
 Expected:
 

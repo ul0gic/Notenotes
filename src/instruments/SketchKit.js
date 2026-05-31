@@ -124,7 +124,8 @@ export class SketchKit {
     this.onCreateInstrument = null;
     this.onDeleteInstrument = null;
     this.onAISeedClick = null;
-    this.onLabsClick = null;
+    this.onControllerMapperClick = null;
+    this.onStageClick = null;
     this._activePadTimers = new Map();
     this._dwellTimers = new Map();
     this._toneClickOutsideHandler = null;
@@ -196,7 +197,8 @@ export class SketchKit {
         <button class="tone-button" id="sk-delete-instrument-button" type="button">Delete</button>
         <button class="tone-button" id="sk-tone-button" type="button" aria-expanded="false" aria-controls="sk-tone-popover">Tone</button>
         <button class="tone-button ai-seed-button" id="sk-ai-seed-button" type="button" aria-expanded="false" aria-controls="ai-seed-popover" title="Seed a snippet with AI">AI</button>
-        <button class="tone-button labs-button" id="sk-labs-button" type="button" aria-expanded="false" aria-controls="labs-popover" title="Performance and controller tools">Labs</button>
+        <button class="tone-button controller-map-button" id="sk-controller-map-button" type="button" aria-expanded="false" aria-controls="controller-map-popover" title="Learn gamepad bindings">Controller</button>
+        <button class="tone-button stage-button" id="sk-stage-button" type="button" title="Open the performance visual layer">Stage</button>
       </div>
       <div class="sketchkit__pads" id="sk-pads" style="grid-template-columns:${this._gridColumns()};">
         ${this._renderPads()}
@@ -262,9 +264,15 @@ export class SketchKit {
         this.onAISeedClick(this.el.querySelector('#sk-kit-selector'), this.el.querySelector('#sk-ai-seed-button'));
       }
     });
-    this.el.querySelector('#sk-labs-button')?.addEventListener('click', (e) => {
+    this.el.querySelector('#sk-controller-map-button')?.addEventListener('click', (e) => {
       e.preventDefault();
-      this.onLabsClick?.(this.el.querySelector('#sk-kit-selector'), this.el.querySelector('#sk-labs-button'));
+      if (this.onControllerMapperClick) {
+        this.onControllerMapperClick(this.el.querySelector('#sk-kit-selector'), this.el.querySelector('#sk-controller-map-button'));
+      }
+    });
+    this.el.querySelector('#sk-stage-button')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      this.onStageClick?.(this.el.querySelector('#sk-kit-selector'), this.el.querySelector('#sk-stage-button'));
     });
     this._syncInstrumentButtons();
     this._bindPadEvents();
