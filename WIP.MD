@@ -10,7 +10,7 @@ After that, the next visible work should be:
 
 1. Mobile Create layout, BPM control, and snippets drawer hardening.
 2. Pre-DAW positioning pass.
-3. Track View prototype.
+3. Stage views and modular pad surface planning.
 4. Google Drive Backup.
 
 Progression/Changes work has started as a foundation slice: the project now has
@@ -197,32 +197,81 @@ Expected scope:
 
 Small writing pass.
 
-## 7. Track View Prototype
+## 7. Stage Views
 
 Goal:
 
-A secondary Canvas view that renders snippets as Guitar Hero / Synthesia-style scrolling lanes during playback.
+Turn the current Stage overlay into a small set of switchable visual views
+without touching audio timing. Stage is already the shipped name for the older
+"Flow" / "Performance Mode" idea; it has live Create views and Canvas track
+views backed by `src/stage/`.
 
-Why it fits:
+Direction under review:
 
-- It supports color over notation.
-- It pairs naturally with controller mode.
-- It is more readable for people who do not read staff notation or piano roll.
-- It can use the same note/hit data without changing the data model.
+- Keep Stage as a full-screen overlay, with left/right arrows or swipe to move
+  between views.
+- Formalize the implicit renderer seam into a tiny Stage view registry/lifecycle
+  so only one view runs at a time.
+- Refactor the current live highway and Canvas track map into the first two
+  registered views before adding new visuals.
+- Cache gradients and reduce hot-path shadow blur before adding more Stage
+  views; Stage must stay a read-only mirror of transport/events and never drive
+  audio.
+- Lazy-load any future Three.js/WebGL view. Do not add three.js eagerly to the
+  base bundle.
+- Honor reduced motion and keep a cheap Canvas 2D fallback.
 
-Prototype notes:
+Open decisions:
 
-- Lives inside Canvas as a toggle or split view, not a new top-level mode.
-- Render to canvas and animate with `requestAnimationFrame`.
-- Audio scheduling stays untouched.
-- Pick lanes by pitch class, scale degree, or pad during prototype.
-- Do not ship it under a trademarked name.
+- Which extra Stage view ships first, if any, beyond the current highway/track
+  views.
+- Whether WebGL is in scope soon or only architected-for.
+- Whether every view must support both live Create and Canvas contexts.
 
 Expected scope:
 
-Medium. Likely 2-3 day prototype plus polish.
+Medium. First slice should be a registry/refactor/perf pass, not a new visual
+spectacle.
 
-## 8. Google Drive Backup
+## 8. Modular Pad Surface
+
+Goal:
+
+Replace the equal-cell `ceil(sqrt(N))` ScaleBoard grid with a responsive,
+span-based pad surface that fits better on mobile and allows future pad layout
+templates without putting a framework or canvas in the note-trigger path.
+
+Direction under review:
+
+- Keep pads as native DOM `<button>` elements. Do not move playable pads to
+  canvas/WebGL; accessibility, dwell play, tremor filtering, keyboard routing,
+  and immediate pointer-to-sound behavior all depend on real buttons.
+- Use CSS Grid with relative span sizes (`small`, `medium`, `large`, `wide` or
+  similar), not absolute pixel/freeform positions.
+- Make the grid container-aware, with a minimum touch target and a narrow-phone
+  fallback that ignores size variation and renders uniform pads.
+- Persist a future `project.settings.padLayout` schema additively. Store layout
+  intent as relative sizes/templates, not fixed coordinates.
+- Deprecate the old `custom` pad mode carefully. Its per-pad single/chord toggle
+  was in-memory-only, but `scalePadsCount` should remain in the data model as
+  dormant plumbing for a future full-custom surface.
+- Avoid `innerHTML` rebuilds on resize or during drag/resize editing. If an
+  editor is added later, move elements with transforms during drag and commit
+  to the schema on drop.
+
+Open decisions:
+
+- First size vocabulary: likely `S / M / L / Wide`, but keep it small.
+- First templates: likely `Even`, `Big tonic`, and `Thumb-friendly`.
+- Whether cosmetic shapes ship in v1 or wait until the layout is stable.
+
+Expected scope:
+
+Medium to large if done properly. The safest first slice is schema + responsive
+layout engine + hiding/deprecating the old `custom` UI, not a full freeform
+editor.
+
+## 9. Google Drive Backup
 
 Goal:
 
@@ -246,7 +295,7 @@ Expected scope:
 
 Large.
 
-## 9. Optional Later: Audio File Import
+## 10. Optional Later: Audio File Import
 
 Goal:
 
@@ -262,7 +311,7 @@ Expected scope:
 
 Small to medium.
 
-## 10. Custom Instrument Patches / Sample Instruments
+## 11. Custom Instrument Patches / Sample Instruments
 
 Goal:
 
@@ -350,7 +399,7 @@ Expected scope:
 
 Medium. Basic playable sample patch is not hard; durable persistence, backup/restore, and WAV export make it a real feature.
 
-## 10. Instrument Selection UX
+## 12. Instrument Selection UX
 
 Goal:
 
