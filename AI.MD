@@ -323,6 +323,11 @@ Rules:
   `MusicTheory.getScaleNotes()`.
 - `chordType` currently supports `triad` and `seventh` only. Add extensions
   deliberately once the UI has a real need.
+- `TransportBar` renders a compact top-bar `Changes` picker using
+  `progressionChoiceGroups()`. Selecting `Off` writes the inactive default;
+  selecting a preset writes a normalized `project.progression` and dispatches
+  `project-progression-changed`. This is still context only: no sound, glow, or
+  transport advancement should be inferred from a selected progression yet.
 - Future visual layers should treat progression glow as "current chord tones are
   hot", not "notes are in scale." In-scale identity already belongs to degree
   colors.

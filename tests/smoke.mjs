@@ -30,6 +30,8 @@ import {
 } from '../src/engine/Meter.js';
 import {
   normalizeProgressionContext,
+  progressionChoiceGroups,
+  progressionLabel,
   progressionPreset,
   resolveProgressionStep,
 } from '../src/engine/Progressions.js';
@@ -119,6 +121,15 @@ test('progression resolver stores degrees but resolves against current key and s
 
   const cMinorVII = resolveProgressionStep({ degree: 'bVII' }, { root: 'C', scale: 'minor' });
   assert.deepEqual(cMinorVII.midis, [70, 74, 77]);
+});
+
+test('progression picker helpers expose a compact Off state and preset groups', () => {
+  assert.equal(progressionLabel(null), 'Off');
+  assert.equal(progressionLabel(progressionPreset('axis')), 'The Axis');
+  const groups = progressionChoiceGroups();
+  assert.equal(groups[0].id, 'basic');
+  assert.equal(groups[0].items[0].value, 'off');
+  assert.equal(groups.flatMap(group => group.items).some(item => item.value === 'jazzTurnaround'), true);
 });
 
 test('note correction quantizes piano and MIDI notes only when enabled', () => {

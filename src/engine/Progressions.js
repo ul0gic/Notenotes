@@ -80,6 +80,35 @@ export const PROGRESSION_PRESETS = {
   },
 };
 
+export function progressionLabel(value = null) {
+  const context = normalizeProgressionContext(value);
+  return context.enabled ? context.name : 'Off';
+}
+
+export function progressionChoiceGroups() {
+  return [
+    {
+      id: 'basic',
+      label: 'Basic',
+      items: [
+        {
+          value: 'off',
+          label: 'Off',
+          kicker: 'No changes',
+          description: 'No progression context. Notes and clips behave normally.',
+          tags: ['none', 'silent', 'default'],
+        },
+        ...['axis', 'dooWop', 'sadHopeful', 'threeChord'].map(presetItem),
+      ],
+    },
+    {
+      id: 'color',
+      label: 'Color',
+      items: ['jazzTurnaround', 'mixolydianRock', 'twelveBarBlues'].map(presetItem),
+    },
+  ];
+}
+
 const ROMAN_DEGREES = {
   i: 0,
   ii: 1,
@@ -94,6 +123,17 @@ const MAJOR_DEGREE_INTERVALS = [0, 2, 4, 5, 7, 9, 11];
 
 function progressionSteps(degrees) {
   return degrees.map(degree => ({ degree, durationBars: 1 }));
+}
+
+function presetItem(id) {
+  const preset = PROGRESSION_PRESETS[id];
+  return {
+    value: id,
+    label: preset.name,
+    kicker: preset.steps.map(step => step.degree).join(' - '),
+    description: preset.description || '',
+    tags: [id, preset.chordType || PROGRESSION_CHORD_TYPES.triad],
+  };
 }
 
 function cloneSteps(steps) {

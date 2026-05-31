@@ -14,8 +14,8 @@ After that, the next visible work should be:
 4. Google Drive Backup.
 
 Progression/Changes work has started as a foundation slice: the project now has
-an inactive, degree-based progression context and resolver, but no user-facing
-selector, glow, or playback behavior yet.
+an inactive, degree-based progression context, resolver, and compact top-bar
+Changes picker. There is no glow or playback behavior yet.
 
 Release/deploy strategy is worth doing before a true `1.0.0`, but it does not need to block the beta hardening work unless accidental GitHub Pages deploys become a real problem.
 
@@ -414,8 +414,6 @@ without making Notenotes feel like a rigid accompaniment generator.
 
 Next slices:
 
-- Add a compact global `Changes` / `Progression` selector that can stay `Off`
-  by default and does not crowd the mobile top bar.
 - Add a shared progression editor/authoring surface, likely reachable from the
   selector and from Step Play, without stuffing more complexity directly into
   `ScaleBoard.js`.

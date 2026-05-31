@@ -24,6 +24,7 @@ import { PlaybackEngine } from './engine/PlaybackEngine.js';
 import { ModulationManager } from './engine/ModulationManager.js';
 import { normalizeMusicalContext } from './engine/MusicTheory.js';
 import { meterToTimeSignature, normalizeMeter, pulseCountForMeter } from './engine/Meter.js';
+import { normalizeProgressionContext, progressionLabel } from './engine/Progressions.js';
 import { workspaceBackupStatus } from './utils/BackupStatus.js';
 import {
   AUTO_FOLDER_BACKUP_DELAY_MS,
@@ -100,10 +101,12 @@ class App {
     // Pass project reference to creative mode
     this._ensureProjectMusicalContext();
     this._ensureProjectMeter();
+    this._ensureProjectProgression();
     this._applyAccessibilityProfiles();
     this.creativeMode.project = this.project;
     this.transportBar.setProjectKey(this.project.musicalContext);
     this.transportBar.setProjectMeter(this.project.meter);
+    this.transportBar.setProjectProgression(this.project.progression);
 
     // Create and render Canvas Mode (needs project)
     this.canvasMode = new CanvasMode(this.transport, this.project, this.undoManager, this.store);
@@ -224,6 +227,9 @@ class App {
     };
     this.transportBar.onProjectMeterChange = (meter) => {
       this._setProjectMeter(meter);
+    };
+    this.transportBar.onProjectProgressionChange = (progression) => {
+      this._setProjectProgression(progression);
     };
     this.transportBar.onBpmChange = (bpm) => {
       if (!this.project) return;
@@ -415,6 +421,13 @@ class App {
     return meter;
   }
 
+  _ensureProjectProgression() {
+    if (!this.project) return normalizeProgressionContext();
+    const progression = normalizeProgressionContext(this.project.progression);
+    this.project.progression = progression;
+    return progression;
+  }
+
   _applyAccessibilityProfiles() {
     if (!this.project) return;
     ensureAccessibilitySettings(this.project);
@@ -478,6 +491,18 @@ class App {
       detail: { timeSignature: { ...this.project.timeSignature }, meter: { ...this.project.meter } },
     }));
     showToast(`Meter: ${next.id}`);
+  }
+
+  _setProjectProgression(progression) {
+    if (!this.project) return;
+    const next = normalizeProgressionContext(progression);
+    const current = normalizeProgressionContext(this.project.progression);
+    if (JSON.stringify(current) === JSON.stringify(next)) return;
+    this.project.progression = next;
+    this.transportBar.setProjectProgression(next);
+    this.store?.scheduleAutoSave(this.project);
+    window.dispatchEvent(new CustomEvent('project-progression-changed', { detail: { ...next } }));
+    showToast(`Changes: ${progressionLabel(next)}`);
   }
 
   _beatColorsForBeats(beats = 4) {
