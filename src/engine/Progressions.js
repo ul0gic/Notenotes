@@ -1,0 +1,247 @@
+/**
+ * Progressions - project-level harmonic context helpers.
+ *
+ * A progression is stored as scale degrees, not absolute notes. Resolution
+ * happens against the current project key/scale so old snippets and clips keep
+ * their own notes while new visual layers can ask "what chord is hot now?"
+ */
+
+import {
+  SCALES,
+  getScaleNotes,
+  noteNameToMidi,
+  normalizeMusicalContext,
+} from './MusicTheory.js';
+import { scaleChordRecipes } from './ScaleChords.js';
+
+export const PROGRESSION_ADVANCE_MODES = {
+  manual: 'manual',
+  strict: 'strict',
+};
+
+export const PROGRESSION_CHORD_TYPES = {
+  triad: 'triad',
+  seventh: 'seventh',
+};
+
+export const DEFAULT_PROGRESSION_CONTEXT = {
+  enabled: false,
+  id: 'off',
+  name: 'Off',
+  advance: PROGRESSION_ADVANCE_MODES.manual,
+  chordType: PROGRESSION_CHORD_TYPES.triad,
+  activeStepIndex: 0,
+  steps: [],
+};
+
+export const PROGRESSION_PRESETS = {
+  axis: {
+    id: 'axis',
+    name: 'The Axis',
+    description: 'I-V-vi-IV pop movement.',
+    steps: progressionSteps(['I', 'V', 'vi', 'IV']),
+  },
+  dooWop: {
+    id: 'dooWop',
+    name: 'Doo-wop',
+    description: 'I-vi-IV-V classic loop.',
+    steps: progressionSteps(['I', 'vi', 'IV', 'V']),
+  },
+  sadHopeful: {
+    id: 'sadHopeful',
+    name: 'Sad but hopeful',
+    description: 'vi-IV-I-V emotional pop loop.',
+    steps: progressionSteps(['vi', 'IV', 'I', 'V']),
+  },
+  jazzTurnaround: {
+    id: 'jazzTurnaround',
+    name: 'Jazz turnaround',
+    description: 'ii-V-I, best with sevenths.',
+    chordType: PROGRESSION_CHORD_TYPES.seventh,
+    steps: progressionSteps(['ii', 'V', 'I']),
+  },
+  threeChord: {
+    id: 'threeChord',
+    name: 'Three-chord',
+    description: 'I-IV-V home base.',
+    steps: progressionSteps(['I', 'IV', 'V']),
+  },
+  mixolydianRock: {
+    id: 'mixolydianRock',
+    name: 'Mixolydian rock',
+    description: 'I-bVII-IV rock color.',
+    steps: progressionSteps(['I', 'bVII', 'IV']),
+  },
+  twelveBarBlues: {
+    id: 'twelveBarBlues',
+    name: '12-bar blues',
+    description: 'A simple I/IV/V blues map.',
+    steps: progressionSteps(['I', 'I', 'I', 'I', 'IV', 'IV', 'I', 'I', 'V', 'IV', 'I', 'V']),
+  },
+};
+
+const ROMAN_DEGREES = {
+  i: 0,
+  ii: 1,
+  iii: 2,
+  iv: 3,
+  v: 4,
+  vi: 5,
+  vii: 6,
+};
+
+const MAJOR_DEGREE_INTERVALS = [0, 2, 4, 5, 7, 9, 11];
+
+function progressionSteps(degrees) {
+  return degrees.map(degree => ({ degree, durationBars: 1 }));
+}
+
+function cloneSteps(steps) {
+  return (Array.isArray(steps) ? steps : [])
+    .map(step => ({ ...step }));
+}
+
+export function progressionPreset(id) {
+  const preset = PROGRESSION_PRESETS[id];
+  if (!preset) return null;
+  return {
+    ...preset,
+    enabled: true,
+    advance: PROGRESSION_ADVANCE_MODES.manual,
+    chordType: preset.chordType || PROGRESSION_CHORD_TYPES.triad,
+    activeStepIndex: 0,
+    steps: cloneSteps(preset.steps),
+  };
+}
+
+export function normalizeProgressionContext(value = {}) {
+  if (!value || typeof value !== 'object') return { ...DEFAULT_PROGRESSION_CONTEXT, steps: [] };
+
+  const preset = typeof value.id === 'string' && value.id !== 'off' ? progressionPreset(value.id) : null;
+  const raw = preset ? { ...preset, ...value } : value;
+  const steps = normalizeProgressionSteps(raw.steps);
+  const activeStepIndex = Math.max(0, Math.min(
+    Math.max(0, steps.length - 1),
+    Number.isInteger(raw.activeStepIndex) ? raw.activeStepIndex : 0
+  ));
+
+  return {
+    enabled: !!raw.enabled && steps.length > 0,
+    id: typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim() : DEFAULT_PROGRESSION_CONTEXT.id,
+    name: typeof raw.name === 'string' && raw.name.trim() ? raw.name.trim().slice(0, 80) : DEFAULT_PROGRESSION_CONTEXT.name,
+    advance: Object.values(PROGRESSION_ADVANCE_MODES).includes(raw.advance)
+      ? raw.advance
+      : DEFAULT_PROGRESSION_CONTEXT.advance,
+    chordType: Object.values(PROGRESSION_CHORD_TYPES).includes(raw.chordType)
+      ? raw.chordType
+      : DEFAULT_PROGRESSION_CONTEXT.chordType,
+    activeStepIndex,
+    steps,
+  };
+}
+
+export function normalizeProgressionSteps(steps = []) {
+  if (!Array.isArray(steps)) return [];
+  return steps
+    .map(step => normalizeProgressionStep(step))
+    .filter(Boolean);
+}
+
+export function normalizeProgressionStep(step = {}) {
+  const degree = normalizeDegreeToken(step?.degree);
+  if (!degree) return null;
+  const duration = Number(step.durationBars);
+  return {
+    degree,
+    durationBars: Number.isFinite(duration) ? Math.max(0.25, Math.min(16, duration)) : 1,
+  };
+}
+
+export function normalizeDegreeToken(value) {
+  const degree = typeof value === 'string' ? value.trim() : '';
+  if (!degree) return '';
+  const parsed = parseDegreeToken(degree);
+  return parsed ? parsed.normalized : '';
+}
+
+export function parseDegreeToken(value) {
+  const degree = typeof value === 'string' ? value.trim() : '';
+  const match = degree.match(/^([b#]*)([ivIV]+)([+°ø]?)$/);
+  if (!match) return null;
+  const [, accidentalText, romanText, suffix] = match;
+  const romanKey = romanText.toLowerCase();
+  if (!Object.prototype.hasOwnProperty.call(ROMAN_DEGREES, romanKey)) return null;
+
+  let accidental = 0;
+  for (const char of accidentalText) accidental += char === '#' ? 1 : -1;
+
+  return {
+    normalized: `${accidentalText}${romanText}${suffix || ''}`,
+    roman: romanText,
+    degreeIndex: ROMAN_DEGREES[romanKey],
+    accidental,
+    suffix: suffix || '',
+  };
+}
+
+export function resolveProgressionStep(step, context = {}, options = {}) {
+  const normalizedStep = normalizeProgressionStep(step);
+  if (!normalizedStep) return null;
+
+  const musicalContext = normalizeMusicalContext(context);
+  const chordType = Object.values(PROGRESSION_CHORD_TYPES).includes(options.chordType)
+    ? options.chordType
+    : PROGRESSION_CHORD_TYPES.triad;
+
+  const curated = resolveCuratedStep(normalizedStep, musicalContext);
+  const midis = curated?.midis || resolveStackedScaleStep(normalizedStep, musicalContext, chordType);
+  if (!midis.length) return null;
+
+  return {
+    degree: normalizedStep.degree,
+    durationBars: normalizedStep.durationBars,
+    chordType,
+    midis,
+    pitchClasses: midis.map(midi => ((midi % 12) + 12) % 12),
+    label: curated?.label || normalizedStep.degree,
+    name: curated?.name || normalizedStep.degree,
+  };
+}
+
+function resolveCuratedStep(step, context) {
+  const recipes = scaleChordRecipes(context.scale);
+  if (!recipes) return null;
+  const recipe = recipes.find(item => item.label === step.degree);
+  if (!recipe) return null;
+  const rootMidi = noteNameToMidi(context.root, 4);
+  return {
+    label: recipe.label,
+    name: recipe.name,
+    midis: recipe.semitones.map(offset => rootMidi + offset),
+  };
+}
+
+function resolveStackedScaleStep(step, context, chordType) {
+  const parsed = parseDegreeToken(step.degree);
+  const scale = SCALES[context.scale] || SCALES.major;
+  if (!parsed || !scale?.intervals?.length) return [];
+
+  const rootMidi = noteNameToMidi(context.root, 4);
+  const targetInterval = modulo12(MAJOR_DEGREE_INTERVALS[parsed.degreeIndex] + parsed.accidental);
+  const desiredPitchClass = modulo12(rootMidi + targetInterval);
+  const scaleNotes = getScaleNotes(context.scale, context.root, 4, 48);
+  const rootIndex = scaleNotes.findIndex(midi => midi >= rootMidi && modulo12(midi) === desiredPitchClass);
+  if (rootIndex < 0) return [];
+
+  const chordSize = chordType === PROGRESSION_CHORD_TYPES.seventh ? 4 : 3;
+  const midis = [];
+  for (let i = 0; i < chordSize; i++) {
+    const midi = scaleNotes[rootIndex + i * 2];
+    if (Number.isFinite(midi)) midis.push(midi);
+  }
+  return midis;
+}
+
+function modulo12(value) {
+  return ((value % 12) + 12) % 12;
+}

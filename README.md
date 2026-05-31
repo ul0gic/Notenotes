@@ -175,7 +175,7 @@ These are the ideas that drive the project. Some are coded, some are sketches, s
 
 ### Safety nets for those who need them
 - [x] **Scale lock** on the pads.
-- [ ] **Chord lock** - only chords that fit the song's key are reachable.
+- [ ] **Progression / chord context** - the project now has a quiet, backward-compatible degree-based progression model under the hood. The next step is a user-facing Changes/Progression selector and chord-tone glow, so the app can show what is harmonically hot right now without rewriting old snippets.
 - [ ] **Microtonal Pads mode** - true quarter-tone maqam/raga support needs a deliberate pitch-label, MIDI-export, ABC-export, AI-schema, and controller-binding design instead of being slipped in as float scale intervals.
 - [ ] **Drone mode** - sustain the root of your key in the background as a tonal anchor.
 - [ ] **Suggest-next-chord** - gentle prompts when you want them, invisible when you don't.

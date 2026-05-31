@@ -28,6 +28,11 @@ import {
   secondsPerTickForMeter,
   ticksPerBarForMeter,
 } from '../src/engine/Meter.js';
+import {
+  normalizeProgressionContext,
+  progressionPreset,
+  resolveProgressionStep,
+} from '../src/engine/Progressions.js';
 import { StageEventStream } from '../src/stage/StageEventStream.js';
 import {
   STAGE_CANVAS_TRACK_LIMIT,
@@ -37,7 +42,7 @@ import {
   stageIntensityForUnits,
   stageTracksForCanvas,
 } from '../src/stage/StageModel.js';
-import { auditProjectAudioAssets } from '../src/data/ProjectStore.js';
+import { auditProjectAudioAssets, createProject } from '../src/data/ProjectStore.js';
 
 function test(name, fn) {
   try {
@@ -65,6 +70,55 @@ test('compound and asymmetric meter math keeps bar durations pulse-based', () =>
 
   assert.equal(pulseCountForMeter('7/8'), 3);
   assert.equal(Math.round(quarterBpmForMeter('7/8', 120)), 140);
+});
+
+test('progression context normalizes to an inactive, backward-compatible default', () => {
+  const project = createProject('Progression smoke');
+  assert.equal(project.progression.enabled, false);
+  assert.equal(project.progression.id, 'off');
+
+  const normalized = normalizeProgressionContext(null);
+  assert.equal(normalized.enabled, false);
+  assert.equal(normalized.activeStepIndex, 0);
+  assert.deepEqual(normalized.steps, []);
+
+  const axis = normalizeProgressionContext({
+    enabled: true,
+    name: 'Custom Axis',
+    advance: 'strict',
+    chordType: 'seventh',
+    steps: [
+      { degree: 'I', durationBars: 2 },
+      { degree: 'bad', durationBars: -1 },
+      { degree: 'vi' },
+    ],
+    activeStepIndex: 99,
+  });
+  assert.equal(axis.enabled, true);
+  assert.equal(axis.name, 'Custom Axis');
+  assert.equal(axis.advance, 'strict');
+  assert.equal(axis.chordType, 'seventh');
+  assert.deepEqual(axis.steps.map(step => [step.degree, step.durationBars]), [['I', 2], ['vi', 1]]);
+  assert.equal(axis.activeStepIndex, 1);
+});
+
+test('progression resolver stores degrees but resolves against current key and scale', () => {
+  const axis = progressionPreset('axis');
+  assert.deepEqual(axis.steps.map(step => step.degree), ['I', 'V', 'vi', 'IV']);
+
+  const cMajorI = resolveProgressionStep({ degree: 'I' }, { root: 'C', scale: 'major' });
+  assert.deepEqual(cMajorI.midis, [60, 64, 67]);
+  assert.deepEqual(cMajorI.pitchClasses, [0, 4, 7]);
+
+  const gMajorI = resolveProgressionStep({ degree: 'I' }, { root: 'G', scale: 'major' });
+  assert.deepEqual(gMajorI.midis, [67, 71, 74]);
+  assert.deepEqual(gMajorI.pitchClasses, [7, 11, 2]);
+
+  const cMajorVSeventh = resolveProgressionStep({ degree: 'V' }, { root: 'C', scale: 'major' }, { chordType: 'seventh' });
+  assert.deepEqual(cMajorVSeventh.midis, [67, 71, 74, 77]);
+
+  const cMinorVII = resolveProgressionStep({ degree: 'bVII' }, { root: 'C', scale: 'minor' });
+  assert.deepEqual(cMinorVII.midis, [70, 74, 77]);
 });
 
 test('note correction quantizes piano and MIDI notes only when enabled', () => {

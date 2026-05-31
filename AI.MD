@@ -43,6 +43,7 @@ src/main.js
     RecordingManager.js     converts live events into snippets
     MusicTheory.js          notes, scales, degree metadata
     ScaleChords.js          curated chord recipes for non-tertian scales
+    Progressions.js         degree-stored harmonic context + chord resolver
     GamepadInputManager.js  gamepad polling and bindable buttons
   ai/
     AIController.js         constrained snippet-generation orchestration
@@ -210,6 +211,15 @@ Project sketch:
   meter,              // canonical
   timeSignature,      // legacy mirror
   musicalContext: { root: 'C', scale: 'major', correction: 'off' },
+  progression: {
+    enabled: false,
+    id: 'off',
+    name: 'Off',
+    advance: 'manual',
+    chordType: 'triad',
+    activeStepIndex: 0,
+    steps: []
+  },
   tracks: [],
   snippets: [],
   settings: {
@@ -288,6 +298,37 @@ Snippet sketch:
 
 Snippets are reused by clips. Editing a source snippet affects every clip that
 references or embeds it unless code intentionally clones it.
+
+## Progression Context
+
+`src/engine/Progressions.js` is the first foundation slice for project-level
+harmonic context. It is intentionally data/model only right now: no glow,
+playback, authoring UI, or snippet migration depends on it yet.
+
+Rules:
+
+- `project.progression` is additive and normalized on project create/load/save.
+  Old projects without the field become `{ enabled: false, id: 'off', steps: [] }`
+  and must keep playing/exporting exactly as they did before.
+- Progression steps store scale degrees such as `I`, `V`, `vi`, `bVII`, not
+  absolute notes. This lets a future Progression/Changes selector transpose
+  with `project.musicalContext`.
+- `normalizeProgressionContext()` clamps unknown/malformed data into a safe
+  inactive shape. Invalid steps are dropped; `activeStepIndex` is clamped to the
+  remaining step list.
+- `resolveProgressionStep(step, musicalContext, { chordType })` resolves a
+  single degree step into MIDI notes and pitch classes for future glow/playback
+  consumers. It first honors exact labels in `ScaleChords.js` for curated
+  non-tertian scales, then falls back to stacked scale-thirds from
+  `MusicTheory.getScaleNotes()`.
+- `chordType` currently supports `triad` and `seventh` only. Add extensions
+  deliberately once the UI has a real need.
+- Future visual layers should treat progression glow as "current chord tones are
+  hot", not "notes are in scale." In-scale identity already belongs to degree
+  colors.
+- Do not mutate snippets to add progression data. Snippets remain portable
+  note/hit/audio objects; if a progression is unavailable in an old project,
+  only the future glow/context layer should be absent.
 
 ## IndexedDB And Audio Assets
 

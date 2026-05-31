@@ -6,6 +6,7 @@
 import { openDB } from 'idb';
 import { DEFAULT_DEGREE_HIGHLIGHTING, DEFAULT_MUSICAL_CONTEXT } from '../engine/MusicTheory.js';
 import { METER_PRESETS, meterToTimeSignature, normalizeMeter } from '../engine/Meter.js';
+import { DEFAULT_PROGRESSION_CONTEXT, normalizeProgressionContext } from '../engine/Progressions.js';
 import { ACCESSIBILITY_DEFAULTS, ensureAccessibilitySettings } from '../ui/AccessibilityProfiles.js';
 
 const DB_NAME = 'notenotes';
@@ -38,6 +39,7 @@ export function createProject(name = 'Untitled Sketch') {
     meter: normalizeMeter(METER_PRESETS['4/4']),
     timeSignature: { beats: 4, subdivision: 4 },
     musicalContext: { ...DEFAULT_MUSICAL_CONTEXT },
+    progression: normalizeProgressionContext(DEFAULT_PROGRESSION_CONTEXT),
     createdAt: Date.now(),
     updatedAt: Date.now(),
     tracks: [],
@@ -498,6 +500,7 @@ export class ProjectStore {
     const meter = normalizeMeter(project.meter || project.timeSignature);
     project.meter = meter;
     project.timeSignature = meterToTimeSignature(meter);
+    project.progression = normalizeProgressionContext(project.progression);
     ensureAccessibilitySettings(project);
     return project;
   }
