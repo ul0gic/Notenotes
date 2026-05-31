@@ -248,6 +248,13 @@ export function resolveProgressionStep(step, context = {}, options = {}) {
   };
 }
 
+export function activeProgressionResolution(progression = {}, context = {}) {
+  const normalized = normalizeProgressionContext(progression);
+  if (!normalized.enabled || !normalized.steps.length) return null;
+  const step = normalized.steps[normalized.activeStepIndex] || normalized.steps[0];
+  return resolveProgressionStep(step, context, { chordType: normalized.chordType });
+}
+
 function resolveCuratedStep(step, context) {
   const recipes = scaleChordRecipes(context.scale);
   if (!recipes) return null;

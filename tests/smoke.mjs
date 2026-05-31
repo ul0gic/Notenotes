@@ -29,6 +29,7 @@ import {
   ticksPerBarForMeter,
 } from '../src/engine/Meter.js';
 import {
+  activeProgressionResolution,
   normalizeProgressionContext,
   progressionChoiceGroups,
   progressionLabel,
@@ -121,6 +122,26 @@ test('progression resolver stores degrees but resolves against current key and s
 
   const cMinorVII = resolveProgressionStep({ degree: 'bVII' }, { root: 'C', scale: 'minor' });
   assert.deepEqual(cMinorVII.midis, [70, 74, 77]);
+});
+
+test('active progression resolution returns the current chord tones only when enabled', () => {
+  assert.equal(activeProgressionResolution(null, { root: 'C', scale: 'major' }), null);
+
+  const progression = normalizeProgressionContext({
+    enabled: true,
+    chordType: 'triad',
+    activeStepIndex: 1,
+    steps: [
+      { degree: 'I' },
+      { degree: 'V' },
+    ],
+  });
+  const active = activeProgressionResolution(progression, { root: 'C', scale: 'major' });
+  assert.deepEqual(active.midis, [67, 71, 74]);
+  assert.deepEqual(active.pitchClasses, [7, 11, 2]);
+
+  const disabled = activeProgressionResolution({ ...progression, enabled: false }, { root: 'C', scale: 'major' });
+  assert.equal(disabled, null);
 });
 
 test('progression picker helpers expose a compact Off state and preset groups', () => {

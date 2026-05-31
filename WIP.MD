@@ -417,12 +417,15 @@ Next slices:
 - Add a shared progression editor/authoring surface, likely reachable from the
   selector and from Step Play, without stuffing more complexity directly into
   `ScaleBoard.js`.
-- Add chord-tone glow first on Pads, then Piano. Glow must mean "current chord
-  tone", not "in scale", because scale identity already belongs to degree
-  colors.
+- Add Piano chord-tone glow using the same "current chord tone" meaning as Pads.
+- Add a progression advance model so the active step can move manually or follow
+  bars. The current shipped glow only reflects `activeStepIndex`.
 - Keep progression steps stored as degrees so changing project key/scale can
   re-resolve the harmonic context. Old snippets without progression data should
   continue to play normally; they simply do not get progression-aware glow.
+- Compact the top-bar controls by moving nouns into picker button labels where
+  useful, such as `Changes: Off`, while keeping modal/picker rows simple (`Off`,
+  `The Axis`, etc.).
 
 Open decisions:
 

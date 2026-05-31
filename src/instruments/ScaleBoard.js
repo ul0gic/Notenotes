@@ -31,6 +31,7 @@ import {
   NOTE_NAMES
 } from '../engine/MusicTheory.js';
 import { scaleChordRecipes } from '../engine/ScaleChords.js';
+import { activeProgressionResolution } from '../engine/Progressions.js';
 import { showToast } from '../ui/Toast.js';
 import { syllabify, extractPlayableSyllables, sanitizePhraseInput } from './voice/syllabify.js';
 import { dwellSettings, tremorAllows } from '../ui/AccessibilityProfiles.js';
@@ -117,6 +118,9 @@ export class ScaleBoard {
         this._updateNotes();
       }
       this._refreshPads();
+    });
+    window.addEventListener('project-progression-changed', () => {
+      if (this.el) this._refreshPads();
     });
   }
 
@@ -407,16 +411,26 @@ export class ScaleBoard {
       const voiceLabel = isVoice ? this._previewSyllableForPad(i) : null;
       const voiceClass = isVoice ? ' scaleboard__pad--voice' : '';
       const degreeMeta = this._degreeMetaForMidi(midi);
+      const progressionMeta = this._progressionMetaForMidi(midi, degreeMeta);
       const degreeClass = degreeMeta
         ? `${degreeMeta.colorEnabled ? ' scaleboard__pad--degree-color' : ''}${degreeMeta.functionName ? ' scaleboard__pad--degree-label' : ''}`
         : '';
-      const degreeStyle = degreeMeta ? ` style="--degree-color: ${this._escapeAttr(degreeMeta.color)}; --degree-intensity: ${this._escapeAttr(degreeMeta.intensityPercent)};"` : '';
+      const progressionClass = progressionMeta ? ' scaleboard__pad--progression-hot' : '';
+      const styleVars = [];
+      if (degreeMeta) {
+        styleVars.push(`--degree-color: ${this._escapeAttr(degreeMeta.color)}`);
+        styleVars.push(`--degree-intensity: ${this._escapeAttr(degreeMeta.intensityPercent)}`);
+      }
+      if (progressionMeta) {
+        styleVars.push(`--progression-color: ${this._escapeAttr(progressionMeta.color)}`);
+      }
+      const padStyle = styleVars.length ? ` style="${styleVars.join('; ')};"` : '';
       const degreeLabel = degreeMeta?.functionName || '';
       const theoryLabel = degreeMeta?.functionName
         ? `, ${degreeMeta.functionName}${degreeMeta.shorthand ? ` (${degreeMeta.shorthand})` : ''}`
         : '';
       return `
-        <button class="scaleboard__pad${voiceClass}${degreeClass} ${this.isEditingLayout ? 'is-editing' : ''}"${degreeStyle} data-index="${i}" data-midi="${midi}"
+        <button class="scaleboard__pad${voiceClass}${degreeClass}${progressionClass} ${this.isEditingLayout ? 'is-editing' : ''}"${padStyle} data-index="${i}" data-midi="${midi}"
                 aria-label="${isRootMode ? `${noteInfo.display} plus nearest ${this.rootNote}, ${rootInfo.display}` : curatedChord ? `${curatedChord.label} chord, ${curatedChord.name}` : `Scale degree ${degree}, ${noteInfo.display}`}${theoryLabel}${voiceLabel ? ', sings ' + voiceLabel : ''}">
           <span class="scaleboard__pad-degree">${isRootMode ? noteInfo.name : (curatedChord?.label || degree)}</span>
           <span class="scaleboard__pad-note">${noteInfo.display}</span>
@@ -442,6 +456,17 @@ export class ScaleBoard {
       intensityPercent: `${Math.round((degree.intensity ?? 0.22) * 100)}%`,
       functionName: degree.showLabels ? (meta.functionName || meta.name || meta.label) : '',
       shorthand: meta.label || ''
+    };
+  }
+
+  _progressionMetaForMidi(midi, degreeMeta = null) {
+    const active = activeProgressionResolution(this.project?.progression, this.project?.musicalContext);
+    if (!active?.pitchClasses?.length) return null;
+    const pitchClass = ((midi % 12) + 12) % 12;
+    if (!active.pitchClasses.includes(pitchClass)) return null;
+    return {
+      color: degreeMeta?.color || '#79c8ff',
+      degree: active.degree,
     };
   }
 

@@ -301,9 +301,10 @@ references or embeds it unless code intentionally clones it.
 
 ## Progression Context
 
-`src/engine/Progressions.js` is the first foundation slice for project-level
-harmonic context. It is intentionally data/model only right now: no glow,
-playback, authoring UI, or snippet migration depends on it yet.
+`src/engine/Progressions.js` is the foundation slice for project-level harmonic
+context. The current shipped behavior is visual-only: selecting Changes can
+highlight current chord tones on Pads, but it does not change playback,
+recording, export, or snippets.
 
 Rules:
 
@@ -326,11 +327,16 @@ Rules:
 - `TransportBar` renders a compact top-bar `Changes` picker using
   `progressionChoiceGroups()`. Selecting `Off` writes the inactive default;
   selecting a preset writes a normalized `project.progression` and dispatches
-  `project-progression-changed`. This is still context only: no sound, glow, or
-  transport advancement should be inferred from a selected progression yet.
-- Future visual layers should treat progression glow as "current chord tones are
-  hot", not "notes are in scale." In-scale identity already belongs to degree
-  colors.
+  `project-progression-changed`.
+- `ScaleBoard` listens for `project-progression-changed` and refreshes Pads.
+  `_progressionMetaForMidi()` calls `activeProgressionResolution()` and adds
+  `.scaleboard__pad--progression-hot` to pads whose pitch class is in the
+  current active chord. This is a halo/outline emphasis channel, not a fill
+  color, so it can layer over degree colors.
+- Progression glow means "current chord tones are hot", not "notes are in
+  scale." In-scale identity already belongs to degree colors.
+- The active step currently stays whatever `project.progression.activeStepIndex`
+  says. There is no automatic bar-following or manual next-step UI yet.
 - Do not mutate snippets to add progression data. Snippets remain portable
   note/hit/audio objects; if a progression is unavailable in an old project,
   only the future glow/context layer should be absent.
