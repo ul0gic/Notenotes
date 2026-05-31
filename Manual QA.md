@@ -39,6 +39,7 @@ Expected:
 
 - Sound plays from the first instrument interaction.
 - No Audio In interaction is required to wake the engine.
+- If iOS keeps the context suspended, an `Enable audio` prompt is visible and tapping it wakes sound without showing the microphone permission prompt.
 - No console error appears.
 
 ### 1.2 Reload Keeps Audio Usable

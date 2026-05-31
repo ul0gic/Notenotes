@@ -793,6 +793,80 @@ input, textarea, select, [contenteditable] {
   line-height: 1.6;
 }
 
+/* --- Audio Unlock Prompt --- */
+.audio-unlock-prompt {
+  position: fixed;
+  right: var(--space-lg);
+  bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+  z-index: var(--z-tooltip);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: 48px;
+  padding: var(--space-sm) var(--space-md);
+  color: var(--text-primary);
+  background:
+    linear-gradient(135deg, rgba(80, 200, 120, 0.18), rgba(176, 176, 176, 0.1)),
+    var(--surface-3);
+  border: 1px solid rgba(80, 200, 120, 0.45);
+  border-radius: var(--radius-md);
+  box-shadow: 0 0 22px rgba(80, 200, 120, 0.16), var(--shadow-md);
+  font: inherit;
+  text-align: left;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(12px);
+  transition:
+    opacity var(--duration-normal) var(--ease-out),
+    transform var(--duration-normal) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out);
+}
+
+.audio-unlock-prompt.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.audio-unlock-prompt.is-working {
+  border-color: rgba(232, 160, 64, 0.75);
+}
+
+.audio-unlock-prompt__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-play);
+  box-shadow: 0 0 12px rgba(80, 200, 120, 0.8);
+  flex: 0 0 auto;
+}
+
+.audio-unlock-prompt__copy {
+  display: grid;
+  gap: 1px;
+}
+
+.audio-unlock-prompt__copy strong {
+  font-size: var(--font-size-sm);
+  line-height: 1.1;
+}
+
+.audio-unlock-prompt__copy small {
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  line-height: 1.2;
+}
+
+@media (max-width: 640px) {
+  .audio-unlock-prompt {
+    left: var(--space-md);
+    right: var(--space-md);
+    bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+    justify-content: center;
+    text-align: center;
+  }
+}
+
 /* --- Toast Notifications --- */
 .toast-container {
   position: fixed;

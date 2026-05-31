@@ -71,6 +71,10 @@ class App {
     this._lastCtrlWheelAt = 0;
     this._folderAutoBackupTimer = null;
     this._folderAutoBackupRunning = false;
+    this._audioUnlockPrompt = null;
+    this._audioUnlockStatus = null;
+    this._audioContextStateBound = false;
+    this._audioVisibilityResumeBound = false;
   }
 
   /**
@@ -259,9 +263,12 @@ class App {
       this.canvasMode?.refresh();
       this.playbackEngine?.onCustomInstrumentsChanged(event.detail?.instrumentId || null);
     });
+    window.addEventListener('notenotes-audio-state-changed', () => this._syncAudioUnlockPrompt());
 
     // First user interaction will init audio
     this._setupAudioInit();
+    this._bindAudioVisibilityResume();
+    this._buildAudioUnlockPrompt();
 
     console.log('[App] Notenotes ready.');
   }
@@ -490,6 +497,99 @@ class App {
     });
   }
 
+  _buildAudioUnlockPrompt() {
+    if (this._audioUnlockPrompt || typeof document === 'undefined') return;
+
+    const prompt = document.createElement('button');
+    prompt.type = 'button';
+    prompt.className = 'audio-unlock-prompt';
+    prompt.hidden = true;
+    prompt.setAttribute('aria-live', 'polite');
+    prompt.innerHTML = `
+      <span class="audio-unlock-prompt__dot" aria-hidden="true"></span>
+      <span class="audio-unlock-prompt__copy">
+        <strong>Enable audio</strong>
+        <small>Tap once if iOS is silent</small>
+      </span>
+    `;
+    prompt.addEventListener('pointerdown', async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      prompt.classList.add('is-working');
+      const ready = await this._initializeAudioFromGesture({ announce: true });
+      prompt.classList.remove('is-working');
+      if (!ready) showToast('Tap again to enable audio');
+    });
+
+    document.body.appendChild(prompt);
+    this._audioUnlockPrompt = prompt;
+    this._audioUnlockStatus = prompt.querySelector('small');
+    this._syncAudioUnlockPrompt();
+  }
+
+  _bindAudioContextState() {
+    if (this._audioContextStateBound || !this.engine.ctx?.addEventListener) return;
+    this._audioContextStateBound = true;
+    this.engine.ctx.addEventListener('statechange', () => {
+      window.dispatchEvent(new CustomEvent('notenotes-audio-state-changed', {
+        detail: { state: this.engine.ctx?.state || 'unknown' },
+      }));
+    });
+  }
+
+  _bindAudioVisibilityResume() {
+    if (this._audioVisibilityResumeBound) return;
+    this._audioVisibilityResumeBound = true;
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && this.engine.ctx?.state === 'suspended') {
+        this.engine.ctx.resume().finally(() => this._syncAudioUnlockPrompt());
+      } else {
+        this._syncAudioUnlockPrompt();
+      }
+    });
+  }
+
+  _syncAudioUnlockPrompt() {
+    if (!this._audioUnlockPrompt) return;
+    const state = this.engine.ctx?.state || 'new';
+    const needsUnlock = !this._initialized || state !== 'running';
+    this._audioUnlockPrompt.hidden = !needsUnlock;
+    this._audioUnlockPrompt.classList.toggle('is-visible', needsUnlock);
+    this._audioUnlockPrompt.setAttribute('aria-label', needsUnlock ? 'Enable audio engine' : 'Audio engine ready');
+    if (this._audioUnlockStatus) {
+      this._audioUnlockStatus.textContent = state === 'suspended'
+        ? 'Tap to wake suspended sound'
+        : 'Tap once if iOS is silent';
+    }
+  }
+
+  async _initializeAudioFromGesture({ announce = false } = {}) {
+    try {
+      if (!this.engine._initialized) {
+        this.engine.initSync();
+      }
+      this._bindAudioContextState();
+      this.metronome.init();
+      this.creativeMode.init();
+      this.playbackEngine?.init();
+      this._initialized = true;
+      this.engine.unlockGesture?.();
+      if (this.engine.ctx?.state === 'suspended') {
+        await this.engine.ctx.resume().catch(() => {});
+      }
+      this.engine.unlockGesture?.();
+      const ready = this.engine.ctx?.state === 'running';
+      this._syncAudioUnlockPrompt();
+      setTimeout(() => this._syncAudioUnlockPrompt(), 120);
+      if (ready && announce) showToast('Audio engine ready');
+      return ready;
+    } catch (e) {
+      console.warn('[App] Audio init failed, will retry:', e);
+      this._syncAudioUnlockPrompt();
+      return false;
+    }
+  }
+
   /**
    * Build the main UI structure.
    */
@@ -617,42 +717,32 @@ class App {
       events.forEach(e => document.removeEventListener(e, handler, { capture: true }));
     };
 
-    const initAudio = () => {
+    const initAudio = async () => {
       if (this._initialized) return;
-      try {
-        this.engine.initSync();
-        this.metronome.init();
-        this.creativeMode.init();
-        this.playbackEngine?.init();
-        this._initialized = true;
+      const ready = await this._initializeAudioFromGesture();
+      if (ready) {
         showToast('Audio engine ready');
         console.log('[App] Audio initialized on user gesture.');
-      } catch (e) {
-        console.warn('[App] Audio init failed, will retry:', e);
         return;
       }
-
-      document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible' && this.engine.ctx?.state === 'suspended') {
-          this.engine.ctx.resume();
-        }
-      });
     };
 
     // Persistent resume handler: iOS may need multiple touches before it accepts one
-    const maybeResume = () => {
+    const maybeResume = async () => {
       if (!this._initialized) {
-        initAudio();
+        await initAudio();
         return;
       }
       if (this.engine.ctx?.state === 'suspended') {
-        this.engine.ctx.resume().catch(() => {});
+        await this.engine.ctx.resume().catch(() => {});
+        this.engine.unlockGesture?.();
       }
+      this._syncAudioUnlockPrompt();
     };
 
     // Listen for first interaction — use touchend on iOS (preferred for audio), pointerdown on desktop
-    const handler = () => {
-      maybeResume();
+    const handler = async () => {
+      await maybeResume();
       if (this._initialized && this.engine.ctx?.state === 'running') {
         removeUnlockListeners(handler);
       } else {

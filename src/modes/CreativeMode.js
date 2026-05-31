@@ -426,8 +426,13 @@ export class CreativeMode {
       if (!this._initialized) {
         this.init();
       }
+      const notifyAudioState = () => window.dispatchEvent(new CustomEvent('notenotes-audio-state-changed', {
+        detail: { state: this.engine.ctx?.state || 'unknown' },
+      }));
       if (this.engine.ctx?.state === 'suspended') {
-        this.engine.ctx.resume().catch(() => {});
+        this.engine.ctx.resume().catch(() => {}).finally(notifyAudioState);
+      } else {
+        notifyAudioState();
       }
       return true;
     } catch (err) {

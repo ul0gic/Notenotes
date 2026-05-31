@@ -102,6 +102,32 @@ frame time. Use the `audioTime` supplied by Transport callbacks or
 Visual updates may use `requestAnimationFrame`; audio scheduling may not depend
 on visual frame timing.
 
+### Browser Audio Unlock
+
+Web Audio must be created or resumed from a user gesture, and iOS Safari can
+still leave the `AudioContext` suspended after the first tap. Do not request
+microphone permission just to wake playback; `MicRecorder` owns the mic prompt
+and should only ask when the user is recording Audio In.
+
+`src/main.js` owns the global unlock path:
+
+- `_initializeAudioFromGesture()` creates/resumes `AudioEngine`, initializes the
+  metronome, Creative mode, and Canvas playback engine, then calls
+  `AudioEngine.unlockGesture()` before and after resume.
+- `_buildAudioUnlockPrompt()` adds the floating `Enable audio` prompt. It stays
+  visible while the app has not initialized audio or while
+  `engine.ctx.state !== 'running'`, and hides only after Web Audio reports a
+  running context.
+- `_bindAudioContextState()` and the `notenotes-audio-state-changed` event keep
+  the prompt synced when instruments attempt their own unlocks.
+- `CreativeMode.ensureAudioReady()` still retries from actual instrument
+  touches, then emits `notenotes-audio-state-changed` so the shell prompt does
+  not get stale.
+
+This is intentionally a visible user-gesture affordance instead of an automatic
+page-load permission request. Page-load audio starts are blocked by browsers,
+and a surprise microphone prompt would break the app's trust model.
+
 ### Ticks And Meter
 
 - The project uses 480 PPQ (`ticksPerBeat` means ticks per quarter note).
