@@ -12,7 +12,6 @@
  *   - "voices": each pad sings a syllable from a typed phrase, at the pad's pitch.
  *               Requires a VoiceEngine to be passed in. Phrase is persisted in
  *               project.settings.voicePhrase.
- *   - "custom": per-pad type selection (single/chord) editable via "Edit Layout".
  *
  * Octave shifts apply uniformly across modes. In voices mode, octave shifts move
  * the voiced source's pitch but leave the syllable's formants alone — that's how
@@ -32,6 +31,7 @@ import {
 } from '../engine/MusicTheory.js';
 import { scaleChordRecipes } from '../engine/ScaleChords.js';
 import { activeProgressionResolution, normalizeProgressionGlow } from '../engine/Progressions.js';
+import { normalizePadLayout, normalizePadMode } from '../engine/PadLayout.js';
 import { showToast } from '../ui/Toast.js';
 import { syllabify, extractPlayableSyllables, sanitizePhraseInput } from './voice/syllabify.js';
 import { dwellSettings, tremorAllows } from '../ui/AccessibilityProfiles.js';
@@ -55,10 +55,8 @@ export class ScaleBoard {
     this.scaleName = 'major';
     this.rootNote = 'C';
     this.octave = 4;
-    this.padMode = 'single'; // 'single', 'chords', 'root', 'compass', 'step', 'voices', 'custom'
+    this.padMode = 'single'; // 'single', 'chords', 'root', 'compass', 'step', 'voices'
     this.extensionsEnabled = false;
-    this.isEditingLayout = false;
-    this.customPadTypes = []; // 'single' or 'chord'
     this._stepPointer = 0;
     this._stepReleaseTimer = null;
     this._activeStepMidis = [];
@@ -101,10 +99,7 @@ export class ScaleBoard {
 
     this._onResize = () => {
       if (this.el) {
-        const container = this.el.querySelector('#sb-pads');
-        if (container) {
-          container.style.gridTemplateColumns = this._gridColumns();
-        }
+        this._applyPadGridLayout();
       }
     };
     
@@ -112,11 +107,7 @@ export class ScaleBoard {
     this.project = project;
 
     window.addEventListener('settings-pads-changed', (e) => {
-      if (e.detail && e.detail.count) {
-        this._updateNotes(e.detail.count);
-      } else {
-        this._updateNotes();
-      }
+      this._updateNotes();
       this._refreshPads();
     });
     window.addEventListener('project-progression-changed', () => {
@@ -126,6 +117,7 @@ export class ScaleBoard {
 
   set project(p) {
     this._project = p;
+    this.padMode = normalizePadMode(this.padMode, { voiceAvailable: !!this.voiceEngine });
     const context = normalizeMusicalContext(p?.musicalContext);
     this.rootNote = context.root;
     this.scaleName = context.scale;
@@ -209,7 +201,7 @@ export class ScaleBoard {
   }
 
   /** Recalculate scale notes */
-  _updateNotes(overrideCount) {
+  _updateNotes() {
     this._fullScaleNotes = getScaleNotes(this.scaleName, this.rootNote, this.octave);
 
     if (this.padMode === 'root') {
@@ -217,9 +209,6 @@ export class ScaleBoard {
     } else if (this.padMode === 'chords' && this._curatedChordRecipes()) {
       const rootMidi = noteNameToMidi(this.rootNote, this.octave);
       this._notes = this._curatedChordRecipes().map(recipe => rootMidi + (recipe.semitones?.[0] || 0));
-    } else if (this.padMode === 'custom') {
-      const count = overrideCount || this.project?.settings?.scalePadsCount || 7;
-      this._notes = this._fullScaleNotes.slice(0, Math.min(count, this._fullScaleNotes.length));
     } else {
       const scaleDef = SCALES[this.scaleName];
       const degreeCount = scaleDef ? scaleDef.intervals.length : 7;
@@ -228,12 +217,6 @@ export class ScaleBoard {
         : degreeCount;
       this._notes = this._fullScaleNotes.slice(0, Math.min(count, this._fullScaleNotes.length));
     }
-
-    const noteCount = this._notes.length;
-    while (this.customPadTypes.length < noteCount) {
-      this.customPadTypes.push('single');
-    }
-    this.customPadTypes.length = noteCount;
   }
 
   /**
@@ -258,7 +241,6 @@ export class ScaleBoard {
             <option value="compass" ${this.padMode === 'compass' ? 'selected' : ''}>Compass</option>
             <option value="step" ${this.padMode === 'step' ? 'selected' : ''}>Step Play</option>
             ${this.voiceEngine ? `<option value="voices" ${this.padMode === 'voices' ? 'selected' : ''}>Voice Sketch</option>` : ''}
-            <option value="custom" ${this.padMode === 'custom' ? 'selected' : ''}>Custom</option>
           </select>
         </div>
         ${this.padMode !== 'step' ? `<div class="scaleboard__octave">
@@ -266,13 +248,6 @@ export class ScaleBoard {
           <span class="scaleboard__oct-display" id="sb-oct-display">Oct ${this.octave}</span>
           <button class="btn btn--icon btn--ghost scaleboard__oct-btn" id="sb-oct-up" aria-label="Octave up">▲</button>
         </div>` : '<div class="scaleboard__octave scaleboard__octave--hidden" aria-hidden="true"></div>'}
-        ${this.padMode === 'custom' ? `
-        <div class="scaleboard__control-group">
-          <button class="btn btn--sm ${this.isEditingLayout ? 'btn--primary' : 'btn--ghost'}" id="sb-edit-layout">
-            ${this.isEditingLayout ? 'Done' : 'Edit Layout'}
-          </button>
-        </div>
-        ` : ''}
         ${this._canUseExtensions() ? `
         <div class="scaleboard__control-group">
           <button class="btn btn--sm ${this.extensionsEnabled ? 'btn--primary' : 'btn--ghost'} scaleboard__extensions-btn" id="sb-extensions" type="button" aria-pressed="${this.extensionsEnabled ? 'true' : 'false'}" title="Show scale degrees 1 through 13">
@@ -286,7 +261,7 @@ export class ScaleBoard {
         ? this._renderCompass()
         : this.padMode === 'step'
           ? this._renderStepPlay()
-        : `<div class="scaleboard__pads" id="sb-pads" style="grid-template-columns: ${this._gridColumns()}; gap: ${this._gridGap()};">
+        : `<div class="scaleboard__pads${this._padGridMetrics().compact ? ' scaleboard__pads--compact' : ''}" id="sb-pads" style="${this._padGridStyle()}">
             ${this._renderPads()}
           </div>`}
     `;
@@ -296,13 +271,32 @@ export class ScaleBoard {
     return this.el;
   }
 
-  _gridColumns() {
-    const idealCols = Math.ceil(Math.sqrt(this._notes.length));
+  _padGridStyle() {
+    const { cols, gap, compact } = this._padGridMetrics();
+    return `--pad-cols: ${cols}; --pad-gap: ${gap};${compact ? ' --pad-compact: 1;' : ''}`;
+  }
+
+  _padGridMetrics() {
     const container = this.el?.querySelector('#sb-pads');
+    const count = Math.max(1, this._notes.length || 1);
+    const idealCols = Math.min(6, Math.ceil(Math.sqrt(count + (count > 8 ? 2 : 0))));
     const width = container?.clientWidth || 360;
     const maxCols = Math.max(1, Math.floor((width - 4) / 72));
     const cols = Math.min(idealCols, maxCols);
-    return `repeat(${cols}, 1fr)`;
+    return {
+      cols,
+      compact: cols < 4,
+      gap: this._gridGap(),
+    };
+  }
+
+  _applyPadGridLayout() {
+    const container = this.el?.querySelector('#sb-pads');
+    if (!container) return;
+    const { cols, gap, compact } = this._padGridMetrics();
+    container.style.setProperty('--pad-cols', String(cols));
+    container.style.setProperty('--pad-gap', gap);
+    container.classList.toggle('scaleboard__pads--compact', compact);
   }
 
   _gridGap() {
@@ -398,13 +392,15 @@ export class ScaleBoard {
   }
 
   _renderPads() {
+    const layout = normalizePadLayout(this.project?.settings?.padLayout, this._notes.length);
     return this._notes.map((midi, i) => {
       const noteInfo = midiToNoteName(midi);
       const curatedChord = this._curatedChordRecipe(i);
       const isRootMode = this.padMode === 'root';
       const rootMidi = isRootMode ? this._rootMidiNear(midi) : midi;
       const rootInfo = midiToNoteName(rootMidi);
-      let isChord = this.padMode === 'chords' || (this.padMode === 'custom' && this.customPadTypes[i] === 'chord');
+      let isChord = this.padMode === 'chords';
+      const padSize = layout.pads[i]?.size || 'small';
       const degree = i + 1;
       let typeLabel = isRootMode ? `+ ${rootInfo.display}` : (curatedChord?.name || (isChord ? 'Chord' : 'Note'));
       const isVoice = this.padMode === 'voices';
@@ -431,12 +427,12 @@ export class ScaleBoard {
         ? `, ${degreeMeta.functionName}${degreeMeta.shorthand ? ` (${degreeMeta.shorthand})` : ''}`
         : '';
       return `
-        <button class="scaleboard__pad${voiceClass}${degreeClass}${progressionClass} ${this.isEditingLayout ? 'is-editing' : ''}"${padStyle} data-index="${i}" data-midi="${midi}"
+        <button class="scaleboard__pad${voiceClass}${degreeClass}${progressionClass}"${padStyle} data-size="${this._escapeAttr(padSize)}" data-index="${i}" data-midi="${midi}"
                 aria-label="${isRootMode ? `${noteInfo.display} plus nearest ${this.rootNote}, ${rootInfo.display}` : curatedChord ? `${curatedChord.label} chord, ${curatedChord.name}` : `Scale degree ${degree}, ${noteInfo.display}`}${theoryLabel}${voiceLabel ? ', sings ' + voiceLabel : ''}">
           <span class="scaleboard__pad-degree">${isRootMode ? noteInfo.name : (curatedChord?.label || degree)}</span>
           <span class="scaleboard__pad-note">${noteInfo.display}</span>
           ${degreeLabel ? `<span class="scaleboard__pad-degree-name">${this._escapeHtml(degreeLabel)}</span>` : ''}
-          ${(this.padMode === 'custom' || isRootMode || curatedChord) ? `<span class="scaleboard__pad-type">${this._escapeHtml(typeLabel)}</span>` : ''}
+          ${(isRootMode || curatedChord) ? `<span class="scaleboard__pad-type">${this._escapeHtml(typeLabel)}</span>` : ''}
           ${isVoice && voiceLabel ? `<span class="scaleboard__pad-syllable">${this._escapeHtml(voiceLabel)}</span>` : ''}
         </button>
       `;
@@ -764,7 +760,7 @@ export class ScaleBoard {
     this._updateNotes();
     const padsContainer = this.el.querySelector('#sb-pads');
     if (!padsContainer) return;
-    padsContainer.style.gridTemplateColumns = this._gridColumns();
+    this._applyPadGridLayout();
     padsContainer.innerHTML = this._renderPads();
     this._bindPadEvents();
   }
@@ -784,16 +780,13 @@ export class ScaleBoard {
     // Mode selector
     this.el.querySelector('#sb-pad-mode')?.addEventListener('change', (e) => {
       this.releaseAllPads();
-      this.padMode = e.target.value;
-      if (this.padMode !== 'custom') this.isEditingLayout = false;
+      this.padMode = normalizePadMode(e.target.value, { voiceAvailable: !!this.voiceEngine });
       // When entering voices mode, ensure tokens reflect the latest bank/phrase.
       if (this.padMode === 'voices') {
         this._recomputeVoiceTokens();
       }
       this._refreshLayout();
-      if (this.padMode === 'custom') {
-        showToast('Tap "Edit Layout" to set each pad to Note or Chord');
-      } else if (this.padMode === 'root') {
+      if (this.padMode === 'root') {
         showToast('Root Mode: each note also plays the nearest root');
       } else if (this.padMode === 'compass') {
         showToast('Compass: major chords outside, relative minors inside');
@@ -819,13 +812,6 @@ export class ScaleBoard {
       this._refreshLayout();
       showToast(this.extensionsEnabled ? `Extensions: ${this._notes.length} scale pads` : 'Extensions off');
       if (this.onExtensionsChanged) this.onExtensionsChanged(this.extensionsEnabled);
-    });
-
-    // Edit Layout toggle
-    this.el.querySelector('#sb-edit-layout')?.addEventListener('click', (e) => {
-      e.preventDefault();
-      this.isEditingLayout = !this.isEditingLayout;
-      this._refreshLayout();
     });
 
     this._bindVoiceEvents();
@@ -1211,13 +1197,6 @@ export class ScaleBoard {
       pad.addEventListener('pointerdown', (e) => {
         e.preventDefault();
         this._cancelDwell(`pad:${i}`);
-        
-        if (this.isEditingLayout) {
-          // Toggle custom type
-          this.customPadTypes[i] = this.customPadTypes[i] === 'single' ? 'chord' : 'single';
-          this._refreshPads();
-          return;
-        }
 
         const learnTarget = this._controllerLearnTargetForPad(i, midi);
         if (learnTarget && this._onControllerLearnTarget?.(learnTarget)) return;
@@ -1229,7 +1208,6 @@ export class ScaleBoard {
 
       pad.addEventListener('pointerenter', () => {
         this._startDwell(`pad:${i}`, pad, () => {
-          if (this.isEditingLayout) return;
           if (!tremorAllows(this.project, `scale:${this.padMode}:${i}`)) return;
           this._dwellActivePads.add(i);
           this.pressPad(i);
@@ -1243,8 +1221,6 @@ export class ScaleBoard {
 
       const handleRelease = (e) => {
         e.preventDefault();
-        if (this.isEditingLayout) return;
-
         this.releasePad(i);
         this._dwellActivePads.delete(i);
       };
@@ -1312,7 +1288,7 @@ export class ScaleBoard {
       this.triggerStepPlay();
       return;
     }
-    if (this.isEditingLayout || this._activePadIndexes.has(index)) return;
+    if (this._activePadIndexes.has(index)) return;
     const pad = this.el?.querySelector(`.scaleboard__pad[data-index="${index}"]`);
     const midi = this._notes[index];
     if (!pad || midi === undefined) return;
@@ -1333,7 +1309,7 @@ export class ScaleBoard {
       return;
     }
 
-    const isChord = this.padMode === 'chords' || (this.padMode === 'custom' && this.customPadTypes[index] === 'chord');
+    const isChord = this.padMode === 'chords';
     if (isChord) {
       const chordMidis = this._getChordMidis(index);
       this._activeChords.set(index, chordMidis);
@@ -1434,7 +1410,7 @@ export class ScaleBoard {
   }
 
   _padActionForIndex(index) {
-    if (this.padMode === 'chords' || (this.padMode === 'custom' && this.customPadTypes[index] === 'chord')) return 'chord';
+    if (this.padMode === 'chords') return 'chord';
     if (this.padMode === 'root') return 'root';
     return 'single';
   }

@@ -7,6 +7,7 @@ import { openDB } from 'idb';
 import { DEFAULT_DEGREE_HIGHLIGHTING, DEFAULT_MUSICAL_CONTEXT } from '../engine/MusicTheory.js';
 import { METER_PRESETS, meterToTimeSignature, normalizeMeter } from '../engine/Meter.js';
 import { DEFAULT_PROGRESSION_CONTEXT, DEFAULT_PROGRESSION_GLOW, normalizeProgressionContext, normalizeProgressionGlow } from '../engine/Progressions.js';
+import { normalizePadLayout } from '../engine/PadLayout.js';
 import { ACCESSIBILITY_DEFAULTS, ensureAccessibilitySettings } from '../ui/AccessibilityProfiles.js';
 
 const DB_NAME = 'notenotes';
@@ -72,6 +73,9 @@ export function createProject(name = 'Untitled Sketch') {
       },
       controllerBindings: {},
       controllerBindingPresets: [],
+      // Dormant for now: retained for future full-custom modular pad surfaces.
+      scalePadsCount: 7,
+      padLayout: normalizePadLayout(null, 7),
       degreeHighlighting: {
         enabled: DEFAULT_DEGREE_HIGHLIGHTING.enabled,
         showLabels: DEFAULT_DEGREE_HIGHLIGHTING.showLabels,
@@ -507,6 +511,7 @@ export class ProjectStore {
     project.settings ||= {};
     project.progression = normalizeProgressionContext(project.progression);
     project.settings.progressionGlow = normalizeProgressionGlow(project.settings.progressionGlow);
+    project.settings.padLayout = normalizePadLayout(project.settings.padLayout, 7);
     ensureAccessibilitySettings(project);
     return project;
   }

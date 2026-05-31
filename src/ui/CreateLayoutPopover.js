@@ -6,6 +6,7 @@ import {
   SCALES,
 } from '../engine/MusicTheory.js';
 import { DEFAULT_PROGRESSION_GLOW, normalizeProgressionGlow } from '../engine/Progressions.js';
+import { DEFAULT_PAD_LAYOUT_TEMPLATE, PAD_LAYOUT_TEMPLATES, normalizePadLayout } from '../engine/PadLayout.js';
 
 export function clampCustomPadCount(value) {
   const parsed = parseInt(value, 10);
@@ -122,8 +123,7 @@ export class CreateLayoutPopover {
 
   _openPads(anchor, buttonEl) {
     const project = this.getProject?.();
-    const count = project?.settings?.scalePadsCount || 7;
-    const showCustomCount = this.getScaleBoard?.()?.padMode === 'custom';
+    const currentLayout = normalizePadLayout(project?.settings?.padLayout, this.getScaleBoard?.()?._notes?.length || 7);
     const popover = document.createElement('div');
     popover.className = 'tone-popover create-control-popover';
     popover.id = 'pads-popover';
@@ -131,14 +131,15 @@ export class CreateLayoutPopover {
       <div class="tone-popover__header">
         <span>Pads</span>
       </div>
-      ${showCustomCount ? `
-      <label class="create-control-popover__row create-control-popover__row--slider">
-        <span>Custom pad count</span>
-        <span class="create-control-popover__value" id="pads-count-value">${count}</span>
-        <input class="tone-row__slider" id="pads-count-slider" type="range" min="1" max="16" value="${count}" aria-label="Custom pad count">
+      <label class="create-control-popover__row">
+        <span>Pad template</span>
+        <select class="create-control-popover__select" id="pads-layout-template" aria-label="Pad layout template">
+          ${Object.values(PAD_LAYOUT_TEMPLATES).map(template => `
+            <option value="${escapeAttr(template.id)}" ${template.id === currentLayout.template ? 'selected' : ''}>${escapeHtml(template.label)}</option>
+          `).join('')}
+        </select>
       </label>
-      <p class="create-control-popover__hint">Used by Pads Custom mode.</p>
-      ` : `<p class="create-control-popover__hint">Custom pad count appears here in Custom mode.</p>`}
+      <p class="create-control-popover__hint">Templates use relative pad sizes on wider screens and collapse to uniform pads on narrow phones.</p>
       ${this._renderDegreeControls()}
       ${this._renderProgressionGlowControls()}
     `;
@@ -149,14 +150,16 @@ export class CreateLayoutPopover {
     this._padsAnchor = anchor;
     this._padsButton = buttonEl;
 
-    popover.querySelector('#pads-count-slider')?.addEventListener('input', (event) => {
-      const value = clampCustomPadCount(event.target.value);
+    popover.querySelector('#pads-layout-template')?.addEventListener('change', (event) => {
       const nextProject = this.getProject?.();
       nextProject.settings ||= {};
-      nextProject.settings.scalePadsCount = value;
-      popover.querySelector('#pads-count-value')?.replaceChildren(String(value));
+      nextProject.settings.padLayout = normalizePadLayout({
+        version: 1,
+        template: event.target.value || DEFAULT_PAD_LAYOUT_TEMPLATE,
+        pads: [],
+      }, this.getScaleBoard?.()?._notes?.length || 7);
       this.onScheduleSave?.();
-      this.onPadsChanged?.(value);
+      this.onPadsChanged?.();
     });
     this._bindDegreeControls(popover);
     this._bindProgressionGlowControls(popover);

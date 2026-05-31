@@ -372,14 +372,41 @@
 }
 
 .scaleboard__pads {
+  container-type: inline-size;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: var(--space-md);
+  grid-template-columns: repeat(var(--pad-cols, 4), minmax(56px, 1fr));
+  gap: var(--pad-gap, var(--space-md));
   flex: 1;
   grid-auto-rows: minmax(56px, 1fr);
+  grid-auto-flow: dense;
   align-content: start;
   overflow-y: auto;
-  padding: 2px;
+  padding: 2px 2px max(2px, env(safe-area-inset-bottom));
+}
+
+.scaleboard__pad[data-size="medium"] {
+  grid-column: span 2;
+}
+
+.scaleboard__pad[data-size="large"] {
+  grid-column: span 2;
+  grid-row: span 2;
+}
+
+.scaleboard__pad[data-size="wide"] {
+  grid-column: span 3;
+}
+
+.scaleboard__pads--compact .scaleboard__pad {
+  grid-column: span 1 !important;
+  grid-row: span 1 !important;
+}
+
+@container (max-width: 340px) {
+  .scaleboard__pad {
+    grid-column: span 1 !important;
+    grid-row: span 1 !important;
+  }
 }
 
 .step-play {
@@ -2090,7 +2117,7 @@
 
   .scaleboard__pads {
     gap: 5px !important;
-    grid-auto-rows: minmax(36px, 1fr);
+    grid-auto-rows: minmax(48px, 1fr);
     min-height: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
@@ -2098,7 +2125,7 @@
   }
 
   .scaleboard__pad {
-    min-height: 36px;
+    min-height: 48px;
     border-radius: 10px;
     border-width: 1px;
     gap: 1px;

@@ -22,6 +22,12 @@ import {
 import { padPerformanceIndex, pianoPerformanceIndex } from '../src/modes/input/PerformanceInputRouter.js';
 import { correctMidiToScale, normalizeMusicalContext } from '../src/engine/MusicTheory.js';
 import {
+  DEFAULT_PAD_LAYOUT_TEMPLATE,
+  normalizePadLayout,
+  normalizePadMode,
+  padLayoutForCount,
+} from '../src/engine/PadLayout.js';
+import {
   normalizeMeter,
   pulseCountForMeter,
   quarterBpmForMeter,
@@ -222,6 +228,40 @@ test('performance keyboard maps Pads forward and Piano high-to-low', () => {
   assert.equal(padPerformanceIndex('KeyQ', 13), 12);
   assert.equal(pianoPerformanceIndex('Digit1', 22), 21);
   assert.equal(pianoPerformanceIndex('KeyQ', 22), 9);
+});
+
+test('pad mode normalization retires legacy custom without breaking old projects', () => {
+  assert.equal(normalizePadMode('custom'), 'single');
+  assert.equal(normalizePadMode('single'), 'single');
+  assert.equal(normalizePadMode('voices', { voiceAvailable: false }), 'single');
+  assert.equal(normalizePadMode('voices', { voiceAvailable: true }), 'voices');
+  assert.equal(normalizePadMode('bad-mode'), 'single');
+});
+
+test('pad layout helpers normalize additive relative span settings', () => {
+  assert.equal(DEFAULT_PAD_LAYOUT_TEMPLATE, 'even');
+
+  const layout = normalizePadLayout({
+    version: 99,
+    template: 'bigTonic',
+    pads: [
+      { ref: 'deg:1', size: 'huge' },
+      { ref: 'deg:2', size: 'wide', x: 100, y: 200 },
+    ],
+  }, 4);
+
+  assert.equal(layout.version, 1);
+  assert.equal(layout.template, 'bigTonic');
+  assert.deepEqual(layout.pads.map(pad => [pad.ref, pad.size]), [
+    ['deg:1', 'large'],
+    ['deg:2', 'wide'],
+    ['deg:3', 'small'],
+    ['deg:4', 'small'],
+  ]);
+  assert.equal(Object.prototype.hasOwnProperty.call(layout.pads[1], 'x'), false);
+
+  const thumb = padLayoutForCount(5, { template: 'thumb' });
+  assert.deepEqual(thumb.pads.map(pad => pad.size), ['medium', 'small', 'small', 'medium', 'large']);
 });
 
 test('controller mapper helpers normalize targets without sharing preset references', () => {

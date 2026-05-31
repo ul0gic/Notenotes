@@ -438,13 +438,26 @@ ScaleBoard reads `project.musicalContext` for root and scale. It supports:
 - Single notes
 - Chords
 - Root mode
-- Custom pads
 - Voice Sketch
 - Compass
 - Step Play
 
 Pad count follows the current scale unless a mode overrides it. Extensions
 continue scale degrees into the next octave for Single and normal Chords modes.
+The old `custom` pad mode was removed from the UI because it only duplicated a
+random-note grid without durable musical control. Any legacy `custom` pad mode
+state should normalize to `single` via `normalizePadMode()` instead of throwing
+or reviving the old editor.
+
+`src/engine/PadLayout.js` owns the first modular-pad foundation. Layouts
+are additive settings in `project.settings.padLayout` with relative size tokens
+(`small`, `medium`, `large`, `wide`) and templates (`even`, `bigTonic`,
+`thumb`). Do not store pixel coordinates. `ScaleBoard` keeps real `<button>`
+pads and adds `data-size` per pad; CSS Grid uses `grid-auto-flow: dense` and
+container-aware `--pad-cols` variables. Narrow/compact boards force every pad
+back to 1x1 so phone portrait layouts do not become giant unusable blocks.
+`project.settings.scalePadsCount` remains dormant plumbing for a future
+full-custom surface and should not be deleted from user data.
 
 Step Play is a Pads mode, not a top-level instrument. It renders a dedicated
 one-trigger surface plus a saved note sequence. The editor's palette is
@@ -635,13 +648,16 @@ learning/clearing bindings. Do not bury the mapper inside Labs unless product
 direction changes.
 
 `src/ui/CreateLayoutPopover.js` owns the Create toolbar Layout popover for Pads
-and Piano. It renders the custom pad-count slider, piano count/key sliders, and
-the shared degree-color controls. It receives explicit callbacks from
-`CreativeMode` for project access, autosave scheduling, and event dispatch; the
-popover may update `project.settings.scalePadsCount`, `pianoCount`,
-`pianoKeys`, and `degreeHighlighting`, but it must not construct instruments,
-change the active surface, or own persistence. Keep shared clamp helpers pure so
-`tests/smoke.mjs` can guard their supported ranges without a DOM.
+and Piano. Pads now expose a `Pad template` selector backed by
+`project.settings.padLayout`; the old custom pad-count slider is hidden because
+the old Custom mode is retired. Piano still exposes piano count/key sliders, and
+both Pads/Piano expose degree-color and chord-tone glow controls. The popover
+receives explicit callbacks from `CreativeMode` for project access, autosave
+scheduling, and event dispatch; it may update `project.settings.padLayout`,
+`pianoCount`, `pianoKeys`, `degreeHighlighting`, and `progressionGlow`, but it
+must not construct instruments, change the active surface, or own persistence.
+Keep shared clamp/layout helpers pure so `tests/smoke.mjs` can guard supported
+ranges without a DOM.
 
 Settings drawer layout stability matters because Save/backup status text
 updates asynchronously after the panel opens. `src/ui/settings.css` reserves a

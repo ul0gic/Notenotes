@@ -241,35 +241,32 @@ Replace the equal-cell `ceil(sqrt(N))` ScaleBoard grid with a responsive,
 span-based pad surface that fits better on mobile and allows future pad layout
 templates without putting a framework or canvas in the note-trigger path.
 
-Direction under review:
+Shipped first slice:
 
 - Keep pads as native DOM `<button>` elements. Do not move playable pads to
   canvas/WebGL; accessibility, dwell play, tremor filtering, keyboard routing,
   and immediate pointer-to-sound behavior all depend on real buttons.
-- Use CSS Grid with relative span sizes (`small`, `medium`, `large`, `wide` or
-  similar), not absolute pixel/freeform positions.
+- `project.settings.padLayout` now exists additively with relative span sizes
+  (`small`, `medium`, `large`, `wide`) and templates (`even`, `bigTonic`,
+  `thumb`), not absolute pixel/freeform positions.
 - Make the grid container-aware, with a minimum touch target and a narrow-phone
   fallback that ignores size variation and renders uniform pads.
-- Persist a future `project.settings.padLayout` schema additively. Store layout
-  intent as relative sizes/templates, not fixed coordinates.
-- Deprecate the old `custom` pad mode carefully. Its per-pad single/chord toggle
-  was in-memory-only, but `scalePadsCount` should remain in the data model as
-  dormant plumbing for a future full-custom surface.
+- The old `custom` pad mode is removed from the Pad Mode UI. Legacy `custom`
+  normalizes to `single`; `scalePadsCount` remains dormant plumbing for a future
+  full-custom surface.
+
+Still pending:
+
 - Avoid `innerHTML` rebuilds on resize or during drag/resize editing. If an
   editor is added later, move elements with transforms during drag and commit
   to the schema on drop.
-
-Open decisions:
-
-- First size vocabulary: likely `S / M / L / Wide`, but keep it small.
-- First templates: likely `Even`, `Big tonic`, and `Thumb-friendly`.
 - Whether cosmetic shapes ship in v1 or wait until the layout is stable.
+- Whether to add a real layout editor, and where it should live.
 
 Expected scope:
 
-Medium to large if done properly. The safest first slice is schema + responsive
-layout engine + hiding/deprecating the old `custom` UI, not a full freeform
-editor.
+Next slices are medium to large if done properly. The shipped foundation is not
+a full freeform editor.
 
 ## 9. Google Drive Backup
 
