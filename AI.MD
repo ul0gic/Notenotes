@@ -105,28 +105,40 @@ on visual frame timing.
 ### Browser Audio Unlock
 
 Web Audio must be created or resumed from a user gesture, and iOS Safari can
-still leave the `AudioContext` suspended after the first tap. Do not request
-microphone permission just to wake playback; `MicRecorder` owns the mic prompt
-and should only ask when the user is recording Audio In.
+still leave app output silent even after `AudioContext.state` reports
+`running`. On affected iOS builds, opening the system media route through
+`getUserMedia({ audio: true })` is the same action that makes Mic In unblock
+sound. This is not recording; it is a user-gesture permission primer.
 
 `src/main.js` owns the global unlock path:
 
 - `_initializeAudioFromGesture()` creates/resumes `AudioEngine`, initializes the
   metronome, Creative mode, and Canvas playback engine, then calls
-  `AudioEngine.unlockGesture()` before and after resume.
+  `AudioEngine.unlockGesture()` before and after resume. On likely iOS devices
+  it also starts `AudioEngine.primeMediaRoute()` before the first awaited
+  resume so Safari receives the media request directly inside the user's tap.
 - `_buildAudioUnlockPrompt()` adds the floating `Tap to enable sound` prompt.
-  It stays visible while the app has not initialized audio or while
-  `engine.ctx.state !== 'running'`, and hides only after Web Audio reports a
-  running context.
+  It stays visible while the app has not initialized audio, while
+  `engine.ctx.state !== 'running'`, or while iOS still has not primed the media
+  route. On iOS it tells the user Safari may ask for microphone access and that
+  Notenotes will not record from this unlock path.
 - `_bindAudioContextState()` and the `notenotes-audio-state-changed` event keep
   the prompt synced when instruments attempt their own unlocks.
 - `CreativeMode.ensureAudioReady()` still retries from actual instrument
   touches, then emits `notenotes-audio-state-changed` so the shell prompt does
   not get stale.
+- `MicRecorder._openStream()` calls `AudioEngine.markMediaRoutePrimed()` after
+  a successful stream open so using Audio In also satisfies the same iOS route
+  requirement.
+- `AudioEngine.primeMediaRoute()` immediately stops every track from the
+  temporary stream. Do not connect this stream to the graph or keep it alive
+  unless a future iOS regression proves that stopping it is insufficient.
 
 This is intentionally a visible user-gesture affordance instead of an automatic
 page-load permission request. Page-load audio starts are blocked by browsers,
-and a surprise microphone prompt would break the app's trust model.
+and a surprise microphone prompt would break the app's trust model. The primer
+may run from the first sound-producing gesture on iOS because the prompt is
+already visible and the platform has proven that Web Audio alone is not enough.
 
 ### Ticks And Meter
 
@@ -1095,3 +1107,32 @@ Touching a Canvas clip no longer immediately starts a drag. It enters
 
 Mouse and trackpad behavior stays immediate: pointer down on a clip still starts
 dragging, and modifier-key delete/resize behavior is unchanged.
+
+## iOS Media Route Primer 0.1.76
+
+iOS QA showed a stricter failure than a suspended `AudioContext`: pads could make
+the bottom audio prompt disappear, `AudioContext.state` could report `running`,
+and the app still remained silent until the user visited Audio In and granted
+Safari microphone permission. That means the readiness signal is not only Web
+Audio state on iOS; the system media route can also need to be opened.
+
+The unlock path now tracks this separately:
+
+- `AudioEngine.mediaRoutePrimed` records whether the page has successfully
+  opened the system media route.
+- `AudioEngine.primeMediaRoute()` calls `getUserMedia({ audio: true })`, then
+  immediately stops every returned track. It does not connect the stream to the
+  audio graph and does not start a recording.
+- `main.js` only requests this primer on likely iOS devices, and only from the
+  explicit audio prompt or a sound-producing target such as Pads, Step Play,
+  Tonal Compass, Piano keys, Kit pads, or Stage lanes. Generic page taps should
+  still initialize/resume Web Audio without surprising the user with a mic
+  permission dialog.
+- `_syncAudioUnlockPrompt()` keeps the prompt visible while iOS still needs the
+  media route, even if the context itself is already `running`.
+- `MicRecorder._openStream()` calls `markMediaRoutePrimed()` so the real Audio
+  In permission path satisfies the same route state.
+
+If future iOS testing proves that stopping the temporary stream is not enough,
+the next escalation is to keep a clearly documented muted primer stream alive
+for the session. Do not do that preemptively; it is a larger privacy tradeoff.

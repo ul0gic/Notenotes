@@ -39,7 +39,8 @@ Expected:
 
 - Sound plays from the first instrument interaction.
 - No Audio In interaction is required to wake the engine.
-- If iOS keeps the context suspended, a `Tap to enable sound` prompt is visible and tapping it wakes sound without showing the microphone permission prompt.
+- On iOS Safari, if pads stay silent until Mic In permission is granted, the first sound-producing gesture or the `Tap to allow iOS sound` prompt may show Safari's microphone permission dialog. Grant it, then confirm Notenotes immediately plays pads/keys/kit without starting an Audio In recording.
+- The audio prompt remains visible until the iOS media route is primed; it should not disappear merely because `AudioContext.state` reports `running`.
 - No console error appears.
 
 ### 1.2 Reload Keeps Audio Usable

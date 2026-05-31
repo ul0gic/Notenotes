@@ -102,6 +102,7 @@ export class MicRecorder {
 
     this._stopStream();
     this._stream = await navigator.mediaDevices.getUserMedia(constraints);
+    this.engine.markMediaRoutePrimed?.();
     this._setupAnalyser();
   }
 

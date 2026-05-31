@@ -72,6 +72,7 @@ class App {
     this._folderAutoBackupTimer = null;
     this._folderAutoBackupRunning = false;
     this._audioUnlockPrompt = null;
+    this._audioUnlockTitle = null;
     this._audioUnlockStatus = null;
     this._audioContextStateBound = false;
     this._audioVisibilityResumeBound = false;
@@ -509,20 +510,21 @@ class App {
       <span class="audio-unlock-prompt__dot" aria-hidden="true"></span>
       <span class="audio-unlock-prompt__copy">
         <strong>Tap to enable sound</strong>
-        <small>No microphone permission needed</small>
+        <small>Starting audio...</small>
       </span>
     `;
     prompt.addEventListener('pointerdown', async (event) => {
       event.preventDefault();
       event.stopPropagation();
       prompt.classList.add('is-working');
-      const ready = await this._initializeAudioFromGesture({ announce: true });
+      const ready = await this._initializeAudioFromGesture({ announce: true, primeIOSMediaRoute: true });
       prompt.classList.remove('is-working');
       if (!ready) showToast('Tap again to enable audio');
     });
 
     document.body.appendChild(prompt);
     this._audioUnlockPrompt = prompt;
+    this._audioUnlockTitle = prompt.querySelector('strong');
     this._audioUnlockStatus = prompt.querySelector('small');
     this._syncAudioUnlockPrompt();
   }
@@ -552,18 +554,49 @@ class App {
   _syncAudioUnlockPrompt() {
     if (!this._audioUnlockPrompt) return;
     const state = this.engine.ctx?.state || 'new';
-    const needsUnlock = !this._initialized || state !== 'running';
+    const needsMediaRoute = this._needsIOSMediaRoutePrime();
+    const needsUnlock = !this._initialized || state !== 'running' || needsMediaRoute;
     this._audioUnlockPrompt.hidden = !needsUnlock;
     this._audioUnlockPrompt.classList.toggle('is-visible', needsUnlock);
-    this._audioUnlockPrompt.setAttribute('aria-label', needsUnlock ? 'Enable audio engine' : 'Audio engine ready');
+    this._audioUnlockPrompt.setAttribute('aria-label', needsMediaRoute ? 'Enable iOS sound route' : (needsUnlock ? 'Enable audio engine' : 'Audio engine ready'));
+    if (this._audioUnlockTitle) {
+      this._audioUnlockTitle.textContent = needsMediaRoute ? 'Tap to allow iOS sound' : 'Tap to enable sound';
+    }
     if (this._audioUnlockStatus) {
-      this._audioUnlockStatus.textContent = state === 'suspended'
+      this._audioUnlockStatus.textContent = needsMediaRoute
+        ? 'Safari may ask for microphone access; nothing records'
+        : state === 'suspended'
         ? 'Tap to resume Web Audio'
         : 'No microphone permission needed';
     }
   }
 
-  async _initializeAudioFromGesture({ announce = false } = {}) {
+  _isLikelyIOS() {
+    if (typeof navigator === 'undefined') return false;
+    const ua = navigator.userAgent || '';
+    const platform = navigator.platform || '';
+    return /iPad|iPhone|iPod/.test(ua)
+      || (platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  }
+
+  _needsIOSMediaRoutePrime() {
+    return this._isLikelyIOS()
+      && !!navigator.mediaDevices?.getUserMedia
+      && !this.engine.mediaRoutePrimed;
+  }
+
+  _isPlayableAudioTarget(target) {
+    return !!target?.closest?.([
+      '.scaleboard__pad',
+      '.step-play__trigger',
+      '.tonal-compass__segment',
+      '.micropiano__key',
+      '.sketchkit__pad',
+      '.stage-overlay__input',
+    ].join(','));
+  }
+
+  async _initializeAudioFromGesture({ announce = false, primeIOSMediaRoute = false } = {}) {
     try {
       if (!this.engine._initialized) {
         this.engine.initSync();
@@ -574,14 +607,22 @@ class App {
       this.playbackEngine?.init();
       this._initialized = true;
       this.engine.unlockGesture?.();
+      const mediaRoutePrime = primeIOSMediaRoute && this._needsIOSMediaRoutePrime()
+        ? this.engine.primeMediaRoute().catch((err) => {
+          console.warn('[App] iOS media route prime failed:', err);
+          if (announce) showToast('iOS sound permission was not granted');
+          return false;
+        })
+        : null;
       if (this.engine.ctx?.state === 'suspended') {
         await this.engine.ctx.resume().catch(() => {});
       }
       this.engine.unlockGesture?.();
-      const ready = this.engine.ctx?.state === 'running';
+      if (mediaRoutePrime) await mediaRoutePrime;
+      const ready = this.engine.ctx?.state === 'running' && !this._needsIOSMediaRoutePrime();
       this._syncAudioUnlockPrompt();
       setTimeout(() => this._syncAudioUnlockPrompt(), 120);
-      if (ready && announce) showToast('Audio engine ready');
+      if (ready && announce) showToast(this._isLikelyIOS() ? 'iOS sound route ready' : 'Audio engine ready');
       return ready;
     } catch (e) {
       console.warn('[App] Audio init failed, will retry:', e);
@@ -717,9 +758,11 @@ class App {
       events.forEach(e => document.removeEventListener(e, handler, { capture: true }));
     };
 
-    const initAudio = async () => {
+    const initAudio = async (event = null) => {
       if (this._initialized) return;
-      const ready = await this._initializeAudioFromGesture();
+      const ready = await this._initializeAudioFromGesture({
+        primeIOSMediaRoute: this._isPlayableAudioTarget(event?.target),
+      });
       if (ready) {
         showToast('Audio engine ready');
         console.log('[App] Audio initialized on user gesture.');
@@ -728,26 +771,34 @@ class App {
     };
 
     // Persistent resume handler: iOS may need multiple touches before it accepts one
-    const maybeResume = async () => {
+    const maybeResume = async (event = null) => {
+      const shouldPrimeRoute = this._isPlayableAudioTarget(event?.target);
       if (!this._initialized) {
-        await initAudio();
+        await initAudio(event);
         return;
       }
+      const mediaRoutePrime = shouldPrimeRoute && this._needsIOSMediaRoutePrime()
+        ? this.engine.primeMediaRoute().catch((err) => {
+          console.warn('[App] iOS media route prime failed:', err);
+          return false;
+        })
+        : null;
       if (this.engine.ctx?.state === 'suspended') {
         await this.engine.ctx.resume().catch(() => {});
         this.engine.unlockGesture?.();
       }
+      if (mediaRoutePrime) await mediaRoutePrime;
       this._syncAudioUnlockPrompt();
     };
 
     // Listen for first interaction — use touchend on iOS (preferred for audio), pointerdown on desktop
-    const handler = async () => {
-      await maybeResume();
-      if (this._initialized && this.engine.ctx?.state === 'running') {
+    const handler = async (event) => {
+      await maybeResume(event);
+      if (this._initialized && this.engine.ctx?.state === 'running' && !this._needsIOSMediaRoutePrime()) {
         removeUnlockListeners(handler);
       } else {
         setTimeout(() => {
-          if (this._initialized && this.engine.ctx?.state === 'running') {
+          if (this._initialized && this.engine.ctx?.state === 'running' && !this._needsIOSMediaRoutePrime()) {
             removeUnlockListeners(handler);
           }
         }, 120);

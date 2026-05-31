@@ -17,6 +17,8 @@ export class AudioEngine {
     /** @type {DynamicsCompressorNode|null} */
     this.limiter = null;
     this._initialized = false;
+    this._mediaRoutePrimed = false;
+    this._mediaRoutePrimePromise = null;
   }
 
   static getInstance() {
@@ -102,6 +104,44 @@ export class AudioEngine {
       source.start(now);
       source.stop(now + 0.04);
     } catch (e) { /* non-critical unlock nudge */ }
+  }
+
+  get mediaRoutePrimed() {
+    return this._mediaRoutePrimed;
+  }
+
+  markMediaRoutePrimed() {
+    this._mediaRoutePrimed = true;
+  }
+
+  /**
+   * iOS Safari can report a running AudioContext while still muting app audio
+   * until the page has opened the system media route. This intentionally uses
+   * the same user-permission path as Mic In, then closes the stream immediately.
+   */
+  async primeMediaRoute() {
+    if (this._mediaRoutePrimed) return true;
+    if (this._mediaRoutePrimePromise) return this._mediaRoutePrimePromise;
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+      return false;
+    }
+
+    this._mediaRoutePrimePromise = navigator.mediaDevices.getUserMedia({ audio: true })
+      .then((stream) => {
+        stream.getTracks().forEach((track) => track.stop());
+        this._mediaRoutePrimed = true;
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('notenotes-audio-state-changed', {
+            detail: { state: this.ctx?.state || 'unknown', mediaRoutePrimed: true },
+          }));
+        }
+        return true;
+      })
+      .finally(() => {
+        this._mediaRoutePrimePromise = null;
+      });
+
+    return this._mediaRoutePrimePromise;
   }
 
   /**
