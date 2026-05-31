@@ -31,7 +31,7 @@ import {
 } from '../engine/MusicTheory.js';
 import { scaleChordRecipes } from '../engine/ScaleChords.js';
 import { activeProgressionResolution, normalizeProgressionGlow } from '../engine/Progressions.js';
-import { normalizePadLayout, normalizePadMode } from '../engine/PadLayout.js';
+import { normalizePadLayout, normalizePadMode, recommendedPadColumns } from '../engine/PadLayout.js';
 import { showToast } from '../ui/Toast.js';
 import { syllabify, extractPlayableSyllables, sanitizePhraseInput } from './voice/syllabify.js';
 import { dwellSettings, tremorAllows } from '../ui/AccessibilityProfiles.js';
@@ -279,10 +279,9 @@ export class ScaleBoard {
   _padGridMetrics() {
     const container = this.el?.querySelector('#sb-pads');
     const count = Math.max(1, this._notes.length || 1);
-    const idealCols = Math.min(6, Math.ceil(Math.sqrt(count + (count > 8 ? 2 : 0))));
     const width = container?.clientWidth || 360;
-    const maxCols = Math.max(1, Math.floor((width - 4) / 72));
-    const cols = Math.min(idealCols, maxCols);
+    const layout = normalizePadLayout(this.project?.settings?.padLayout, count);
+    const cols = recommendedPadColumns(count, width, { template: layout.template });
     return {
       cols,
       compact: cols < 4,

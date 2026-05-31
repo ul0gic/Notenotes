@@ -75,6 +75,7 @@ class App {
     this._audioUnlockPrompt = null;
     this._audioUnlockTitle = null;
     this._audioUnlockStatus = null;
+    this._audioUnlockRequestInFlight = false;
     this._audioContextStateBound = false;
     this._audioVisibilityResumeBound = false;
   }
@@ -545,13 +546,19 @@ class App {
         <small>Starting audio...</small>
       </span>
     `;
-    prompt.addEventListener('pointerdown', async (event) => {
-      event.preventDefault();
-      event.stopPropagation();
+    const requestUnlock = async (event) => {
+      if (event?.cancelable) event.preventDefault();
+      event?.stopPropagation?.();
+      if (this._audioUnlockRequestInFlight) return;
+      this._audioUnlockRequestInFlight = true;
       prompt.classList.add('is-working');
       const ready = await this._initializeAudioFromGesture({ announce: true, primeIOSMediaRoute: true });
       prompt.classList.remove('is-working');
       if (!ready) showToast('Tap again to enable audio');
+      this._audioUnlockRequestInFlight = false;
+    };
+    ['pointerdown', 'touchend', 'click'].forEach(type => {
+      prompt.addEventListener(type, requestUnlock);
     });
 
     document.body.appendChild(prompt);
@@ -625,11 +632,20 @@ class App {
       '.micropiano__key',
       '.sketchkit__pad',
       '.stage-overlay__input',
+      '.audio-unlock-prompt',
     ].join(','));
   }
 
   async _initializeAudioFromGesture({ announce = false, primeIOSMediaRoute = false } = {}) {
     try {
+      const shouldPrimeMediaRoute = primeIOSMediaRoute && this._needsIOSMediaRoutePrime();
+      const mediaRoutePrime = shouldPrimeMediaRoute
+        ? this.engine.primeMediaRoute().catch((err) => {
+          console.warn('[App] iOS media route prime failed:', err);
+          if (announce) showToast('iOS sound permission was not granted');
+          return false;
+        })
+        : null;
       if (!this.engine._initialized) {
         this.engine.initSync();
       }
@@ -639,13 +655,6 @@ class App {
       this.playbackEngine?.init();
       this._initialized = true;
       this.engine.unlockGesture?.();
-      const mediaRoutePrime = primeIOSMediaRoute && this._needsIOSMediaRoutePrime()
-        ? this.engine.primeMediaRoute().catch((err) => {
-          console.warn('[App] iOS media route prime failed:', err);
-          if (announce) showToast('iOS sound permission was not granted');
-          return false;
-        })
-        : null;
       if (this.engine.ctx?.state === 'suspended') {
         await this.engine.ctx.resume().catch(() => {});
       }

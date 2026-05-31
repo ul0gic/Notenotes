@@ -247,10 +247,12 @@ Shipped first slice:
   canvas/WebGL; accessibility, dwell play, tremor filtering, keyboard routing,
   and immediate pointer-to-sound behavior all depend on real buttons.
 - `project.settings.padLayout` now exists additively with relative span sizes
-  (`small`, `medium`, `large`, `wide`) and templates (`even`, `bigTonic`,
-  `thumb`), not absolute pixel/freeform positions.
+  (`small`, `medium`, `large`, `wide`) and templates (`even` / Fit, `compact`,
+  `rows`, `bigTonic`, `thumb`), not absolute pixel/freeform positions.
 - Make the grid container-aware, with a minimum touch target and a narrow-phone
   fallback that ignores size variation and renders uniform pads.
+- Equal-size templates use a balanced column helper so wide screens avoid
+  orphaning one final pad when a cleaner split is available.
 - The old `custom` pad mode is removed from the Pad Mode UI. Legacy `custom`
   normalizes to `single`; `scalePadsCount` remains dormant plumbing for a future
   full-custom surface.

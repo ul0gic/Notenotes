@@ -1708,9 +1708,17 @@
   text-transform: uppercase;
 }
 
-.ctrlmode__modifier-select .ctrlmode__select {
+.ctrlmode__modifier-button {
   width: 100%;
   max-width: none;
+  min-height: 34px;
+  justify-content: space-between;
+}
+
+.ctrlmode__modifier-button .choice-picker-button__label {
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
 }
 
 .ctrlmode__trigger-assignments {

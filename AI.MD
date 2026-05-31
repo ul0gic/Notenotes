@@ -44,6 +44,8 @@ src/main.js
     MusicTheory.js          notes, scales, degree metadata
     ScaleChords.js          curated chord recipes for non-tertian scales
     Progressions.js         degree-stored harmonic context + chord resolver
+    PadLayout.js            modular pad layout schema/templates/packing
+    ControllerModifiers.js  pure controller modifier recipes and picker groups
     GamepadInputManager.js  gamepad polling and bindable buttons
   ai/
     AIController.js         constrained snippet-generation orchestration
@@ -116,13 +118,17 @@ sound. This is not recording; it is a user-gesture permission primer.
 - `_initializeAudioFromGesture()` creates/resumes `AudioEngine`, initializes the
   metronome, Creative mode, and Canvas playback engine, then calls
   `AudioEngine.unlockGesture()` before and after resume. On likely iOS devices
-  it also starts `AudioEngine.primeMediaRoute()` before the first awaited
-  resume so Safari receives the media request directly inside the user's tap.
+  it also starts `AudioEngine.primeMediaRoute()` before `AudioContext` setup
+  and before the first awaited resume when route priming is requested, so Safari
+  receives the media request directly inside the user's tap.
 - `_buildAudioUnlockPrompt()` adds the floating `Tap to enable sound` prompt.
   It stays visible while the app has not initialized audio, while
   `engine.ctx.state !== 'running'`, or while iOS still has not primed the media
   route. On iOS it tells the user Safari may ask for microphone access and that
-  Notenotes will not record from this unlock path.
+  Notenotes will not record from this unlock path. The prompt itself counts as
+  an iOS route-prime target and listens to pointerdown, touchend, and click so
+  WebKit has multiple valid gesture hooks; keep this broad unless device QA
+  proves it causes duplicate permission prompts.
 - `_bindAudioContextState()` and the `notenotes-audio-state-changed` event keep
   the prompt synced when instruments attempt their own unlocks.
 - `CreativeMode.ensureAudioReady()` still retries from actual instrument
@@ -451,8 +457,11 @@ or reviving the old editor.
 
 `src/engine/PadLayout.js` owns the first modular-pad foundation. Layouts
 are additive settings in `project.settings.padLayout` with relative size tokens
-(`small`, `medium`, `large`, `wide`) and templates (`even`, `bigTonic`,
-`thumb`). Do not store pixel coordinates. `ScaleBoard` keeps real `<button>`
+(`small`, `medium`, `large`, `wide`) and templates (`even` / Fit, `compact`,
+`rows`, `bigTonic`, `thumb`). `recommendedPadColumns()` balances equal-size
+templates so wide boards avoid orphan final rows when space allows; 13 pads
+should prefer a balanced split such as 7/6 over `4/4/4/1`. Do not store pixel
+coordinates. `ScaleBoard` keeps real `<button>`
 pads and adds `data-size` per pad; CSS Grid uses `grid-auto-flow: dense` and
 container-aware `--pad-cols` variables. Narrow/compact boards force every pad
 back to 1x1 so phone portrait layouts do not become giant unusable blocks.
@@ -515,6 +524,12 @@ Current controller modifiers are note/chord transforms: octave down/up, Triad,
 through the current project scale when the struck note exists in that scale;
 if the root is chromatic/out-of-scale, they fall back to interval recipes so
 exact Piano bindings remain playable instead of failing.
+
+Controller modifier slots use compact buttons plus `ChoicePicker`, not native
+select menus. The option list is long enough that native dropdowns become ugly
+and hard to scan on mobile. Modifier recipes and picker groups live in the pure
+`src/engine/ControllerModifiers.js` helper so smoke tests can verify that
+Tone/effect modifiers remain absent without importing DOM/CSS UI code.
 
 Bindings store target kind/mode details, not only a MIDI number, so Pads bindings
 can remember Single/Chord/Root behavior. If a bound target no longer exists

@@ -7,6 +7,13 @@
 import { getScaleNotes, midiToNoteName, normalizeMusicalContext, SCALES } from '../engine/MusicTheory.js';
 import { normalizeSoundTraits } from './WebAudioSynth.js';
 import { gamepadButtonInfo } from '../engine/GamepadInputManager.js';
+import {
+  CONTROLLER_NOTE_MODIFIERS,
+  controllerModifierLabel,
+  controllerModifierPickerGroups,
+  normalizeControllerModifier,
+} from '../engine/ControllerModifiers.js';
+import { ChoicePicker } from '../ui/ChoicePicker.js';
 
 const MODIFIER_SLOTS = [
   { key: 'leftBumper', short: 'LB', label: 'Left bumper', buttonIndex: 4, defaultValue: 'octaveDown' },
@@ -16,31 +23,6 @@ const MODIFIER_SLOTS = [
 ];
 
 const SLOT_BY_KEY = Object.fromEntries(MODIFIER_SLOTS.map(slot => [slot.key, slot]));
-
-export const CONTROLLER_NOTE_MODIFIERS = {
-  octaveDown: { id: 'octaveDown', name: 'Octave down', shortName: 'Oct -', intervalOffsets: [-12] },
-  octaveUp: { id: 'octaveUp', name: 'Octave up', shortName: 'Oct +', intervalOffsets: [12] },
-  triad: { id: 'triad', name: 'Triad', shortName: 'Triad', scaleOffsets: [0, 2, 4], intervalFallback: [0, 4, 7] },
-  seventh: { id: 'seventh', name: '7th chord', shortName: '7th', scaleOffsets: [0, 2, 4, 6], intervalFallback: [0, 4, 7, 10] },
-  sus2: { id: 'sus2', name: 'Sus2', shortName: 'sus2', intervalOffsets: [0, 2, 7] },
-  sus4: { id: 'sus4', name: 'Sus4', shortName: 'sus4', intervalOffsets: [0, 5, 7] },
-  power: { id: 'power', name: 'Power chord', shortName: '5', intervalOffsets: [0, 7] },
-  add9: { id: 'add9', name: 'Add 9', shortName: 'add9', scaleOffsets: [0, 2, 4, 8], intervalFallback: [0, 4, 7, 14] },
-  ninth: { id: 'ninth', name: '9th chord', shortName: '9th', scaleOffsets: [0, 2, 4, 6, 8], intervalFallback: [0, 4, 7, 10, 14] },
-  eleventh: { id: 'eleventh', name: '11th chord', shortName: '11th', scaleOffsets: [0, 2, 4, 6, 8, 10], intervalFallback: [0, 4, 7, 10, 14, 17] },
-  thirteenth: { id: 'thirteenth', name: '13th chord', shortName: '13th', scaleOffsets: [0, 2, 4, 6, 8, 10, 12], intervalFallback: [0, 4, 7, 10, 14, 17, 21] },
-};
-
-export function normalizeControllerModifier(value) {
-  if (!value || value === 'none') return 'none';
-  if (String(value).startsWith('note:')) return normalizeControllerModifier(String(value).replace('note:', ''));
-  return CONTROLLER_NOTE_MODIFIERS[value] ? value : 'none';
-}
-
-export function controllerModifierLabel(value) {
-  const modifier = CONTROLLER_NOTE_MODIFIERS[normalizeControllerModifier(value)];
-  return modifier?.name || 'None';
-}
 
 export class ControllerMode {
   constructor(synth, project, modManager, gamepadInput = null) {
@@ -220,30 +202,12 @@ export class ControllerMode {
       <label class="ctrlmode__modifier-select">
         <span>${slot.short}</span>
         <small>${slot.label}</small>
-        <select class="ctrlmode__select" id="ct-mod-${slot.key}" aria-label="${slot.label} modifier">
-          ${this._renderModifierOptions(value)}
-        </select>
+        <button class="choice-picker-button ctrlmode__modifier-button" id="ct-mod-${slot.key}" type="button" aria-label="${slot.label} modifier" aria-haspopup="dialog" data-modifier-slot="${slot.key}">
+          <span class="choice-picker-button__label">${this._escapeHtml(controllerModifierLabel(value))}</span>
+          <span class="choice-picker-button__chevron" aria-hidden="true">▼</span>
+        </button>
       </label>
     `;
-  }
-
-  _renderModifierOptions(value) {
-    const groups = [
-      ['None', [['none', 'None']]],
-      ['Navigation', [
-        ['octaveDown', CONTROLLER_NOTE_MODIFIERS.octaveDown.name],
-        ['octaveUp', CONTROLLER_NOTE_MODIFIERS.octaveUp.name],
-      ]],
-      ['Chords', Object.values(CONTROLLER_NOTE_MODIFIERS)
-        .filter(mod => !['octaveDown', 'octaveUp'].includes(mod.id))
-        .map(mod => [mod.id, mod.name])],
-    ];
-
-    return groups.map(([label, options]) => `
-      <optgroup label="${label}">
-        ${options.map(([id, optionLabel]) => `<option value="${id}" ${value === id ? 'selected' : ''}>${optionLabel}</option>`).join('')}
-      </optgroup>
-    `).join('');
   }
 
   _bindEvents() {
@@ -259,11 +223,24 @@ export class ControllerMode {
       this.shiftOctave(1);
     });
     MODIFIER_SLOTS.forEach(slot => {
-      this.el.querySelector(`#ct-mod-${slot.key}`)?.addEventListener('change', (e) => {
-        this._setModifierAssignment(slot.key, e.target.value);
+      this.el.querySelector(`#ct-mod-${slot.key}`)?.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        this._openModifierPicker(slot, e.currentTarget);
       });
     });
     this._syncModifierSelects();
+  }
+
+  _openModifierPicker(slot, anchor) {
+    const assignments = this._controllerModifierAssignments();
+    const picker = new ChoicePicker({
+      title: `${slot.short} modifier`,
+      groups: controllerModifierPickerGroups(),
+      selectedValue: assignments[slot.key] || slot.defaultValue,
+      searchPlaceholder: 'Search modifiers...',
+      onSelect: (value) => this._setModifierAssignment(slot.key, value),
+    });
+    picker.open(anchor);
   }
 
   shiftOctave(delta) {
@@ -347,8 +324,9 @@ export class ControllerMode {
   _syncModifierSelects() {
     const assignments = this._controllerModifierAssignments();
     MODIFIER_SLOTS.forEach(slot => {
-      const select = this.el?.querySelector(`#ct-mod-${slot.key}`);
-      if (select) select.value = assignments[slot.key] || slot.defaultValue;
+      const button = this.el?.querySelector(`#ct-mod-${slot.key}`);
+      const label = button?.querySelector('.choice-picker-button__label');
+      if (label) label.textContent = controllerModifierLabel(assignments[slot.key] || slot.defaultValue);
     });
   }
 

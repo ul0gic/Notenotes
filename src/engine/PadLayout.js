@@ -4,8 +4,18 @@ export const DEFAULT_PAD_LAYOUT_TEMPLATE = 'even';
 export const PAD_LAYOUT_TEMPLATES = {
   even: {
     id: 'even',
-    label: 'Even',
-    description: 'Uniform pads that stay calm on every screen.',
+    label: 'Fit',
+    description: 'Equal pads packed into balanced rows.',
+  },
+  compact: {
+    id: 'compact',
+    label: 'Compact',
+    description: 'Equal pads with fewer rows when wider screens allow it.',
+  },
+  rows: {
+    id: 'rows',
+    label: 'Rows',
+    description: 'Equal pads with a calmer row-first shape.',
   },
   bigTonic: {
     id: 'bigTonic',
@@ -61,6 +71,39 @@ export function padLayoutForCount(padCount = 0, options = {}) {
     template: options.template || DEFAULT_PAD_LAYOUT_TEMPLATE,
     pads: [],
   }, padCount);
+}
+
+export function recommendedPadColumns(padCount = 0, width = 360, options = {}) {
+  const count = Math.max(1, Math.floor(Number(padCount) || 1));
+  const availableWidth = Math.max(1, Number(width) || 360);
+  const minPadWidth = options.minPadWidth || 72;
+  const template = options.template || DEFAULT_PAD_LAYOUT_TEMPLATE;
+  const maxCols = Math.max(1, Math.min(count, Math.floor((availableWidth - 4) / minPadWidth)));
+  if (maxCols <= 1) return 1;
+
+  const targetRows = targetRowsForTemplate(template, count);
+  let best = 1;
+  let bestScore = Number.POSITIVE_INFINITY;
+  for (let cols = 1; cols <= maxCols; cols += 1) {
+    const rows = Math.ceil(count / cols);
+    const finalRow = count % cols || cols;
+    const orphanPenalty = finalRow === 1 && rows > 1 ? 100 : 0;
+    const rowBalance = rows > 1 ? Math.abs(cols - finalRow) : cols;
+    const rowPenalty = Math.abs(rows - targetRows) * 12;
+    const densityPenalty = template === 'compact' ? (maxCols - cols) * 0.25 : cols * 0.05;
+    const score = orphanPenalty + rowBalance + rowPenalty + densityPenalty;
+    if (score < bestScore) {
+      bestScore = score;
+      best = cols;
+    }
+  }
+  return best;
+}
+
+function targetRowsForTemplate(template, count) {
+  if (template === 'compact') return count > 10 ? 2 : 1;
+  if (template === 'rows') return count > 8 ? 3 : 2;
+  return count > 8 ? 2 : 2;
 }
 
 export function sizeForTemplate(template = DEFAULT_PAD_LAYOUT_TEMPLATE, index = 0, count = 0) {

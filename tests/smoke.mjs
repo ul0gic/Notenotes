@@ -9,7 +9,7 @@ import {
   normalizeControllerTarget,
 } from '../src/ui/ControllerMapperPopover.js';
 import { BINDABLE_GAMEPAD_BUTTONS } from '../src/engine/GamepadInputManager.js';
-import { normalizeControllerModifier } from '../src/instruments/ControllerMode.js';
+import { controllerModifierPickerGroups, normalizeControllerModifier } from '../src/engine/ControllerModifiers.js';
 import {
   clampCustomPadCount,
   clampPianoKeyCount,
@@ -23,6 +23,7 @@ import { padPerformanceIndex, pianoPerformanceIndex } from '../src/modes/input/P
 import { correctMidiToScale, normalizeMusicalContext } from '../src/engine/MusicTheory.js';
 import {
   DEFAULT_PAD_LAYOUT_TEMPLATE,
+  recommendedPadColumns,
   normalizePadLayout,
   normalizePadMode,
   padLayoutForCount,
@@ -264,6 +265,14 @@ test('pad layout helpers normalize additive relative span settings', () => {
   assert.deepEqual(thumb.pads.map(pad => pad.size), ['medium', 'small', 'small', 'medium', 'large']);
 });
 
+test('pad layout column helper avoids orphaned single pads when space allows', () => {
+  assert.equal(recommendedPadColumns(13, 1800, { template: 'even' }), 7);
+  assert.equal(recommendedPadColumns(12, 1800, { template: 'even' }), 6);
+  assert.equal(recommendedPadColumns(7, 1800, { template: 'even' }), 4);
+  assert.equal(recommendedPadColumns(5, 1800, { template: 'even' }), 3);
+  assert.equal(recommendedPadColumns(13, 360, { template: 'even' }), 4);
+});
+
 test('controller mapper helpers normalize targets without sharing preset references', () => {
   const scale = normalizeControllerTarget({
     type: 'scalePad',
@@ -291,6 +300,11 @@ test('controller modifier slots reserve shoulders and triggers from binding', ()
   assert.equal(normalizeControllerModifier('note:seventh'), 'seventh');
   assert.equal(normalizeControllerModifier('drive'), 'none');
   assert.equal(normalizeControllerModifier('sus4'), 'sus4');
+
+  const groups = controllerModifierPickerGroups();
+  assert.deepEqual(groups.map(group => group.id), ['none', 'navigation', 'chords']);
+  assert.equal(groups.flatMap(group => group.items).some(item => item.value === 'drive'), false);
+  assert.equal(groups.flatMap(group => group.items).some(item => item.value === 'thirteenth'), true);
 });
 
 test('layout popover helpers clamp controls to supported ranges', () => {
