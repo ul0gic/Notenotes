@@ -54,6 +54,11 @@ import {
   stageIntensityForUnits,
   stageTracksForCanvas,
 } from '../src/stage/StageModel.js';
+import {
+  DEFAULT_STAGE_VIEW_ID,
+  resolveStageView,
+  stageViewOptionsForMode,
+} from '../src/stage/StageViews.js';
 import { auditProjectAudioAssets, createProject } from '../src/data/ProjectStore.js';
 
 function test(name, fn) {
@@ -487,6 +492,18 @@ test('stage model gives same canvas track events internal sublanes', () => {
       ['G4', 1, 2],
     ]
   );
+});
+
+test('stage view registry exposes trace and thread without leaking canvas-only views into live stage', () => {
+  assert.equal(DEFAULT_STAGE_VIEW_ID, 'trace');
+  assert.equal(resolveStageView('missing').id, 'trace');
+  assert.equal(resolveStageView('thread').label, 'Thread');
+
+  const liveIds = stageViewOptionsForMode('live').map(view => view.id);
+  assert.deepEqual(liveIds, ['trace', 'thread']);
+
+  const canvasIds = stageViewOptionsForMode('canvas').map(view => view.id);
+  assert.deepEqual(canvasIds, ['trace']);
 });
 
 test('audio audit reports missing, orphaned, and backup readiness without mutating project', () => {

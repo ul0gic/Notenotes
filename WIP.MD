@@ -206,14 +206,22 @@ without touching audio timing. Stage is already the shipped name for the older
 "Flow" / "Performance Mode" idea; it has live Create views and Canvas track
 views backed by `src/stage/`.
 
-Direction under review:
+Shipped first slice:
 
-- Keep Stage as a full-screen overlay, with left/right arrows or swipe to move
-  between views.
-- Formalize the implicit renderer seam into a tiny Stage view registry/lifecycle
-  so only one view runs at a time.
-- Refactor the current live highway and Canvas track map into the first two
-  registered views before adding new visuals.
+- Keep Stage as a full-screen overlay. `src/stage/StageViews.js` now formalizes
+  the view registry and filters views by mode.
+- The current highway is the registered **Trace** view for live Create.
+- **Thread** is the first alternate live view: pitch-contour ribbons where
+  sustain becomes line length, velocity affects thickness, drums sit on a floor
+  line, and chords read as parallel strands.
+- Canvas Stage still uses the horizontal track map only. That view already shows
+  internal note/drum/audio sublanes and should not be forced through every live
+  view metaphor.
+
+Still pending:
+
+- Add left/right arrows or swipe to move between views; the first slice uses a
+  simple selector in the Stage header.
 - Cache gradients and reduce hot-path shadow blur before adding more Stage
   views; Stage must stay a read-only mirror of transport/events and never drive
   audio.
@@ -221,12 +229,25 @@ Direction under review:
   base bundle.
 - Honor reduced motion and keep a cheap Canvas 2D fallback.
 
+Viable future views from Opus/Grok review:
+
+- **Halo**: circle-of-fifths / tonal compass bloom. Best unique Notenotes view
+  because key, scale, and harmonic gravity are first-class in the app.
+- **Pocket**: groove clock. Strongest guide view for timing, drums, swing, and
+  early/late feel.
+- **Ink/Bloom**: one organic expressive Canvas2D view merging the better parts
+  of Sustain Nebula, Ripple Pond, Particle Garden, and Ink. Do not ship four
+  separate "pretty particles" views.
+- **Ridge**: first serious Three.js candidate. A flyover terrain where played
+  notes become geography is the clearest 3D extension of the reverse-Guitar-Hero
+  idea.
+
 Open decisions:
 
-- Which extra Stage view ships first, if any, beyond the current highway/track
-  views.
+- Whether Halo or Pocket should be the next Canvas2D view.
 - Whether WebGL is in scope soon or only architected-for.
-- Whether every view must support both live Create and Canvas contexts.
+- Whether each future view must support Canvas mode; default should be no unless
+  it can show dense track detail better than the existing map.
 
 Expected scope:
 

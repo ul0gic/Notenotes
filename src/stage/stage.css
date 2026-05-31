@@ -52,6 +52,35 @@
   white-space: nowrap;
 }
 
+.stage-overlay__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm, 8px);
+  flex: 0 0 auto;
+}
+
+.stage-overlay__view {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.stage-overlay__view select {
+  min-height: 34px;
+  min-width: 118px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  padding: 0 28px 0 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font: 800 0.8rem system-ui, sans-serif;
+}
+
 .stage-overlay__canvas {
   display: block;
   width: 100%;
@@ -139,6 +168,25 @@
   .stage-overlay__chrome {
     align-items: flex-start;
     padding-inline: var(--space-md, 16px);
+  }
+
+  .stage-overlay__actions {
+    align-items: flex-end;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .stage-overlay__view {
+    gap: 4px;
+  }
+
+  .stage-overlay__view span {
+    display: none;
+  }
+
+  .stage-overlay__view select {
+    min-width: 108px;
+    min-height: 36px;
   }
 
   .stage-overlay__input-strip {

@@ -1,6 +1,7 @@
 import './stage.css';
 
 import { STAGE_CANVAS_TRACK_LIMIT, STAGE_LIVE_LANE_LIMIT } from './StageModel.js';
+import { resolveStageView, stageViewOptionsForMode } from './StageViews.js';
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -52,6 +53,7 @@ export class CanvasStageRenderer {
     this.onInputDown = options.onInputDown || null;
     this.onInputUp = options.onInputUp || null;
     this.onClose = options.onClose || null;
+    this.viewId = resolveStageView(options.viewId || this._storedViewId(), this.mode).id;
     const fallbackLimit = this.mode === 'canvas' ? STAGE_CANVAS_TRACK_LIMIT : STAGE_LIVE_LANE_LIMIT;
     this.maxLanes = Math.max(1, Math.floor(Number(options.maxLanes) || fallbackLimit));
 
@@ -75,7 +77,10 @@ export class CanvasStageRenderer {
           <h2 class="stage-overlay__title">${this.title}</h2>
           <p class="stage-overlay__subtitle">${this.subtitle}</p>
         </div>
-        <button class="btn btn--ghost stage-overlay__close" type="button">Close Stage</button>
+        <div class="stage-overlay__actions">
+          ${this._renderViewSelector()}
+          <button class="btn btn--ghost stage-overlay__close" type="button">Close Stage</button>
+        </div>
       </div>
       ${this.mode === 'live' ? this._renderInputStrip() : ''}
       <canvas class="stage-overlay__canvas" aria-label="Stage performance visualization"></canvas>
@@ -84,6 +89,10 @@ export class CanvasStageRenderer {
     this.canvas = this.el.querySelector('canvas');
     this.ctx = this.canvas.getContext('2d', { alpha: true });
     this.el.querySelector('.stage-overlay__close')?.addEventListener('click', () => this.close());
+    this.el.querySelector('#stage-view-select')?.addEventListener('change', (event) => {
+      this.viewId = resolveStageView(event.target.value, this.mode).id;
+      this._storeViewId(this.viewId);
+    });
     this._bindInputStrip();
     document.body.appendChild(this.el);
 
@@ -91,6 +100,37 @@ export class CanvasStageRenderer {
       this._unsubscribe = this.eventStream.subscribe(payload => this._receiveStreamEvent(payload));
     }
     this._draw();
+  }
+
+  _storedViewId() {
+    try {
+      return window.localStorage?.getItem(`notenotes-stage-view-${this.mode}`);
+    } catch {
+      return '';
+    }
+  }
+
+  _storeViewId(viewId) {
+    try {
+      window.localStorage?.setItem(`notenotes-stage-view-${this.mode}`, viewId);
+    } catch { /* non-critical preference */ }
+  }
+
+  _renderViewSelector() {
+    const options = stageViewOptionsForMode(this.mode);
+    if (options.length < 2) return '';
+    return `
+      <label class="stage-overlay__view">
+        <span>View</span>
+        <select id="stage-view-select" aria-label="Stage view">
+          ${options.map(view => `
+            <option value="${this._escapeAttr(view.id)}" ${view.id === this.viewId ? 'selected' : ''}>
+              ${this._escapeHtml(view.label)}
+            </option>
+          `).join('')}
+        </select>
+      </label>
+    `;
   }
 
   _renderInputStrip() {
@@ -221,8 +261,12 @@ export class CanvasStageRenderer {
       this._raf = requestAnimationFrame(this._draw);
       return;
     }
-    this._drawHighway(ctx, width, height);
-    this._drawEvents(ctx, width, height);
+    if (this.viewId === 'thread') {
+      this._drawThread(ctx, width, height);
+    } else {
+      this._drawHighway(ctx, width, height);
+      this._drawEvents(ctx, width, height);
+    }
     this._raf = requestAnimationFrame(this._draw);
   };
 
@@ -499,6 +543,134 @@ export class CanvasStageRenderer {
     }
   }
 
+  _threadGeometry(width, height) {
+    const laneCount = clamp(Math.floor(Number(this.getLaneCount()) || 1), 1, this.maxLanes);
+    const top = height * 0.16;
+    const bottom = height * 0.82;
+    const nowX = width * 0.82;
+    const left = width * 0.08;
+    const floorY = height * 0.88;
+    return {
+      laneCount,
+      top,
+      bottom,
+      nowX,
+      left,
+      floorY,
+      spanX: nowX - left,
+    };
+  }
+
+  _threadY(event, geom) {
+    if (event.type === 'hit' || !Number.isFinite(Number(event.pitch))) {
+      const sub = clamp(event.lane || 0, 0, geom.laneCount - 1);
+      const spread = geom.laneCount <= 1 ? 0 : (sub / (geom.laneCount - 1));
+      return geom.floorY - spread * 42;
+    }
+    const pitch = clamp(Number(event.pitch), 36, 96);
+    const normalized = (pitch - 36) / 60;
+    return geom.bottom - normalized * (geom.bottom - geom.top);
+  }
+
+  _drawThread(ctx, width, height) {
+    const geom = this._threadGeometry(width, height);
+    const now = performance.now();
+    const events = this._eventsForFrame();
+    const sweepMs = 5200;
+
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    const field = ctx.createLinearGradient(geom.left, 0, geom.nowX, 0);
+    field.addColorStop(0, 'rgba(255,255,255,0.02)');
+    field.addColorStop(0.72, 'rgba(90, 215, 255, 0.07)');
+    field.addColorStop(1, 'rgba(255,255,255,0.12)');
+    ctx.fillStyle = field;
+    this._roundedRect(ctx, geom.left, geom.top - 24, geom.spanX, geom.floorY - geom.top + 48, 18);
+    ctx.fill();
+
+    for (let i = 0; i <= 6; i += 1) {
+      const y = geom.top + (i / 6) * (geom.bottom - geom.top);
+      ctx.strokeStyle = `rgba(255,255,255,${i === 3 ? 0.16 : 0.07})`;
+      ctx.lineWidth = i === 3 ? 1.4 : 0.8;
+      ctx.beginPath();
+      ctx.moveTo(geom.left, y);
+      ctx.lineTo(geom.nowX + 18, y);
+      ctx.stroke();
+    }
+
+    ctx.strokeStyle = 'rgba(255,255,255,0.48)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(geom.nowX, geom.top - 34);
+    ctx.lineTo(geom.nowX, geom.floorY + 16);
+    ctx.stroke();
+    ctx.font = '800 10px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(255,255,255,0.82)';
+    ctx.fillText('NOW', geom.nowX, geom.top - 42);
+
+    ctx.strokeStyle = 'rgba(255,255,255,0.14)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(geom.left, geom.floorY);
+    ctx.lineTo(geom.nowX + 20, geom.floorY);
+    ctx.stroke();
+
+    for (const event of events) {
+      const startMs = event._visualStartMs || now;
+      const endMs = event._active ? now : (event._visualEndMs || startMs + 120);
+      const startAge = now - startMs;
+      const endAge = now - endMs;
+      const xStart = geom.nowX - clamp(startAge / sweepMs, 0, 1.08) * geom.spanX;
+      const xEnd = geom.nowX - clamp(Math.max(0, endAge) / sweepMs, 0, 1.08) * geom.spanX;
+      if (Math.max(xStart, xEnd) < geom.left - 20) continue;
+      const y = this._threadY(event, geom);
+      const velocity = event.velocity || 0.8;
+      const glow = event.intensity?.glow ?? 0.35;
+      const alpha = event._active ? 0.92 : 0.38 + velocity * 0.3;
+      const lineWidth = event.type === 'hit'
+        ? 2.5 + velocity * 5
+        : 3 + velocity * 7 + glow * 5;
+
+      ctx.save();
+      ctx.shadowColor = rgba(event.accentColor, 0.74);
+      ctx.shadowBlur = 8 + glow * 26;
+      ctx.strokeStyle = rgba(event.color, alpha);
+      ctx.lineWidth = lineWidth;
+      ctx.beginPath();
+      if (event.type === 'hit') {
+        ctx.moveTo(xStart, geom.floorY + 6);
+        ctx.lineTo(xEnd, y);
+      } else {
+        const bend = Math.sin((startMs * 0.002) + (event.pitch || 0)) * 10;
+        const midX = (xStart + xEnd) / 2;
+        ctx.moveTo(xStart, y + bend * 0.2);
+        ctx.quadraticCurveTo(midX, y + bend, xEnd, y);
+      }
+      ctx.stroke();
+
+      const headX = event._active ? xEnd : xStart;
+      ctx.fillStyle = rgba(event.accentColor, Math.min(1, alpha + 0.12));
+      ctx.beginPath();
+      ctx.arc(headX, y, event.type === 'hit' ? 5 + velocity * 8 : 4 + velocity * 6, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (event.label && event._active && width > 560) {
+        ctx.shadowBlur = 0;
+        ctx.font = '750 11px system-ui, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = 'rgba(255,255,255,0.82)';
+        ctx.fillText(String(event.label).slice(0, 10), Math.min(geom.nowX + 18, width - 64), y);
+      }
+      ctx.restore();
+    }
+
+    ctx.restore();
+  }
+
   _drawEventShape(ctx, geom, lane, zStart, zEnd, event) {
     const inset = 0.14;
     const leftStart = geom.xAt(lane + inset, zStart);
@@ -538,5 +710,19 @@ export class CanvasStageRenderer {
       ctx.fillText(String(event.label).slice(0, 10), (leftStart + rightStart + leftEnd + rightEnd) / 4, (yStart + yEnd) / 2);
     }
     ctx.restore();
+  }
+
+  _escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, char => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    })[char]);
+  }
+
+  _escapeAttr(value) {
+    return this._escapeHtml(value);
   }
 }

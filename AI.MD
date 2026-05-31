@@ -81,6 +81,7 @@ src/main.js
   stage/
     StageEventStream.js     renderer-agnostic live/visual performance events
     StageModel.js           Stage lane limits, intensity tiers, track mapping
+    StageViews.js           Stage view registry and mode filtering
   data/
     ProjectStore.js         IndexedDB, audio assets, backup, history
   export/
@@ -721,10 +722,14 @@ moving musical input or transport logic.
   units.
 - `src/stage/CanvasStageRenderer.js` owns the current visual layer. It renders a
   fixed full-screen overlay with a design-language-friendly Close Stage button,
-  not a corner X. In `live` mode it renders the Create performance highway,
-  subscribes to `StageEventStream`, and keeps a short recent-event tail so idle
-  playing, armed recording, and active recording all visualize the same way. In
-  `canvas` mode it switches to a horizontal track map rather than the highway:
+  not a corner X. It reads `src/stage/StageViews.js` for the mode-safe view list
+  and persists the chosen view in `localStorage` per Stage mode. In `live` mode
+  the default `trace` view renders the Create performance highway, while the
+  `thread` view renders pitch-contour ribbons where sustain is literal line
+  length and chords appear as parallel strands. Both subscribe to
+  `StageEventStream` and keep a short recent-event tail so idle playing, armed
+  recording, and active recording all visualize the same way. In `canvas` mode
+  it switches to a horizontal track map rather than the highway:
   each audible Canvas track is a row, internal sublanes show individual notes or
   drum sounds, audio clips render as sustained blocks, and a vertical playhead
   anchors the motion. Keep this split unless a later Three.js renderer can show
