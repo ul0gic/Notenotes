@@ -767,7 +767,7 @@ Expected:
 - Short taps produce audible sound.
 - Held notes still feel like modern/pad instruments rather than chip plucks.
 
-## 8. Controller Triggers
+## 8. Controller
 
 ### 8.0 Controller Mapper Bindings
 
@@ -779,10 +779,12 @@ Steps:
 4. Open List Current Bindings.
 5. Switch Pads to Custom, set one pad to Chord, and bind that pad too.
 6. Bind one Piano key and one Kit pad.
+7. Try holding LB, LT, RB, and RT in the mapper.
 
 Expected:
 
 - The mapper stays open after Set long enough for the next Pads/Piano/Kit click to bind.
+- LB, LT, RB, and RT are not offered as bindable buttons; they are reserved for held modifiers.
 - Pads bindings show as Pads/Chord/Root targets, not just fixed note names.
 - Pads bindings keep the learned action. A button learned from Single stays a single note after switching Pads to Chords.
 - A binding learned from a pad that no longer exists shows a clear toast instead of silently doing nothing.
@@ -792,49 +794,52 @@ Expected:
 - Kit bindings still play exact drum sounds.
 - Save Current creates a named controller preset, Load restores it, and Delete removes it.
 
-### 8.1 Trigger Notes In Single Mode
+### 8.1 Held Modifiers On Pads And Piano
 
 Steps:
 
-1. Go to Controller.
-2. Assign LT or RT to a Trigger Note such as 7th or 9th.
-3. Hold the trigger.
-4. Strike a note.
+1. Go to Labs.
+2. Assign LT to Triad and RT to 7th chord.
+3. Go to Pads in Single mode.
+4. Hold LT and strike an unbound fallback controller button.
+5. Hold RT and strike the same button.
+6. Bind a Piano key in the Controller mapper, then hold LT and press that learned button.
 
 Expected:
 
-- The trigger note behavior only applies when the trigger is held before striking the note.
-- The green trigger helper text matches the selected assignment.
+- The modifier behavior only applies when the shoulder/trigger is held before striking the note.
+- LT turns the single note into a triad; RT turns it into a four-note seventh chord.
+- Learned Piano note bindings also expand through the held modifier.
+- The active modifier indicator matches the held slot.
 
-### 8.2 Trigger Notes In Chord Mode
+### 8.2 Extended Modifier Choices
 
 Steps:
 
-1. Set Pads mode to Chord.
-2. Assign a Trigger Note.
-3. Hold the trigger.
-4. Strike a chord pad.
+1. In Labs, assign each slot a different choice: Sus2, Sus4, Power, and 9th.
+2. Hold each slot one at a time and press a learned Pads or Piano button.
+3. Switch key/scale and repeat with a fallback Pads button.
 
 Expected:
 
-- The chord includes the selected trigger extension.
-- Helper text explains that the trigger must be held before striking.
+- Sus2, Sus4, and Power use their interval shapes from the struck note.
+- 9th and other extended choices follow the current scale when the struck note is in-scale.
+- If the struck Piano note is out of the scale, the modifier still plays a sensible interval fallback instead of failing.
 
-### 8.3 Tone Trigger Hotswitch Recording
+### 8.3 Tone Is Not A Controller Modifier
 
 Steps:
 
-1. Assign LT or RT to a Tone effect.
-2. Record a MIDI or drum snippet.
-3. Play some notes without the trigger.
-4. Hold the trigger and play some notes.
-5. Stop recording.
-6. Play back the snippet.
+1. Open Labs.
+2. Open all four modifier dropdowns.
+3. Record a MIDI snippet while holding a modifier on some notes.
+4. Export the snippet as MIDI.
 
 Expected:
 
-- Only notes or hits played while the trigger was active have the trigger Tone.
-- The trigger Tone does not smear across the whole clip.
+- Tone traits such as Drive, Echo, Space, and Noise are not present in the modifier dropdowns.
+- Recorded controller modifiers become normal MIDI notes/chords, not effect hotswitch metadata.
+- Drum bindings ignore note modifiers and still trigger the exact drum sound.
 
 ## 9. Mobile Menu And Settings
 

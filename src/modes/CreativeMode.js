@@ -48,6 +48,8 @@ const INSTRUMENTS = {
   CONTROLLER: 'controller',
 };
 
+const CONTROLLER_MODIFIER_BUTTONS = new Set([4, 5, 6, 7]);
+
 export class CreativeMode {
   constructor(engine, transport, quantizer, store, project, modManager) {
     this.engine = engine;
@@ -1034,6 +1036,7 @@ export class CreativeMode {
   _handleControllerButtonDown(index) {
     if (!this._isCreativeActive() || this.controllerMapper?.isOpen()) return;
     if (this.activeInstrument === INSTRUMENTS.SCALEBOARD && this.scaleBoard?.padMode === 'voices') return;
+    if (CONTROLLER_MODIFIER_BUTTONS.has(index)) return;
     const binding = this._controllerBinding(index);
     if (binding) {
       this._playControllerBinding(index, binding);
@@ -1043,6 +1046,7 @@ export class CreativeMode {
   }
 
   _handleControllerButtonUp(index) {
+    if (CONTROLLER_MODIFIER_BUTTONS.has(index)) return;
     this._releaseControllerBinding(index);
     this._playControllerFallbackUp(index);
   }
@@ -1082,7 +1086,12 @@ export class CreativeMode {
       if (this.scaleBoard?.padMode === 'voices') return;
       if (this._heldControllerPads.has(index)) return;
       const bindingKey = `controller-${index}`;
-      const played = this.scaleBoard.pressControllerPadBinding(bindingKey, binding);
+      const rootMidi = this.scaleBoard?._notes?.[binding.padIndex] ?? binding.midi;
+      const modifiedMidis = this.controllerMode?.modifiedMidisForRoot?.(rootMidi);
+      const played = this.scaleBoard.pressControllerPadBinding(bindingKey, {
+        ...binding,
+        midis: modifiedMidis || undefined,
+      });
       if (!played) {
         showToast(`${controllerTargetLabel(binding)} is not available in the current Pads layout`);
         return;
@@ -1092,8 +1101,10 @@ export class CreativeMode {
     }
     if (binding.type === 'midi' && Number.isFinite(binding.midi)) {
       if (this._heldControllerMidis.has(index)) return;
-      this.microPiano.pressControllerMidi(binding.midi);
-      this._heldControllerMidis.set(index, binding.midi);
+      const source = `controller-${index}`;
+      const midis = this.controllerMode?.modifiedMidisForRoot?.(binding.midi) || [binding.midi];
+      midis.forEach(midi => this.microPiano.pressControllerMidi(midi, 0.8, { source }));
+      this._heldControllerMidis.set(index, { midis, source });
     }
   }
 
@@ -1105,28 +1116,44 @@ export class CreativeMode {
       return;
     }
     if (!this._heldControllerMidis.has(index)) return;
-    const midi = this._heldControllerMidis.get(index);
-    this.microPiano.releaseControllerMidi(midi);
+    const held = this._heldControllerMidis.get(index);
+    const midis = Array.isArray(held) ? held : (held?.midis || [held]);
+    const source = held?.source || 'controller';
+    midis.forEach(midi => this.microPiano.releaseControllerMidi(midi, { source }));
     this._heldControllerMidis.delete(index);
   }
 
   _playControllerFallbackDown(index) {
     const degreeMap = { 12: 0, 13: 1, 14: 2, 15: 3, 0: 4, 1: 5, 2: 6, 3: 0 };
-    if (index === 4 || index === 5) {
-      this._shiftActiveInstrumentOctave(index === 5 ? 1 : -1);
-      return;
-    }
+    if (CONTROLLER_MODIFIER_BUTTONS.has(index)) return;
 
     const degree = degreeMap[index];
     if (degree === undefined) return;
     this.ensureAudioReady();
 
     if (this.activeInstrument === INSTRUMENTS.SCALEBOARD && degree < this.scaleBoard._notes.length) {
-      this._heldControllerFallback.set(index, { type: 'scale', value: degree });
-      this.scaleBoard.pressPad(degree);
+      if (this.scaleBoard?.padMode === 'step') {
+        this.scaleBoard.triggerStepPlay();
+        return;
+      }
+      const bindingKey = `fallback-${index}`;
+      const midi = this.scaleBoard._notes[degree];
+      const modifiedMidis = this.controllerMode?.modifiedMidisForRoot?.(midi);
+      const played = this.scaleBoard.pressControllerPadBinding(bindingKey, {
+        type: 'scalePad',
+        padIndex: degree,
+        midi,
+        padMode: this.scaleBoard.padMode,
+        padAction: this.scaleBoard._padActionForIndex?.(degree) || 'single',
+        midis: modifiedMidis || undefined,
+      });
+      if (played) this._heldControllerFallback.set(index, { type: 'scale', value: bindingKey });
     } else if (this.activeInstrument === INSTRUMENTS.PIANO && degree < this.microPiano.visibleMidis().length) {
-      this._heldControllerFallback.set(index, { type: 'piano', value: degree });
-      this.microPiano.pressVisibleKey(degree);
+      const midi = this.microPiano.visibleMidis()[degree];
+      const midis = this.controllerMode?.modifiedMidisForRoot?.(midi) || [midi];
+      const source = `fallback-${index}`;
+      midis.forEach(m => this.microPiano.pressControllerMidi(m, 0.8, { source }));
+      this._heldControllerFallback.set(index, { type: 'piano', value: { midis, source } });
     } else if (this.activeInstrument === INSTRUMENTS.KIT && degree < this.sketchKit.visiblePadIds().length) {
       this.sketchKit.triggerVisiblePad(degree);
     } else if (this.activeInstrument === INSTRUMENTS.CONTROLLER) {
@@ -1138,8 +1165,12 @@ export class CreativeMode {
   _playControllerFallbackUp(index) {
     const held = this._heldControllerFallback.get(index);
     if (!held) return;
-    if (held.type === 'scale') this.scaleBoard.releasePad(held.value);
-    else if (held.type === 'piano') this.microPiano.releaseVisibleKey(held.value);
+    if (held.type === 'scale') this.scaleBoard.releaseControllerPadBinding(held.value);
+    else if (held.type === 'piano') {
+      const midis = held.value?.midis || [];
+      const source = held.value?.source || `fallback-${index}`;
+      midis.forEach(midi => this.microPiano.releaseControllerMidi(midi, { source }));
+    }
     else if (held.type === 'controller') this.controllerMode.handleFallbackButtonUp(held.value);
     this._heldControllerFallback.delete(index);
   }

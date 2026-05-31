@@ -218,7 +218,13 @@ Project sketch:
     customInstruments: [],
     controllerBindings: {},
     controllerBindingPresets: [],
-    controllerToneAssignments: { leftTrigger: 'none', rightTrigger: 'none' },
+    controllerModifierAssignments: {
+      leftBumper: 'octaveDown',
+      leftTrigger: 'none',
+      rightBumper: 'octaveUp',
+      rightTrigger: 'none'
+    },
+    controllerToneAssignments: { leftTrigger: 'none', rightTrigger: 'none' }, // legacy migration input only
     degreeHighlighting: {},
     backupContents: 'current',
     versionHistoryLimit: 5,
@@ -414,8 +420,21 @@ from live synthesis.
 
 Controller bindings are global in Create. A learned controller button can target
 Pads, Piano notes, or Kit sounds regardless of which Create tab is visible.
-Triggers and analog sticks are reserved for expression/Tone functions and are
-not bindable as regular buttons.
+LB, LT, RB, RT, and analog sticks are reserved and are not bindable as regular
+buttons. Analog sticks remain continuous expression (`left stick = modulation`,
+`right stick = pitch bend`). LB/LT/RB/RT are held musical modifier slots stored
+in `project.settings.controllerModifierAssignments`.
+
+Do not reintroduce Tone traits as held controller modifiers. Cutting effects in
+and out during a single recording encourages ugly audio and creates misleading
+MIDI exports, because MIDI cannot represent Notenotes Tone. Users can still
+record separate snippets with different Tone settings when they want contrast.
+
+Current controller modifiers are note/chord transforms: octave down/up, Triad,
+7th, Sus2, Sus4, Power, Add 9, 9th, 11th, and 13th. Diatonic modifiers stack
+through the current project scale when the struck note exists in that scale;
+if the root is chromatic/out-of-scale, they fall back to interval recipes so
+exact Piano bindings remain playable instead of failing.
 
 Bindings store target kind/mode details, not only a MIDI number, so Pads bindings
 can remember Single/Chord/Root behavior. If a bound target no longer exists
@@ -541,12 +560,12 @@ instrument construction. `CreativeMode` remains the adapter that schedules saves
 and refreshes `ControllerMode` after bindings change.
 
 The old top-level `Ctrl` tab is now labeled `Labs`. It still renders
-`ControllerMode` for the gamepad picture, trigger assignments, connection
-status, fallback scale, and current binding readout; that screen is the first
-Labs resident because it is lower-frequency setup/control work rather than a
-core note surface. The Create toolbar `Controller` button remains the global
-Controller Mapper entry point for learning/clearing bindings. Do not bury the
-mapper inside Labs unless product direction changes.
+`ControllerMode` for connection status, fallback scale, four held modifier
+slots, and current binding readout. The old controller artwork was removed
+because Labs is setup/control space, not a performance stage. The Create toolbar
+`Controller` button remains the global Controller Mapper entry point for
+learning/clearing bindings. Do not bury the mapper inside Labs unless product
+direction changes.
 
 `src/ui/CreateLayoutPopover.js` owns the Create toolbar Layout popover for Pads
 and Piano. It renders the custom pad-count slider, piano count/key sliders, and
@@ -1136,3 +1155,36 @@ The unlock path now tracks this separately:
 If future iOS testing proves that stopping the temporary stream is not enough,
 the next escalation is to keep a clearly documented muted primer stream alive
 for the session. Do not do that preemptively; it is a larger privacy tradeoff.
+
+## Controller Labs Modifier Slots 0.1.77
+
+Controller Labs no longer uses the large controller artwork as its main surface.
+It now shows setup/status panels: current custom bindings, fallback scale notes,
+and four held modifier dropdowns for `LB`, `LT`, `RB`, and `RT`.
+
+Implementation details:
+
+- `GamepadInputManager.BINDABLE_GAMEPAD_BUTTONS` excludes buttons `4`, `5`,
+  `6`, and `7`. Those physical controls are reserved modifier slots and cannot
+  be learned in the Controller Mapper.
+- `GamepadInputManager` emits trigger/axis state before button down/up events
+  each poll. This matters when a user presses a modifier and note button in the
+  same frame; the modifier state must be visible before the note routes.
+- `ControllerMode` stores the new assignments in
+  `project.settings.controllerModifierAssignments`. When loading old projects,
+  legacy `controllerToneAssignments` values migrate only if they were old
+  `note:*` trigger-note choices; old Tone trait assignments normalize to
+  `none`.
+- `ControllerMode.modifiedMidisForRoot(rootMidi)` is the public adapter used by
+  `CreativeMode` when routing learned MIDI bindings, learned Pads bindings,
+  fallback Pads buttons, and fallback Piano buttons. Drum bindings ignore note
+  modifiers.
+- `ScaleBoard.pressControllerPadBinding()` accepts an optional `binding.midis`
+  array. This lets global controller modifiers transform a Pads binding without
+  changing the stored binding target or the user's project key/scale behavior.
+- `MicroPiano.pressControllerMidi()` receives a per-button source key such as
+  `controller-0` or `fallback-12` when a modifier expands one input into
+  several notes, so release can cleanly stop the exact notes that were started.
+
+Tone is intentionally not part of these modifier slots. Keep effect punching in
+Tone recording workflows, not held controller modifiers.

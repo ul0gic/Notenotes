@@ -1,16 +1,16 @@
 const POLL_INTERVAL = 30;
 
-export const BINDABLE_GAMEPAD_BUTTONS = new Set([0, 1, 2, 3, 4, 5, 8, 9, 10, 11, 12, 13, 14, 15]);
+export const BINDABLE_GAMEPAD_BUTTONS = new Set([0, 1, 2, 3, 8, 9, 10, 11, 12, 13, 14, 15]);
 
 export const GAMEPAD_BUTTON_LABELS = {
   0: { short: 'A', label: 'A', detail: 'Face Button Bottom' },
   1: { short: 'B', label: 'B', detail: 'Face Button Right' },
   2: { short: 'X', label: 'X', detail: 'Face Button Left' },
   3: { short: 'Y', label: 'Y', detail: 'Face Button Top' },
-  4: { short: 'LB', label: 'Left Bumper', detail: 'Left Bumper' },
-  5: { short: 'RB', label: 'Right Bumper', detail: 'Right Bumper' },
-  6: { short: 'LT', label: 'Left Trigger', detail: 'Tone / Trigger Note Modifier' },
-  7: { short: 'RT', label: 'Right Trigger', detail: 'Tone / Trigger Note Modifier' },
+  4: { short: 'LB', label: 'Left Bumper', detail: 'Held Modifier Slot' },
+  5: { short: 'RB', label: 'Right Bumper', detail: 'Held Modifier Slot' },
+  6: { short: 'LT', label: 'Left Trigger', detail: 'Held Modifier Slot' },
+  7: { short: 'RT', label: 'Right Trigger', detail: 'Held Modifier Slot' },
   8: { short: 'Back', label: 'Back', detail: 'Back / Select' },
   9: { short: 'Start', label: 'Start', detail: 'Start / Menu' },
   10: { short: 'LS', label: 'Left Stick Press', detail: 'Left Stick Press' },
@@ -127,11 +127,11 @@ export class GamepadInputManager {
     this._currentButtons = currentButtons;
     this._heldBindableButton = [...currentButtons].find(index => BINDABLE_GAMEPAD_BUTTONS.has(index)) ?? null;
 
+    this._emit('triggers', { buttons: pad.buttons, axes: pad.axes || [] });
+    this._emit('axes', { axes: pad.axes || [] });
     newlyPressed.forEach(index => this._emit('buttonDown', { index, info: gamepadButtonInfo(index), bindable: BINDABLE_GAMEPAD_BUTTONS.has(index) }));
     newlyReleased.forEach(index => this._emit('buttonUp', { index, info: gamepadButtonInfo(index), bindable: BINDABLE_GAMEPAD_BUTTONS.has(index) }));
     this._emit('buttons', { current: currentButtons, heldBindableButton: this._heldBindableButton });
-    this._emit('triggers', { buttons: pad.buttons, axes: pad.axes || [] });
-    this._emit('axes', { axes: pad.axes || [] });
 
     this._prevButtons = currentButtons;
   }

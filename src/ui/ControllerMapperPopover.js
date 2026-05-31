@@ -118,7 +118,7 @@ export class ControllerMapperPopover {
         <p class="controller-map__status" id="controller-map-status">
           Currently holding: ${info ? `<strong>${escapeHtml(info.label)}</strong> (${escapeHtml(info.detail)})` : 'None'}
         </p>
-        <p class="controller-map__hint">${learning ? `${escapeHtml(learning.label)} is waiting for a sound target. The next Pads, Piano, or Kit press will bind instead of play.` : 'Triggers and analog sticks stay reserved for Tone, trigger notes, pitch, and modulation.'}</p>
+        <p class="controller-map__hint">${learning ? `${escapeHtml(learning.label)} is waiting for a sound target. The next Pads, Piano, or Kit press will bind instead of play.` : 'Shoulders, triggers, and analog sticks stay reserved for modifiers, pitch, and modulation.'}</p>
         <div class="controller-map__actions">
           <button class="btn btn--primary controller-map__set" id="controller-map-set" type="button" ${held === null ? 'disabled' : ''}>Set</button>
           <button class="btn btn--ghost" id="controller-map-list" type="button">List Current Bindings</button>

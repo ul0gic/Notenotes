@@ -1604,9 +1604,52 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: var(--space-sm);
   min-width: 0;
+}
+
+.ctrlmode__modifier-panel {
+  width: min(100%, 680px);
+  display: grid;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  background: var(--surface-1);
+  border: var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.ctrlmode__modifier-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(120px, 1fr));
+  gap: var(--space-sm);
+}
+
+.ctrlmode__modifier-select {
+  display: grid;
+  gap: 3px;
+  padding: var(--space-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--surface-4);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+}
+
+.ctrlmode__modifier-select span {
+  color: var(--accent);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+}
+
+.ctrlmode__modifier-select small {
+  color: var(--text-tertiary);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+}
+
+.ctrlmode__modifier-select .ctrlmode__select {
+  width: 100%;
+  max-width: none;
 }
 
 .ctrlmode__trigger-assignments {
@@ -1805,6 +1848,10 @@
 
   .ctrlmode__controller {
     justify-content: flex-start;
+  }
+
+  .ctrlmode__modifier-grid {
+    grid-template-columns: 1fr 1fr;
   }
 
   .ctrlmode__trigger-assignments {

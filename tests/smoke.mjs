@@ -8,6 +8,8 @@ import {
   controllerTargetLabel,
   normalizeControllerTarget,
 } from '../src/ui/ControllerMapperPopover.js';
+import { BINDABLE_GAMEPAD_BUTTONS } from '../src/engine/GamepadInputManager.js';
+import { normalizeControllerModifier } from '../src/instruments/ControllerMode.js';
 import {
   clampCustomPadCount,
   clampPianoKeyCount,
@@ -135,6 +137,18 @@ test('controller mapper helpers normalize targets without sharing preset referen
   const cloned = cloneControllerBindings(original);
   cloned[0].nested.ok = false;
   assert.equal(original[0].nested.ok, true);
+});
+
+test('controller modifier slots reserve shoulders and triggers from binding', () => {
+  assert.equal(BINDABLE_GAMEPAD_BUTTONS.has(4), false);
+  assert.equal(BINDABLE_GAMEPAD_BUTTONS.has(5), false);
+  assert.equal(BINDABLE_GAMEPAD_BUTTONS.has(6), false);
+  assert.equal(BINDABLE_GAMEPAD_BUTTONS.has(7), false);
+  assert.equal(BINDABLE_GAMEPAD_BUTTONS.has(0), true);
+  assert.equal(BINDABLE_GAMEPAD_BUTTONS.has(12), true);
+  assert.equal(normalizeControllerModifier('note:seventh'), 'seventh');
+  assert.equal(normalizeControllerModifier('drive'), 'none');
+  assert.equal(normalizeControllerModifier('sus4'), 'sus4');
 });
 
 test('layout popover helpers clamp controls to supported ranges', () => {

@@ -58,6 +58,12 @@ export function createProject(name = 'Untitled Sketch') {
       soundTraits: {},
       tonePresets: [],
       customInstruments: [],
+      controllerModifierAssignments: {
+        leftBumper: 'octaveDown',
+        leftTrigger: 'none',
+        rightBumper: 'octaveUp',
+        rightTrigger: 'none'
+      },
       controllerToneAssignments: {
         leftTrigger: 'none',
         rightTrigger: 'none'

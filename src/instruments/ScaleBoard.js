@@ -1332,9 +1332,13 @@ export class ScaleBoard {
     } else {
       midis = [midi];
     }
+    if (Array.isArray(binding.midis) && binding.midis.some(Number.isFinite)) {
+      midis = [...new Set(binding.midis.filter(Number.isFinite))];
+    }
 
-    pad.classList.add('is-active', `is-controller-${action}`);
-    this._activeControllerPadBindings.set(bindingKey, { index, midis, action });
+    const visualAction = action === 'single' && midis.length > 1 ? 'chord' : action;
+    pad.classList.add('is-active', `is-controller-${visualAction}`);
+    this._activeControllerPadBindings.set(bindingKey, { index, midis, action: visualAction });
     midis.forEach(m => this._noteOn(m));
     return true;
   }
