@@ -86,9 +86,8 @@ export class TransportBar {
           <span class="choice-picker-button__label" id="project-scale-label">${this._scaleLabel(this._projectKey.scale)}</span>
           <span class="choice-picker-button__chevron" aria-hidden="true">▼</span>
         </button>
-        <span class="transport-bar__project-key-label">Changes</span>
         <button class="choice-picker-button transport-bar__progression-picker" id="project-progression-picker" type="button" aria-label="Progression changes" aria-haspopup="dialog">
-          <span class="choice-picker-button__label" id="project-progression-label">${progressionLabel(this._projectProgression)}</span>
+          <span class="choice-picker-button__label" id="project-progression-label">${this._progressionButtonLabel(this._projectProgression)}</span>
           <span class="choice-picker-button__chevron" aria-hidden="true">▼</span>
         </button>
         <span class="transport-bar__project-key-label">Correction</span>
@@ -296,6 +295,10 @@ export class TransportBar {
     return SCALES[scaleName]?.name || SCALES.major.name;
   }
 
+  _progressionButtonLabel(value = {}) {
+    return `Changes: ${progressionLabel(value)}`;
+  }
+
   _scaleGroups() {
     const groups = new Map();
     Object.entries(SCALES)
@@ -426,7 +429,7 @@ export class TransportBar {
     const label = this.el?.querySelector('#project-progression-label');
     const button = this.el?.querySelector('#project-progression-picker');
     const text = progressionLabel(this._projectProgression);
-    if (label) label.textContent = text;
+    if (label) label.textContent = this._progressionButtonLabel(this._projectProgression);
     if (button) {
       const title = this._projectProgression.enabled
         ? `Changes: ${text}. Future chord-tone glow will follow this progression.`

@@ -324,10 +324,12 @@ Rules:
   `MusicTheory.getScaleNotes()`.
 - `chordType` currently supports `triad` and `seventh` only. Add extensions
   deliberately once the UI has a real need.
-- `TransportBar` renders a compact top-bar `Changes` picker using
-  `progressionChoiceGroups()`. Selecting `Off` writes the inactive default;
-  selecting a preset writes a normalized `project.progression` and dispatches
-  `project-progression-changed`.
+- `TransportBar` renders a compact top-bar `Changes: ...` picker using
+  `progressionChoiceGroups()`. The closed button carries the noun for
+  visibility (`Changes: Off`, `Changes: The Axis`), while the modal rows stay
+  plain (`Off`, `The Axis`, etc.) so picker content does not become noisy.
+  Selecting `Off` writes the inactive default; selecting a preset writes a
+  normalized `project.progression` and dispatches `project-progression-changed`.
 - `ScaleBoard` listens for `project-progression-changed` and refreshes Pads.
   `_progressionMetaForMidi()` calls `activeProgressionResolution()` and adds
   `.scaleboard__pad--progression-hot` to pads whose pitch class is in the

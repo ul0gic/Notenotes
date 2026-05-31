@@ -14,8 +14,9 @@ After that, the next visible work should be:
 4. Google Drive Backup.
 
 Progression/Changes work has started as a foundation slice: the project now has
-an inactive, degree-based progression context, resolver, and compact top-bar
-Changes picker. There is no glow or playback behavior yet.
+an inactive-by-default, degree-based progression context, resolver, compact
+`Changes: ...` top-bar picker, and Pads chord-tone glow. There is no playback,
+recording, export, or automatic progression-advance behavior yet.
 
 Release/deploy strategy is worth doing before a true `1.0.0`, but it does not need to block the beta hardening work unless accidental GitHub Pages deploys become a real problem.
 
@@ -423,9 +424,10 @@ Next slices:
 - Keep progression steps stored as degrees so changing project key/scale can
   re-resolve the harmonic context. Old snippets without progression data should
   continue to play normally; they simply do not get progression-aware glow.
-- Compact the top-bar controls by moving nouns into picker button labels where
-  useful, such as `Changes: Off`, while keeping modal/picker rows simple (`Off`,
-  `The Axis`, etc.).
+- Consider the same noun-in-button-label pattern for other long top-bar
+  controls only where it actually reduces clutter. Changes already uses
+  `Changes: Off` while keeping modal/picker rows simple (`Off`, `The Axis`,
+  etc.).
 
 Open decisions:
 
