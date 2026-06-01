@@ -10,6 +10,7 @@ import { WebAudioSynth, PRESETS } from '../instruments/WebAudioSynth.js';
 import { DRUM_KITS, SketchKit } from '../instruments/SketchKit.js';
 import { AudioEngine } from './AudioEngine.js';
 import { TransportState } from './Transport.js';
+import { normalizeClipTimeScale } from './ClipTimeScale.js';
 
 /** Available instruments for track assignment */
 export const TRACK_INSTRUMENTS = {
@@ -254,13 +255,15 @@ export class PlaybackEngine {
         if (trackType === 'drum' && snippet.type !== 'drum') continue;
         if (trackType === 'midi' && snippet.type !== 'midi') continue;
 
-        const clipStartTick = (clip.startBar || 0) * ticksPerBar;
-        const clipEndTick = clipStartTick + (snippet.durationTicks || ticksPerBar);
+        const timeScale = normalizeClipTimeScale(clip.timeScale);
+        const clipStartTick = Math.round((clip.startBar || 0) * ticksPerBar);
+        const clipEndTick = clipStartTick + Math.max(1, Math.round((snippet.durationTicks || ticksPerBar) * timeScale));
 
         // Is the current tick within this clip's range?
         if (tick < clipStartTick || tick >= clipEndTick) continue;
 
-        const localTick = tick - clipStartTick;
+        const timelineLocalTick = tick - clipStartTick;
+        const localTick = timelineLocalTick / timeScale;
         const clipKey = clip.id || `${track.id}-${clip.snippetId}-${clipStartTick}`;
         const lastLocalTick = this._lastClipLocalTick.get(clipKey);
         if (lastLocalTick !== undefined && localTick < lastLocalTick) {
@@ -272,10 +275,11 @@ export class PlaybackEngine {
         const synth = instDef?.type === 'synth' ? this._getSynthForTrack(track) : null;
         if (instDef?.type === 'synth' && synth && snippet.notes) {
           for (const note of snippet.notes) {
-            if (note.startTick === localTick) {
+            const noteStartTick = clipStartTick + Math.round((note.startTick || 0) * timeScale);
+            if (noteStartTick === tick) {
               synth.setSoundTraits(clip.soundTraits || note.soundTraits || snippet.soundTraits || this.project?.settings?.soundTraits);
               synth.noteOn(note.pitch, note.velocity || 0.8, nextTickTime);
-              const noteOffTick = tick + (note.durationTick || 240);
+              const noteOffTick = tick + Math.max(1, Math.round((note.durationTick || 240) * timeScale));
               const key = `${track.id}-${note.pitch}`;
               this._activeNotes.set(key, { synth, pitch: note.pitch, noteOffTick });
             }
@@ -286,7 +290,8 @@ export class PlaybackEngine {
         if (instDef?.type === 'kit' && snippet.hits && this._kit) {
           this._kit.loadKit(instDef.kitId || 'classic');
           for (const hit of snippet.hits) {
-            if (hit.startTick === localTick) {
+            const hitStartTick = clipStartTick + Math.round((hit.startTick || 0) * timeScale);
+            if (hitStartTick === tick) {
               this._kit.setSoundTraits(clip.soundTraits || hit.soundTraits || snippet.soundTraits || this.project?.settings?.soundTraits);
               this._kit._triggerSound(hit.type || 'kick', nextTickTime);
             }
@@ -294,8 +299,8 @@ export class PlaybackEngine {
         }
 
         // Play audio snippets
-        if (snippet.type === 'audio' && this._hasAudioSource(snippet) && localTick === 0) {
-          this._playAudioClip(snippet, nextTickTime);
+        if (snippet.type === 'audio' && this._hasAudioSource(snippet) && timelineLocalTick === 0) {
+          this._playAudioClip(snippet, nextTickTime, timeScale);
         }
 
         // Apply recorded modulation
@@ -383,7 +388,7 @@ export class PlaybackEngine {
     }
   }
 
-  async _playAudioClip(snippet, audioTime = null) {
+  async _playAudioClip(snippet, audioTime = null, timeScale = 1) {
     const ctx = this._engine.ctx;
     if (!ctx || !this._hasAudioSource(snippet)) return;
 
@@ -404,6 +409,7 @@ export class PlaybackEngine {
 
       const source = ctx.createBufferSource();
       source.buffer = buffer;
+      source.playbackRate.value = 1 / Math.max(0.01, normalizeClipTimeScale(timeScale));
       const gain = ctx.createGain();
       gain.gain.value = 0.7;
       source.connect(gain);

@@ -1,5 +1,6 @@
 import { DRUM_KITS } from '../instruments/SketchKit.js';
 import { meterToTimeSignature, quarterBpmForMeter, ticksPerBarForMeter } from '../engine/Meter.js';
+import { normalizeClipTimeScale } from '../engine/ClipTimeScale.js';
 
 const PPQ = 480;
 const DRUM_MIDI = {
@@ -70,13 +71,21 @@ function stats(options) {
   return options.stats;
 }
 
-function addMidiNoteEvents(events, note, startTick, channel, exportStats) {
-  events.push(...noteEvents(startTick + (note.startTick || 0), note.pitch, note.durationTick, note.velocity, channel));
+function addMidiNoteEvents(events, note, startTick, channel, exportStats, timeScale = 1) {
+  const scale = normalizeClipTimeScale(timeScale);
+  events.push(...noteEvents(
+    startTick + (note.startTick || 0) * scale,
+    note.pitch,
+    Math.max(1, (note.durationTick || PPQ / 2) * scale),
+    note.velocity,
+    channel,
+  ));
   exportStats.renderedEvents += 1;
 }
 
-function addDrumHitEvents(events, hit, startTick, exportStats) {
-  events.push(...noteEvents(startTick + (hit.startTick || 0), DRUM_MIDI[hit.type] || 38, PPQ / 8, hit.velocity, 9));
+function addDrumHitEvents(events, hit, startTick, exportStats, timeScale = 1) {
+  const scale = normalizeClipTimeScale(timeScale);
+  events.push(...noteEvents(startTick + (hit.startTick || 0) * scale, DRUM_MIDI[hit.type] || 38, Math.max(1, (PPQ / 8) * scale), hit.velocity, 9));
   exportStats.renderedEvents += 1;
 }
 
@@ -114,10 +123,11 @@ export function projectToMidiBlob(project, options = {}) {
       }
 
       const start = (clip.startBar || 0) * ticksPerBar;
+      const timeScale = normalizeClipTimeScale(clip.timeScale);
       if (trackType === 'midi') {
-        for (const note of (snippet.notes || [])) addMidiNoteEvents(events, note, start, 0, exportStats);
+        for (const note of (snippet.notes || [])) addMidiNoteEvents(events, note, start, 0, exportStats, timeScale);
       } else if (trackType === 'drum') {
-        for (const hit of (snippet.hits || [])) addDrumHitEvents(events, hit, start, exportStats);
+        for (const hit of (snippet.hits || [])) addDrumHitEvents(events, hit, start, exportStats, timeScale);
       }
     }
   }

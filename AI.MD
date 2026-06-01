@@ -1301,3 +1301,64 @@ Implementation details:
 
 Tone is intentionally not part of these modifier slots. Keep effect punching in
 Tone recording workflows, not held controller modifiers.
+
+## Canvas Clip Time Scale 0.1.88
+
+Canvas no longer uses the old `Alt+drag` clip resize path. That path mutated the
+shared snippet by deleting notes/hits outside the resized range, which made
+Canvas behave like a destructive editor. Inspect remains the place to remove or
+shorten notes. Canvas now treats clip timing as an arrangement-level lens.
+
+### Data model
+
+- Clips may carry `clip.timeScale`.
+- Missing, malformed, or unsupported values normalize to `1`.
+- Supported v1 values live in `src/engine/ClipTimeScale.js`:
+  - `0.5` = **Double-time**. The clip is half as long.
+  - `1` = **Normal**.
+  - `2` = **Half-time**. The clip is twice as long.
+- The original snippet is never mutated by Canvas Time. `clip.durationBars`
+  stores the visible arrangement length, but the source duration still comes
+  from `clip.snippet.durationTicks` when available.
+
+### Canvas UI and collision policy
+
+`CanvasMode` exposes a **Time** toolbar button. When active, clicking a clip
+opens a modal with the supported timing presets. There is no close-X pattern;
+the modal uses the app's normal Cancel button shape.
+
+Applying a timing preset:
+
+- keeps `clip.startBar` fixed
+- grows or shrinks to the right
+- pushes every later clip on the same track by the growth amount when the clip
+  gets longer, preserving downstream spacing
+- does not pull later clips left when shrinking
+- writes one undo entry covering the edited clip and all shifted clip starts
+
+This means Canvas Time behaves like inserting more/less time into one track,
+not like trimming the underlying snippet.
+
+### Playback and export parity
+
+Every live/export path must apply the same lens:
+
+- Live `PlaybackEngine` schedules note/hit event starts at
+  `clipStartTick + event.startTick * clip.timeScale`.
+- MIDI note durations scale by `clip.timeScale`.
+- Recorded modulation reads the source-local tick as
+  `(timelineTick - clipStartTick) / clip.timeScale`.
+- Audio clips use tape-style vari-speed:
+  `BufferSource.playbackRate = 1 / clip.timeScale`. Pitch follows timing by
+  design; there is no pitch-preserving time stretch in this version.
+- `WavExporter` mirrors MIDI/drum timing math and resamples audio snippets with
+  linear interpolation for the same tape-style behavior.
+- `MidiExporter` applies the same scaled starts/durations for Canvas MIDI
+  export. Standalone snippet MIDI export remains unscaled because snippets do
+  not own arrangement-level clip lenses.
+- `StageModel` applies the same timing scale so Canvas Stage lanes stay aligned
+  with what the Canvas plays.
+
+Use `clipTimeScaleBadgeItem()` with the existing Tone badge renderer when a
+clip's timing is not normal. This intentionally places Time beside Tone so users
+can see both "this clip has effects" and "this clip has arrangement timing."

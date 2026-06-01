@@ -1,6 +1,7 @@
 import { DRUM_KITS } from '../instruments/SketchKit.js';
 import { PRESETS } from '../instruments/WebAudioSynth.js';
 import { secondsPerTickForMeter, ticksPerBarForMeter } from '../engine/Meter.js';
+import { normalizeClipTimeScale } from '../engine/ClipTimeScale.js';
 
 const TICKS_PER_BEAT = 480;
 const SAMPLE_RATE = 44100;
@@ -340,13 +341,14 @@ function renderHit(buffer, hit, startSec, secPerTick, kitId = 'classic') {
 function renderSnippetEvents(buffer, snippet, startSec, bpm, options = {}) {
   const sourceBpm = options.useSnippetBpm === false ? bpm : (snippet.bpm || bpm);
   const secPerTick = secondsPerTickFor(snippet, sourceBpm);
+  const timeScale = normalizeClipTimeScale(options.timeScale);
   const gain = clampGain(options.gain);
   if (options.includeMidi !== false) {
     for (const note of snippet.notes || []) {
       renderTone(
         buffer,
-        startSec + (note.startTick || 0) * secPerTick,
-        Math.max(secPerTick, (note.durationTick || TICKS_PER_BEAT) * secPerTick),
+        startSec + (note.startTick || 0) * secPerTick * timeScale,
+        Math.max(secPerTick, (note.durationTick || TICKS_PER_BEAT) * secPerTick * timeScale),
         note.pitch || 60,
         (note.velocity || 0.8) * gain,
       );
@@ -359,10 +361,10 @@ function renderSnippetEvents(buffer, snippet, startSec, bpm, options = {}) {
       const traits = hasClipTraits ? options.toneTraits : (hit.soundTraits || options.toneTraits || snippet.soundTraits);
       if (hasToneTraits(traits)) {
         const hitSamples = ensureLength(null, buffer.length / SAMPLE_RATE);
-        renderHit(hitSamples, hitWithGain, startSec, secPerTick, options.kitId);
+        renderHit(hitSamples, { ...hitWithGain, startTick: (hitWithGain.startTick || 0) * timeScale }, startSec, secPerTick, options.kitId);
         mixBuffer(buffer, applyToneTraits(hitSamples, traits));
       } else {
-        renderHit(buffer, hitWithGain, startSec, secPerTick, options.kitId);
+        renderHit(buffer, { ...hitWithGain, startTick: (hitWithGain.startTick || 0) * timeScale }, startSec, secPerTick, options.kitId);
       }
     }
   }
@@ -371,6 +373,7 @@ function renderSnippetEvents(buffer, snippet, startSec, bpm, options = {}) {
 function renderMidiWithTone(target, snippet, startSec, bpm, baseTraits = {}, gain = 1, options = {}) {
   const sourceBpm = options.useSnippetBpm === false ? bpm : (snippet.bpm || bpm);
   const secPerTick = secondsPerTickFor(snippet, sourceBpm);
+  const timeScale = normalizeClipTimeScale(options.timeScale);
   const renderGain = clampGain(gain);
   const patch = normalizeExportPatch(options.patch || PRESETS.chip_lead);
   const hasClipTraits = hasToneTraits(baseTraits);
@@ -379,8 +382,8 @@ function renderMidiWithTone(target, snippet, startSec, bpm, baseTraits = {}, gai
     const noteSamples = ensureLength(null, target.length / SAMPLE_RATE);
     renderPatchTone(
       noteSamples,
-      startSec + (note.startTick || 0) * secPerTick,
-      Math.max(secPerTick, (note.durationTick || TICKS_PER_BEAT) * secPerTick),
+      startSec + (note.startTick || 0) * secPerTick * timeScale,
+      Math.max(secPerTick, (note.durationTick || TICKS_PER_BEAT) * secPerTick * timeScale),
       note.pitch || 60,
       (note.velocity || 0.8) * renderGain,
       patch,
@@ -428,16 +431,24 @@ async function decodeAudioSnippet(snippet, options = {}) {
   }
 }
 
-function mixAudioBuffer(target, decoded, startSec, gain = 1) {
+function mixAudioBuffer(target, decoded, startSec, gain = 1, timeScale = 1) {
   if (!decoded) return;
   const offset = Math.max(0, Math.floor(startSec * SAMPLE_RATE));
   const channels = decoded.numberOfChannels || 1;
   const renderGain = clampGain(gain);
+  const scale = normalizeClipTimeScale(timeScale);
+  const outputLength = Math.max(1, Math.floor(decoded.length * scale * (SAMPLE_RATE / decoded.sampleRate)));
   for (let ch = 0; ch < channels; ch++) {
     const data = decoded.getChannelData(ch);
     const channelGain = (0.7 * renderGain) / channels;
-    for (let i = 0; i < data.length; i++) {
-      mixSample(target, offset + i, data[i] * channelGain);
+    for (let i = 0; i < outputLength; i++) {
+      const sourceIndex = (i / scale) * (decoded.sampleRate / SAMPLE_RATE);
+      const i0 = Math.floor(sourceIndex);
+      if (i0 >= data.length) break;
+      const i1 = Math.min(data.length - 1, i0 + 1);
+      const frac = sourceIndex - i0;
+      const sample = (data[i0] || 0) * (1 - frac) + (data[i1] || 0) * frac;
+      mixSample(target, offset + i, sample * channelGain);
     }
   }
 }
@@ -481,11 +492,12 @@ function sampleAt(decoded, sourceIndex) {
 function renderSampleNote(target, decoded, instrument, note, startSec, bpm, gain = 1, options = {}) {
   if (!decoded) return;
   const secPerTick = secondsPerTickFor(options.meterSource || {}, bpm);
-  const noteStart = startSec + (note.startTick || 0) * secPerTick;
+  const timeScale = normalizeClipTimeScale(options.timeScale);
+  const noteStart = startSec + (note.startTick || 0) * secPerTick * timeScale;
   const rate = Math.pow(2, ((note.pitch || 60) - (instrument.rootMidi ?? 60)) / 12);
   const durationSec = instrument.playbackMode === 'oneShot'
     ? decoded.duration / Math.max(0.01, rate)
-    : Math.max(secPerTick, (note.durationTick || TICKS_PER_BEAT) * secPerTick) + 0.18;
+    : Math.max(secPerTick, (note.durationTick || TICKS_PER_BEAT) * secPerTick * timeScale) + 0.18;
   const start = Math.max(0, Math.floor(noteStart * SAMPLE_RATE));
   const len = Math.max(1, Math.floor(durationSec * SAMPLE_RATE));
   const attack = Math.max(1, Math.floor((instrument.attack ?? 0.005) * SAMPLE_RATE));
@@ -633,16 +645,17 @@ export async function projectToWavBlob(project, options = {}) {
       }
 
       const startSec = (clip.startBar || 0) * barTicks * secPerTick;
-      const durationSec = (snippet.durationTicks || barTicks) * secPerTick;
+      const timeScale = normalizeClipTimeScale(clip.timeScale);
+      const durationSec = (snippet.durationTicks || barTicks) * secPerTick * timeScale;
       const traits = clip.soundTraits || snippet.soundTraits || project?.settings?.soundTraits || {};
       const customInstrument = trackType === 'midi' ? customInstrumentForTrack(project, track) : null;
       const patch = trackType === 'midi' && !customInstrument ? (PRESETS[track.instrumentId] || PRESETS.chip_lead) : null;
-      const job = { trackType, snippet, startSec, durationSec, gain, traits, customInstrument, patch, kitId };
+      const job = { trackType, snippet, startSec, durationSec, gain, traits, customInstrument, patch, kitId, timeScale };
 
       if (snippet.type === 'audio') {
         job.decoded = await decodeAudioSnippet(snippet, options);
         if (!job.decoded) continue;
-        job.durationSec = Math.max(durationSec, job.decoded.duration || 0);
+        job.durationSec = Math.max(durationSec, (job.decoded.duration || 0) * timeScale);
       }
       if (customInstrument) {
         job.customDecoded = await decodeCustomInstrument(customInstrument, options);
@@ -663,21 +676,21 @@ export async function projectToWavBlob(project, options = {}) {
   for (const job of jobs) {
     const { trackType, snippet, startSec, gain, traits } = job;
     if (snippet.type === 'audio') {
-      mixAudioBuffer(samples, job.decoded, startSec, gain);
+      mixAudioBuffer(samples, job.decoded, startSec, gain, job.timeScale);
     } else if (trackType === 'midi' && snippet.type === 'midi') {
       if (job.customInstrument && job.customDecoded) {
         if (hasToneTraits(traits)) {
           const toneLayer = ensureLength(null, samples.length / SAMPLE_RATE);
-          renderMidiWithCustomInstrument(toneLayer, snippet, job.customDecoded, job.customInstrument, startSec, bpm, gain, { useSnippetBpm: false, meterSource: project });
+          renderMidiWithCustomInstrument(toneLayer, snippet, job.customDecoded, job.customInstrument, startSec, bpm, gain, { useSnippetBpm: false, meterSource: project, timeScale: job.timeScale });
           mixBuffer(samples, applyToneTraits(toneLayer, traits));
         } else {
-          renderMidiWithCustomInstrument(samples, snippet, job.customDecoded, job.customInstrument, startSec, bpm, gain, { useSnippetBpm: false, meterSource: project });
+          renderMidiWithCustomInstrument(samples, snippet, job.customDecoded, job.customInstrument, startSec, bpm, gain, { useSnippetBpm: false, meterSource: project, timeScale: job.timeScale });
         }
       } else {
-        renderMidiWithTone(samples, snippet, startSec, bpm, traits, gain, { useSnippetBpm: false, patch: job.patch });
+        renderMidiWithTone(samples, snippet, startSec, bpm, traits, gain, { useSnippetBpm: false, patch: job.patch, timeScale: job.timeScale });
       }
     } else {
-      renderSnippetEvents(samples, snippet, startSec, bpm, { includeMidi: false, toneTraits: traits, gain, useSnippetBpm: false, kitId: job.kitId });
+      renderSnippetEvents(samples, snippet, startSec, bpm, { includeMidi: false, toneTraits: traits, gain, useSnippetBpm: false, kitId: job.kitId, timeScale: job.timeScale });
     }
   }
 

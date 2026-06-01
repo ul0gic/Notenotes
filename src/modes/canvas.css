@@ -94,6 +94,12 @@
   border-color: var(--accent-dim);
 }
 
+.canvas-time-tool.is-active {
+  color: var(--accent-light);
+  background: var(--accent-glow);
+  border-color: var(--accent-dim);
+}
+
 .canvas-toolbar__spacer { flex: 1; }
 
 @media (max-width: 640px) {
@@ -433,6 +439,12 @@
   border-color: rgba(255,255,255,0.2);
 }
 
+.canvas-mode.is-time-tool-active .canvas-clip {
+  cursor: pointer;
+  outline: 1px dashed rgba(255,255,255,0.25);
+  outline-offset: 2px;
+}
+
 .canvas-clip.is-selected {
   border-color: var(--accent);
   box-shadow: 0 0 16px var(--accent-glow);
@@ -502,6 +514,83 @@
   flex: 1;
   padding: 2px;
   opacity: 0.6;
+}
+
+.canvas-time-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal-backdrop);
+  display: grid;
+  place-items: center;
+  padding: var(--space-lg);
+  background: rgba(0,0,0,0.58);
+}
+
+.canvas-time-modal {
+  width: min(420px, calc(100vw - 32px));
+  padding: var(--space-md);
+  border: 1px solid var(--surface-4);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  box-shadow: var(--shadow-xl);
+}
+
+.canvas-time-modal__header {
+  display: grid;
+  gap: 2px;
+  margin-bottom: var(--space-md);
+}
+
+.canvas-time-modal__kicker {
+  color: var(--text-tertiary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.canvas-time-modal__options {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.canvas-time-modal__option {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  padding: var(--space-sm);
+  border: 1px solid var(--surface-4);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-primary);
+  text-align: left;
+}
+
+.canvas-time-modal__option span {
+  font-weight: var(--font-weight-semibold);
+}
+
+.canvas-time-modal__option small {
+  color: var(--text-tertiary);
+  line-height: 1.35;
+}
+
+.canvas-time-modal__option.is-selected,
+.canvas-time-modal__option:hover {
+  border-color: var(--accent);
+  background: var(--accent-glow);
+}
+
+.canvas-time-modal__note {
+  margin: var(--space-md) 0;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  line-height: 1.4;
+}
+
+.canvas-time-modal__actions {
+  display: flex;
+  justify-content: flex-end;
 }
 
 /* --- Playhead --- */

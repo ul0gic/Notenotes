@@ -1,4 +1,5 @@
 import { midiToNoteName } from '../engine/MusicTheory.js';
+import { normalizeClipTimeScale } from '../engine/ClipTimeScale.js';
 
 export const STAGE_CANVAS_TRACK_LIMIT = 20;
 export const STAGE_LIVE_LANE_LIMIT = 64;
@@ -136,6 +137,7 @@ export function stageEventsForCanvasTracks(tracks = [], options = {}) {
     for (const clip of (track.clips || [])) {
       const snippet = clip?.snippet || {};
       const clipTick = clipStartTick(clip, ticksPerBar);
+      const timeScale = normalizeClipTimeScale(clip.timeScale);
       const fallbackDuration = clipDurationTick(clip, snippet, ticksPerBar);
       const color = laneInfo.color;
       const source = laneInfo.id;
@@ -143,8 +145,8 @@ export function stageEventsForCanvasTracks(tracks = [], options = {}) {
       for (const note of (snippet.notes || [])) {
         const pitch = notePitch(note);
         if (!Number.isFinite(pitch)) continue;
-        const startTick = clipTick + Math.max(0, Math.round(Number(note.startTick) || 0));
-        const duration = Math.max(1, noteDurationTick(note, unitTicks));
+        const startTick = clipTick + Math.max(0, Math.round((Number(note.startTick) || 0) * timeScale));
+        const duration = Math.max(1, Math.round(noteDurationTick(note, unitTicks) * timeScale));
         const endTick = startTick + duration;
         events.push({
           id: `${source}:note:${events.length}`,
@@ -166,8 +168,8 @@ export function stageEventsForCanvasTracks(tracks = [], options = {}) {
       }
 
       for (const hit of (snippet.hits || [])) {
-        const startTick = clipTick + Math.max(0, Math.round(Number(hit.startTick) || 0));
-        const duration = Math.max(1, Math.round(Number(hit.durationTicks) || unitTicks * 0.25));
+        const startTick = clipTick + Math.max(0, Math.round((Number(hit.startTick) || 0) * timeScale));
+        const duration = Math.max(1, Math.round((Number(hit.durationTicks) || unitTicks * 0.25) * timeScale));
         const endTick = startTick + duration;
         const label = hitLabel(hit);
         events.push({

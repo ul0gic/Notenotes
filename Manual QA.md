@@ -1068,3 +1068,27 @@ Expected:
 - Check meter matrix reports PASS for all supported meter/BPM cells, pair-up checks, and linearity checks.
 - Measure live tempo starts an isolated silent transport, reports expected vs measured duration, and does not start the app's active transport, play clips, play the metronome, or mutate the current project.
 - In `5/8`, `2+3` should report alternating short-long pulse gaps and `3+2` should report long-short pulse gaps. Pair-up checks mean total bar duration only, not identical pulse feel.
+
+### 12.5 Canvas Time Scale
+
+Steps:
+
+1. Record or create a short MIDI clip with at least two notes.
+2. Drag it onto a MIDI Canvas track.
+3. Add a second clip later on the same track.
+4. Click **Time**, then click the first clip.
+5. Choose **Half-time**.
+6. Play the Canvas, export Canvas WAV, and export Canvas MIDI.
+7. Undo, then repeat with **Double-time**.
+8. Repeat once with an audio clip.
+
+Expected:
+
+- The first clip start does not move.
+- Half-time doubles the clip's visible length and pushes later clips on that track to the right.
+- Double-time shortens the clip without pulling later clips left.
+- The original snippet in Inspect is unchanged.
+- A Time badge appears on scaled clips.
+- Live playback, WAV export, MIDI export, and Canvas Stage all use the scaled timing.
+- Audio clips use tape-style speed: half-time is lower/slower, double-time is higher/faster.
+- `Alt+drag` no longer resizes Canvas clips.

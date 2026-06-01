@@ -60,6 +60,12 @@ import {
   stageViewNeighbor,
   stageViewOptionsForMode,
 } from '../src/stage/StageViews.js';
+import {
+  clipTimeScaleBadgeItem,
+  clipVisualDurationBars,
+  normalizeClipTimeScale,
+  pushClipsRightForTimeScale,
+} from '../src/engine/ClipTimeScale.js';
 import { auditProjectAudioAssets, createProject } from '../src/data/ProjectStore.js';
 
 function test(name, fn) {
@@ -495,6 +501,33 @@ test('stage model gives same canvas track events internal sublanes', () => {
   );
 });
 
+test('stage model applies clip time scale to canvas note timing', () => {
+  const tracks = [
+    {
+      id: 'scaled',
+      color: '#55ffaa',
+      type: 'midi',
+      clips: [
+        {
+          startBar: 1,
+          timeScale: 2,
+          durationBars: 2,
+          snippet: {
+            durationTicks: 1920,
+            notes: [{ pitch: 60, startTick: 480, durationTick: 240 }],
+            hits: [],
+          },
+        },
+      ],
+    },
+  ];
+
+  const events = stageEventsForCanvasTracks(tracks, { ticksPerBar: 1920, unitTicks: 480 });
+  assert.equal(events.length, 1);
+  assert.equal(events[0].startTick, 2880);
+  assert.equal(events[0].durationTick, 480);
+});
+
 test('stage view registry exposes live views without leaking them into canvas stage', () => {
   assert.equal(DEFAULT_STAGE_VIEW_ID, 'trace');
   assert.equal(resolveStageView('missing').id, 'trace');
@@ -516,6 +549,41 @@ test('stage view navigation wraps within the current Stage mode', () => {
   assert.equal(stageViewNeighbor('halo', 'live', 1).id, 'trace');
   assert.equal(stageViewNeighbor('trace', 'live', -1).id, 'halo');
   assert.equal(stageViewNeighbor('pulse', 'canvas', 1).id, 'trace');
+});
+
+test('clip time scale normalizes as an additive per-clip lens', () => {
+  assert.equal(normalizeClipTimeScale(), 1);
+  assert.equal(normalizeClipTimeScale(0.5), 0.5);
+  assert.equal(normalizeClipTimeScale(2), 2);
+  assert.equal(normalizeClipTimeScale(4), 1);
+
+  const clip = { timeScale: 2, durationBars: 1, snippet: { durationTicks: 1920 } };
+  assert.equal(clipVisualDurationBars(clip, 1920), 2);
+  assert.deepEqual(clipTimeScaleBadgeItem({ timeScale: 0.5 }), {
+    id: 'timeScale',
+    label: '2x',
+    title: 'Double-time',
+  });
+  assert.equal(clipTimeScaleBadgeItem({ timeScale: 1 }), null);
+});
+
+test('clip time scale growth pushes later clips right without changing the edited start', () => {
+  const edited = { id: 'a', startBar: 1, durationBars: 1, timeScale: 1, snippet: { durationTicks: 1920 } };
+  const neighbor = { id: 'b', startBar: 2.25, durationBars: 1, snippet: { durationTicks: 1920 } };
+  const later = { id: 'c', startBar: 4, durationBars: 1, snippet: { durationTicks: 1920 } };
+  const track = { clips: [edited, neighbor, later] };
+
+  const result = pushClipsRightForTimeScale(track, edited, 2, 1920);
+
+  assert.equal(edited.startBar, 1);
+  assert.equal(edited.durationBars, 2);
+  assert.equal(edited.timeScale, 2);
+  assert.equal(neighbor.startBar, 3.25);
+  assert.equal(later.startBar, 5);
+  assert.deepEqual(result.moved.map(item => [item.clip.id, item.from, item.to]), [
+    ['b', 2.25, 3.25],
+    ['c', 4, 5],
+  ]);
 });
 
 test('audio audit reports missing, orphaned, and backup readiness without mutating project', () => {

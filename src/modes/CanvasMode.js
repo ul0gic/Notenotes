@@ -10,6 +10,13 @@ import { TRACK_INSTRUMENTS } from '../engine/PlaybackEngine.js';
 import { DRUM_KITS } from '../instruments/SketchKit.js';
 import { PRESETS, normalizeSoundTraits } from '../instruments/WebAudioSynth.js';
 import { normalizeMeter, pulseCountForMeter, subBeatsForPulse } from '../engine/Meter.js';
+import {
+  CLIP_TIME_SCALE_PRESETS,
+  clipTimeScaleBadgeItem,
+  clipVisualDurationBars,
+  normalizeClipTimeScale,
+  pushClipsRightForTimeScale,
+} from '../engine/ClipTimeScale.js';
 import { showToast } from '../ui/Toast.js';
 import { ChoicePicker } from '../ui/ChoicePicker.js';
 import { renderToneBadges, toneBadgeItemsForClip } from '../ui/ToneBadges.js';
@@ -54,6 +61,7 @@ export class CanvasMode {
     this._audioPeakLoads = new Set();
     this._tonePicker = null;
     this._stageOverlay = null;
+    this._timeToolActive = false;
 
     /** Called when a track's instrument changes */
     this.onTrackInstrumentChanged = null;
@@ -187,6 +195,7 @@ export class CanvasMode {
         <div class="canvas-toolbar__divider"></div>
         <button class="btn btn--ghost canvas-toolbar__btn" id="canvas-trim-btn" title="Trim empty space from all snippets">Trim</button>
         <button class="btn btn--ghost canvas-loop-toggle" id="canvas-loop-toggle" type="button" aria-pressed="${this._canvasLoopEnabled() ? 'true' : 'false'}" title="Loop Canvas from the start to the latest clip">Loop</button>
+        <button class="btn btn--ghost canvas-toolbar__btn canvas-time-tool" id="canvas-time-tool" type="button" aria-pressed="false" title="Pick a clip to set half-time or double-time">Time</button>
         <div class="canvas-toolbar__divider"></div>
         <button class="choice-picker-button canvas-toolbar__select" id="canvas-tone-preset" type="button" aria-label="Tone preset for selected clip" aria-haspopup="dialog" disabled data-selected-tone-preset="">
           <span class="choice-picker-button__label" id="canvas-tone-preset-label">Tone preset...</span>
@@ -508,7 +517,8 @@ export class CanvasMode {
   /** Create a clip DOM element */
   _createClipElement(clip, color) {
     const x = (clip.startBar || 0) * this.barWidth;
-    const w = (clip.durationBars || 1) * this.barWidth;
+    const w = clipVisualDurationBars(clip, this.transport.ticksPerBar) * this.barWidth;
+    clip.durationBars = clipVisualDurationBars(clip, this.transport.ticksPerBar);
 
     const el = document.createElement('div');
     el.className = 'canvas-clip';
@@ -540,8 +550,9 @@ export class CanvasMode {
         return;
       }
 
-      if (e.altKey) {
-        this._startClipResize(e, clip, el);
+      if (this._timeToolActive) {
+        e.preventDefault();
+        this._openTimeScaleModal(clip);
       } else if (e.pointerType === 'touch') {
         this._startTouchClipIntent(e, clip, el);
       } else {
@@ -675,7 +686,10 @@ export class CanvasMode {
   }
 
   _renderToneBadges(clip) {
-    return renderToneBadges(toneBadgeItemsForClip(clip), 'canvas-clip__tone-badges tone-badges');
+    return renderToneBadges(
+      [...toneBadgeItemsForClip(clip), clipTimeScaleBadgeItem(clip)].filter(Boolean),
+      'canvas-clip__tone-badges tone-badges',
+    );
   }
 
   _tonePresets() {
@@ -811,6 +825,103 @@ export class CanvasMode {
     applyBtn.title = title;
   }
 
+  _setTimeToolActive(active) {
+    this._timeToolActive = !!active;
+    this.el?.classList.toggle('is-time-tool-active', this._timeToolActive);
+    const btn = this.el?.querySelector('#canvas-time-tool');
+    if (btn) {
+      btn.classList.toggle('is-active', this._timeToolActive);
+      btn.setAttribute('aria-pressed', String(this._timeToolActive));
+      btn.title = this._timeToolActive ? 'Click a clip to set its timing' : 'Pick a clip to set half-time or double-time';
+    }
+  }
+
+  _openTimeScaleModal(clip) {
+    const track = this._trackForClip(clip);
+    if (!clip || !track) return;
+    const current = normalizeClipTimeScale(clip.timeScale);
+    const overlay = document.createElement('div');
+    overlay.className = 'canvas-time-modal-backdrop';
+    overlay.innerHTML = `
+      <div class="canvas-time-modal" role="dialog" aria-modal="true" aria-label="Time Scale">
+        <div class="canvas-time-modal__header">
+          <span class="canvas-time-modal__kicker">Clip timing</span>
+          <strong>Time Scale</strong>
+        </div>
+        <div class="canvas-time-modal__options">
+          ${CLIP_TIME_SCALE_PRESETS.map(preset => `
+            <button class="canvas-time-modal__option${preset.value === current ? ' is-selected' : ''}" type="button" data-time-scale="${preset.value}">
+              <span>${preset.label}</span>
+              <small>${preset.description}</small>
+            </button>
+          `).join('')}
+        </div>
+        <p class="canvas-time-modal__note">Growth keeps the clip start fixed and pushes later clips on this track to the right. Audio uses tape-style speed, so pitch changes with timing.</p>
+        <div class="canvas-time-modal__actions">
+          <button class="btn btn--ghost" id="canvas-time-cancel" type="button">Cancel</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const close = () => overlay.remove();
+    overlay.querySelector('#canvas-time-cancel')?.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      close();
+    });
+
+    overlay.querySelectorAll('[data-time-scale]').forEach(btn => {
+      btn.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        const nextScale = normalizeClipTimeScale(btn.dataset.timeScale);
+        close();
+        this._applyClipTimeScale(track, clip, nextScale);
+      });
+    });
+  }
+
+  _applyClipTimeScale(track, clip, nextScale) {
+    const previousScale = normalizeClipTimeScale(clip.timeScale);
+    if (previousScale === nextScale) {
+      showToast('Clip timing unchanged');
+      return;
+    }
+
+    const previousDuration = Number(clip.durationBars) || clipVisualDurationBars(clip, this.transport.ticksPerBar);
+    const previousStarts = (track.clips || []).map(item => ({ clip: item, startBar: Number(item.startBar) || 0 }));
+    const result = pushClipsRightForTimeScale(track, clip, nextScale, this.transport.ticksPerBar);
+    const nextDuration = result.newDurationBars;
+    const nextStarts = (track.clips || []).map(item => ({ clip: item, startBar: Number(item.startBar) || 0 }));
+
+    this.store?.scheduleAutoSave(this.project);
+    this._renderTracks();
+    this._autoSetLoopFromClips();
+    this._setTimeToolActive(false);
+
+    this.undoManager?.push({
+      type: 'timeScaleClip',
+      description: 'Change clip timing',
+      undo: () => {
+        clip.timeScale = previousScale;
+        clip.durationBars = previousDuration;
+        previousStarts.forEach(item => { item.clip.startBar = item.startBar; });
+        this._renderTracks();
+        this._autoSetLoopFromClips();
+      },
+      redo: () => {
+        clip.timeScale = nextScale;
+        clip.durationBars = nextDuration;
+        nextStarts.forEach(item => { item.clip.startBar = item.startBar; });
+        this._renderTracks();
+        this._autoSetLoopFromClips();
+      },
+    });
+
+    const preset = CLIP_TIME_SCALE_PRESETS.find(item => item.value === nextScale);
+    const moved = result.moved.length ? `, pushed ${result.moved.length}` : '';
+    showToast(`${preset?.label || 'Time scale'} applied${moved}`);
+  }
+
   _renderModOverlay(clip, clipWidth) {
     const mod = clip.snippet?.modulation;
     if (!mod || mod.length < 2) return '';
@@ -841,10 +952,10 @@ export class CanvasMode {
   }
 
   _clipEndBar(clip, startBar = clip?.startBar, durationBars = clip?.durationBars) {
-    return (startBar || 0) + Math.max(1 / this._beatsPerBar(), durationBars || 1);
+    return (startBar || 0) + Math.max(1 / this._beatsPerBar(), durationBars || clipVisualDurationBars(clip, this.transport.ticksPerBar));
   }
 
-  _clipOverlapsAt(track, clip, startBar, durationBars = clip?.durationBars || 1) {
+  _clipOverlapsAt(track, clip, startBar, durationBars = clipVisualDurationBars(clip, this.transport.ticksPerBar)) {
     if (!track) return false;
     const epsilon = 0.001;
     const endBar = this._clipEndBar(clip, startBar, durationBars);
@@ -856,7 +967,7 @@ export class CanvasMode {
     });
   }
 
-  _resolveClipStart(track, clip, desiredStartBar, durationBars = clip?.durationBars || 1) {
+  _resolveClipStart(track, clip, desiredStartBar, durationBars = clipVisualDurationBars(clip, this.transport.ticksPerBar)) {
     const minStep = 1 / this._beatsPerBar();
     const desired = Math.max(0, Math.round((desiredStartBar || 0) / minStep) * minStep);
     const otherClips = (track?.clips || [])
@@ -959,6 +1070,7 @@ export class CanvasMode {
         snippet: snippet,
         startBar: desiredStartBar,
         durationBars,
+        timeScale: 1,
       };
       const startBar = this._resolveClipStart(track, clip, desiredStartBar, durationBars);
       if (startBar === null) {
@@ -1157,61 +1269,6 @@ export class CanvasMode {
     document.addEventListener('pointercancel', onUp);
   }
 
-  _startClipResize(e, clip, el) {
-    e.preventDefault();
-    const startX = e.clientX;
-    const startWidth = parseInt(el.style.width, 10) || clip.durationBars * this.barWidth;
-    const originalBars = clip.durationBars;
-    const track = this._trackForClip(clip);
-    const maxBars = this._maxDurationForClip(track, clip);
-    const pointerId = e.pointerId;
-
-    el.classList.add('is-dragging');
-    el.setPointerCapture?.(pointerId);
-
-    const onMove = (me) => {
-      if (me.pointerId !== pointerId) return;
-      me.preventDefault();
-      const dx = me.clientX - startX;
-      const maxWidth = Number.isFinite(maxBars) ? maxBars * this.barWidth : startWidth;
-      const newWidth = Math.max(this.beatWidth, Math.min(startWidth, maxWidth, startWidth + dx));
-      el.style.width = `${newWidth}px`;
-    };
-
-    const onUp = (ue) => {
-      if (ue.pointerId !== pointerId) return;
-      el.classList.remove('is-dragging');
-      el.releasePointerCapture?.(pointerId);
-      document.removeEventListener('pointermove', onMove);
-      document.removeEventListener('pointerup', onUp);
-      document.removeEventListener('pointercancel', onUp);
-
-      const finalWidth = parseInt(el.style.width, 10);
-      const newBeats = Math.max(1, Math.round(finalWidth / this.beatWidth));
-      const newBars = Math.min(maxBars, newBeats / this._beatsPerBar());
-      if (newBars !== originalBars) {
-        clip.durationBars = newBars;
-        el.style.width = `${newBars * this.barWidth}px`;
-        const snip = clip.snippet;
-        if (snip) {
-          const maxTick = Math.ceil(newBars * this.transport.ticksPerBar);
-          if (snip.notes) snip.notes = snip.notes.filter(n => n.startTick < maxTick);
-          if (snip.hits) snip.hits = snip.hits.filter(h => h.startTick < maxTick);
-          snip.durationTicks = maxTick;
-        }
-        this.store?.scheduleAutoSave(this.project);
-        this._renderTracks();
-        this._autoSetLoopFromClips();
-      } else {
-        el.style.width = `${originalBars * this.barWidth}px`;
-      }
-    };
-
-    document.addEventListener('pointermove', onMove);
-    document.addEventListener('pointerup', onUp);
-    document.addEventListener('pointercancel', onUp);
-  }
-
   /** Render the snippet dock at the bottom */
   _renderSnippetDock() {
     const dock = this.el.querySelector('#canvas-snippet-dock');
@@ -1309,6 +1366,7 @@ export class CanvasMode {
                 snippet: snippet,
                 startBar: desiredStartBar,
                 durationBars,
+                timeScale: 1,
               };
               const startBar = this._resolveClipStart(track, clip, desiredStartBar, durationBars);
               if (startBar === null) {
@@ -1417,6 +1475,10 @@ export class CanvasMode {
 
     this.el.querySelector('#canvas-loop-toggle')?.addEventListener('click', () => {
       this._setCanvasLoopEnabled(!this._canvasLoopEnabled());
+    });
+
+    this.el.querySelector('#canvas-time-tool')?.addEventListener('click', () => {
+      this._setTimeToolActive(!this._timeToolActive);
     });
 
     this.el.querySelector('#canvas-tone-apply')?.addEventListener('click', () => {
@@ -1702,7 +1764,7 @@ export class CanvasMode {
       for (const track of (this.project.tracks || [])) {
         for (const clip of (track.clips || [])) {
           if (clip.snippet) {
-            clip.durationBars = clip.snippet.durationTicks / this.transport.ticksPerBar || 1;
+            clip.durationBars = clipVisualDurationBars(clip, this.transport.ticksPerBar);
           }
         }
       }
