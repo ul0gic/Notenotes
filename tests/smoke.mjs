@@ -40,6 +40,10 @@ import {
   velocityAdjustedDrive,
   velocityAdjustedFilterFrequency,
 } from '../src/engine/VelocityResponse.js';
+import {
+  audioInputConstraints,
+  normalizeAudioInputChannelMode,
+} from '../src/engine/AudioInputChannelMode.js';
 import { normalizeWavChannelMode } from '../src/export/WavChannelMode.js';
 import {
   normalizeTrackPan,
@@ -256,6 +260,17 @@ test('WAV channel mode normalizes export choices without changing defaults', () 
   assert.equal(normalizeWavChannelMode('stereo'), 'stereo');
   assert.equal(normalizeWavChannelMode('weird'), 'auto');
   assert.equal(normalizeWavChannelMode('weird', 'stereo'), 'stereo');
+});
+
+test('audio input channel preference uses non-failing ideal constraints', () => {
+  assert.equal(normalizeAudioInputChannelMode('mono'), 'mono');
+  assert.equal(normalizeAudioInputChannelMode('stereo'), 'stereo');
+  assert.equal(normalizeAudioInputChannelMode('bad'), 'auto');
+  assert.deepEqual(audioInputConstraints('', 'auto'), { audio: true });
+  assert.deepEqual(audioInputConstraints('', 'mono'), { audio: { channelCount: { ideal: 1 } } });
+  assert.deepEqual(audioInputConstraints('device-1', 'stereo'), {
+    audio: { deviceId: { exact: 'device-1' }, channelCount: { ideal: 2 } },
+  });
 });
 
 test('backup validation accepts current workspace backups and rejects newer app versions', () => {

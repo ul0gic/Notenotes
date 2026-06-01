@@ -4,6 +4,10 @@
  */
 
 import { AudioEngine } from '../engine/AudioEngine.js';
+import {
+  audioInputConstraints,
+  normalizeAudioInputChannelMode,
+} from '../engine/AudioInputChannelMode.js';
 
 export class MicRecorder {
   constructor() {
@@ -20,6 +24,8 @@ export class MicRecorder {
     this._onRecordingComplete = null;
     this._devices = [];
     this._selectedDeviceId = '';
+    this._channelMode = 'auto';
+    this._lastTrackSettings = null;
   }
 
   setRecordingCallback(fn) { this._onRecordingComplete = fn; }
@@ -37,6 +43,12 @@ export class MicRecorder {
         <label class="mic-recorder__device-label" for="mic-device-select">Input</label>
         <select class="mic-recorder__device-select" id="mic-device-select" aria-label="Audio input device">
           <option value="">Default input</option>
+        </select>
+        <label class="mic-recorder__device-label" for="mic-channel-select">Channels</label>
+        <select class="mic-recorder__device-select" id="mic-channel-select" aria-label="Audio input channels">
+          <option value="auto" selected>Auto</option>
+          <option value="mono">Mono</option>
+          <option value="stereo">Stereo</option>
         </select>
       </div>
       <div class="mic-recorder__controls">
@@ -73,6 +85,13 @@ export class MicRecorder {
         await this._openStream();
       }
     });
+
+    this.el.querySelector('#mic-channel-select')?.addEventListener('change', async (e) => {
+      this._channelMode = normalizeAudioInputChannelMode(e.target.value);
+      if (this._hasPermission) {
+        await this._openStream();
+      }
+    });
   }
 
   async _requestPermission() {
@@ -94,14 +113,11 @@ export class MicRecorder {
       throw new Error('Media input is not available in this browser');
     }
 
-    const constraints = {
-      audio: this._selectedDeviceId
-        ? { deviceId: { exact: this._selectedDeviceId } }
-        : true,
-    };
-
     this._stopStream();
-    this._stream = await navigator.mediaDevices.getUserMedia(constraints);
+    this._stream = await navigator.mediaDevices.getUserMedia(
+      audioInputConstraints(this._selectedDeviceId, this._channelMode)
+    );
+    this._lastTrackSettings = this._stream.getAudioTracks?.()[0]?.getSettings?.() || null;
     this.engine.markMediaRoutePrimed?.();
     this._setupAnalyser();
   }
@@ -166,10 +182,11 @@ export class MicRecorder {
         this.el.querySelector('#mic-status').textContent = 'No audio was captured. Try recording again.';
         return;
       }
-      if (this._onRecordingComplete) this._onRecordingComplete(blob);
+      if (this._onRecordingComplete) this._onRecordingComplete(blob, this.recordingMetadata());
     };
     this._recorder.start(250);
     this._isRecording = true;
+    this._setInputControlsDisabled(true);
     this.el.querySelector('#mic-btn').classList.add('is-active');
     this.el.querySelector('#mic-status').textContent = 'Recording...';
   }
@@ -180,8 +197,14 @@ export class MicRecorder {
       this._recorder.stop();
     }
     this._isRecording = false;
+    this._setInputControlsDisabled(false);
     this.el.querySelector('#mic-btn').classList.remove('is-active');
     this.el.querySelector('#mic-status').textContent = 'Audio input ready. Tap to record.';
+  }
+
+  _setInputControlsDisabled(disabled) {
+    this.el?.querySelector('#mic-device-select')?.toggleAttribute('disabled', !!disabled);
+    this.el?.querySelector('#mic-channel-select')?.toggleAttribute('disabled', !!disabled);
   }
 
   _drawMeter() {
@@ -256,6 +279,13 @@ export class MicRecorder {
     ];
     if (!window.MediaRecorder?.isTypeSupported) return '';
     return candidates.find(type => MediaRecorder.isTypeSupported(type)) || '';
+  }
+
+  recordingMetadata() {
+    return {
+      inputChannelMode: normalizeAudioInputChannelMode(this._channelMode),
+      inputChannelCount: Number(this._lastTrackSettings?.channelCount) || null,
+    };
   }
 
   destroy() {

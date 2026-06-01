@@ -287,15 +287,19 @@ Steps:
 
 1. Go to Audio In.
 2. Select the intended input device if more than one exists.
-3. Press record.
-4. Speak or make a short sound.
-5. Stop recording.
+3. Set Channels to `Auto`.
+4. Press record.
+5. Speak or make a short sound.
+6. Stop recording.
+7. Repeat with Channels set to `Mono`.
+8. If the browser/device allows it, repeat with Channels set to `Stereo`.
 
 Expected:
 
 - The input meter moves while recording.
 - A new audio snippet appears in the snippet tray.
 - A toast confirms the audio snippet was captured.
+- Mono/Stereo are treated as capture preferences; if a browser falls back to one channel, recording still succeeds.
 - No "Blob/File data" IndexedDB error appears.
 
 ### 2.2 Audio In Survives Reload

@@ -332,13 +332,15 @@ export class CreativeMode {
     });
 
     // Wire mic audio blob → create audio snippet
-    this.micRecorder.setRecordingCallback(async (blob) => {
+    this.micRecorder.setRecordingCallback(async (blob, micMeta = {}) => {
       try {
         if (!blob?.size) throw new Error('No audio was captured');
         const record = await this.store?.saveAudioAsset(blob, {
           mimeType: blob.type || 'audio/webm',
           size: blob.size,
           createdAt: Date.now(),
+          inputChannelMode: micMeta.inputChannelMode || 'auto',
+          inputChannelCount: micMeta.inputChannelCount || null,
         });
         const url = URL.createObjectURL(blob);
         const elapsedMs = this.micRecorder._startTime ? Date.now() - this.micRecorder._startTime : 8000;
@@ -361,6 +363,8 @@ export class CreativeMode {
           audioUrl: url,
           audioMimeType: blob.type || 'audio/webm',
           audioSize: blob.size,
+          audioInputChannelMode: micMeta.inputChannelMode || 'auto',
+          audioInputChannelCount: micMeta.inputChannelCount || null,
           audioPeaks,
         };
         this.snippetTray.addSnippet(snippet);

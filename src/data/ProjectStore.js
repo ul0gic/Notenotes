@@ -302,6 +302,8 @@ export class ProjectStore {
       arrayBuffer,
       mimeType: meta.mimeType || blob.type || 'audio/webm',
       size: meta.size || blob.size || arrayBuffer.byteLength || 0,
+      inputChannelMode: meta.inputChannelMode || null,
+      inputChannelCount: meta.inputChannelCount || null,
       createdAt: meta.createdAt || Date.now(),
       updatedAt: Date.now(),
     };

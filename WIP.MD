@@ -528,9 +528,9 @@ browser supports it, while legacy WAV/data URL assets keep importing and playing
 forever. WAV should remain an explicit export/interchange format even if the
 internal storage default changes.
 
-Also evaluate recording-side channel choices separately from export choices:
-keep the current simple default, but consider a future Audio In setting for Mono
-vs Stereo capture where the browser exposes that constraint clearly.
+Recording-side channel preference is now a shipped Audio In control. Keep future
+work focused on compressed internal formats and import/export bundle shape, not
+on re-solving Mono/Stereo capture unless users report browser-specific issues.
 
 ### Plugin Architecture
 

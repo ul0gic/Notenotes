@@ -1595,3 +1595,50 @@ a clear position control.
 Canvas WAV defaults to stereo and passes the selected `channelMode` through
 `projectToWavBlob()`. Choosing Mono intentionally removes track pan from the
 exported file while keeping all audible clips present.
+
+## Audio In Channel Preference 0.1.94
+
+Audio In now exposes a capture channel preference in the Audio In surface:
+
+- `Auto`
+- `Mono`
+- `Stereo`
+
+This is a recording-time preference, separate from WAV export channel choices.
+It uses `navigator.mediaDevices.getUserMedia()` channel constraints only as
+`ideal`, never `exact`, so unsupported stereo/mono requests should fall back
+instead of failing the recording. Keep that behavior: mobile browsers and input
+hardware vary too much to treat channel count as a hard requirement.
+
+Shared pure helpers live in `src/engine/AudioInputChannelMode.js`:
+
+```js
+normalizeAudioInputChannelMode(mode)
+audioInputConstraints(deviceId, channelMode)
+```
+
+`audioInputConstraints()` returns `{ audio: true }` for Auto unless a device ID
+or channel preference needs an object. Device IDs still use `{ exact: id }`,
+matching the older behavior for a user-selected input device. Mono adds
+`channelCount: { ideal: 1 }`; Stereo adds `channelCount: { ideal: 2 }`.
+
+`MicRecorder` owns the UI and stream reopening:
+
+- Changing Input or Channels reopens the stream when permission is already
+  granted.
+- Input and Channels selects are disabled while recording so a user cannot
+  reopen the stream mid-take.
+- The level meter continues to read from the active stream.
+- `recordingMetadata()` exposes `inputChannelMode` plus the actual
+  `inputChannelCount` reported by the audio track's `getSettings()` when the
+  browser provides it.
+
+`CreativeMode` stores that metadata on new audio snippets:
+
+```js
+audioInputChannelMode
+audioInputChannelCount
+```
+
+`ProjectStore.saveAudioAsset()` mirrors the same metadata onto the audio asset
+record. Old audio snippets/assets do not have these fields and remain valid.
