@@ -386,6 +386,16 @@
   color: var(--surface-1);
 }
 
+.canvas-lane__ctrl-btn--pan {
+  min-width: 34px;
+}
+
+.canvas-lane__ctrl-btn--pan.is-panned {
+  border: 1px solid var(--accent-dim);
+  background: var(--accent-glow);
+  color: var(--accent-light);
+}
+
 /* --- Track Content (grid + clips) --- */
 .canvas-lane__content {
   flex: 1;
@@ -590,7 +600,38 @@
 
 .canvas-time-modal__actions {
   display: flex;
+  gap: var(--space-sm);
   justify-content: flex-end;
+}
+
+.canvas-pan-modal__readout {
+  display: grid;
+  place-items: center;
+  min-height: 56px;
+  margin-bottom: var(--space-sm);
+  border: 1px solid var(--surface-4);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-primary);
+  font-size: 28px;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0;
+}
+
+.canvas-pan-modal__slider {
+  width: 100%;
+  margin: var(--space-xs) 0 var(--space-md);
+  accent-color: var(--accent);
+}
+
+.canvas-pan-modal__presets {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-sm);
+}
+
+.canvas-pan-modal__presets .canvas-time-modal__option {
+  text-align: center;
 }
 
 /* --- Playhead --- */

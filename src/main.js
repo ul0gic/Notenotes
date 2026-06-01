@@ -123,6 +123,9 @@ class App {
     this.canvasMode.onTrackInstrumentChanged = (trackId) => {
       this.playbackEngine?.onTrackInstrumentChanged(trackId);
     };
+    this.canvasMode.onTrackMixChanged = (trackId) => {
+      this.playbackEngine?.onTrackMixChanged(trackId);
+    };
 
     // Create and render Edit Mode (needs project)
     this.editMode = new EditMode(this.transport, this.undoManager, this.store, this.project);

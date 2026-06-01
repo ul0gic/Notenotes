@@ -380,6 +380,11 @@ export class WebAudioSynth {
     if (this._toneInput && this._output) this._rebuildEffects();
   }
 
+  setPan(pan = 0) {
+    if (!this._output) this.init();
+    this.engine.setTrackBusPan?.(this._output, pan);
+  }
+
   /**
    * The entry point of the Tone effect chain. Other instruments (e.g.,
    * VoiceEngine) can connect their output here so they share Crush, Echo,

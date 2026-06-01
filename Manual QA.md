@@ -405,15 +405,19 @@ Steps:
 
 1. Place one MIDI clip, one drum clip, and one audio clip on matching tracks.
 2. Put at least one clip after bar 1.
-3. Open Settings, then Export.
-4. Export Canvas WAV.
-5. Play the exported WAV.
+3. Set the MIDI track pan hard left, the drum track pan hard right, and leave the audio track centered.
+4. Press Play and listen on headphones or speakers with stereo separation.
+5. Open Settings, then Export.
+6. Export Canvas WAV.
+7. Play the exported WAV.
 
 Expected:
 
 - WAV export succeeds.
 - MIDI, drum, and audio content are audible.
 - Clips placed after bar 1 are heard at the correct time.
+- Track pan is audible in live Canvas playback and the exported WAV.
+- MIDI export is not expected to preserve pan yet; this check is Canvas playback/WAV only.
 
 ## 4. MIDI Export
 

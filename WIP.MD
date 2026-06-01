@@ -519,6 +519,15 @@ These are worth keeping visible, but they should not block beta.
 
 The current workspace/snippet backup format is already close to a v1 bundle: project JSON, snippets, audio assets, milestones, version history, and app version. Formalizing it later means documenting what is already shipped before redesigning anything.
 
+### Internal Audio Asset Format
+
+Audio In recordings are still stored through the existing WAV/browser-decoded
+asset path. A future storage slice should evaluate an additive
+`audioAsset.format` model so new recordings can use WebM/Opus or AAC where a
+browser supports it, while legacy WAV/data URL assets keep importing and playing
+forever. WAV should remain an explicit export/interchange format even if the
+internal storage default changes.
+
 ### Plugin Architecture
 
 The README says instruments are pluggable, but today that means "fork the repo and add a class." A real plugin surface should wait until the app shape is more settled.

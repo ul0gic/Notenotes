@@ -1485,3 +1485,69 @@ voices` guards the shared math, and the Modern preset floor test now requires
 Modern patches to include nonzero `stereoWidth`. If a future Modern patch is
 intentionally narrow, document the exception instead of silently weakening the
 family baseline.
+
+## Canvas Track Pan 0.1.92
+
+Canvas tracks now have an additive `track.pan` field:
+
+```js
+track.pan = 0 // -1 hard left, 0 center, 1 hard right
+```
+
+Legacy tracks without the field normalize to center via
+`normalizeTrackPan()` in `src/engine/StereoWidth.js`. This helper is shared by
+the live engine, the Canvas UI, and WAV export so all callers clamp the same
+way.
+
+### Canvas UI
+
+`CanvasMode` renders a small Pan button beside each track's M/S buttons. The
+button shows `C`, `L50`, `R100`, etc. and opens a modal with a slider plus
+Hard L / Center / Hard R presets. Saving mutates only `track.pan`, schedules an
+autosave, pushes an undo entry, rerenders lanes, and calls
+`onTrackMixChanged(track.id)`.
+
+The Pan modal intentionally has no top-right X, matching the rest of the app's
+modal language. Cancel leaves the track unchanged.
+
+### Live playback
+
+Canvas playback applies pan at the track bus level:
+
+- `AudioEngine.setTrackBusPan(gain, pan)` inserts a `StereoPannerNode` between a
+  track output gain and the master bus when the browser supports it.
+- `WebAudioSynth.setPan()` and `SketchKit.setPan()` route their per-track output
+  gains through that helper.
+- `PlaybackEngine` now keeps one `SketchKit` instance per drum track rather
+  than one shared kit, so two drum tracks can pan independently.
+- Audio clips use a per-source `StereoPannerNode` before the playback gain
+  reaches the master bus.
+
+`PlaybackEngine.onTrackMixChanged(trackId)` updates cached synth/kit buses
+without forcing users to stop playback or reload the Canvas.
+
+### WAV export
+
+Canvas WAV export is now stereo by design. `WavExporter.projectToWavBlob()`
+passes each track's pan into MIDI synth rendering, drum hit rendering, custom
+sample rendering, and audio-buffer mixing. Existing standalone snippet WAVs
+remain source-aware: they stay mono unless the selected patch/custom instrument
+has stereo width or a caller explicitly asks for pan.
+
+`mixBuffer()` and `mixSample()` can mix mono or stereo sources into stereo
+targets. When a stereo source is panned, it is intentionally folded to mono
+before equal-power pan is applied, so track pan behaves as a position control
+instead of stacking source width and track position in a surprising way.
+
+MIDI export does not write CC10 pan yet. That should be treated as a later
+metadata/export slice if users need DAW pan automation or track setup in MIDI
+files.
+
+### Internal audio storage note
+
+Internal Audio In recordings still use the existing browser-decoded asset flow
+and are not migrated away from WAV in this slice. A future storage slice can add
+an additive audio asset shape such as `audioAsset.format` and store WebM/Opus or
+AAC where browsers support recording it, while continuing to import/play legacy
+WAV/data URL assets and keeping WAV as an explicit export format. Do not remove
+legacy WAV support; old projects must always move forward.

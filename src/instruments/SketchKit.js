@@ -174,6 +174,11 @@ export class SketchKit {
     this._syncToneSliders();
   }
 
+  setPan(pan = 0) {
+    if (!this._output) this.init();
+    this.engine.setTrackBusPan?.(this._output, pan);
+  }
+
   get _padCount() {
     return Math.min(this.project?.settings?.drumPads || 10, SOUNDS.length);
   }

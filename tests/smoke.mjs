@@ -41,6 +41,7 @@ import {
   velocityAdjustedFilterFrequency,
 } from '../src/engine/VelocityResponse.js';
 import {
+  normalizeTrackPan,
   panForVoice,
   stereoGainsForPan,
 } from '../src/engine/StereoWidth.js';
@@ -232,6 +233,9 @@ test('velocity response changes timbre without changing legacy patches', () => {
 });
 
 test('stereo width helper keeps center stable and spreads unison voices', () => {
+  assert.equal(normalizeTrackPan(-2), -1);
+  assert.equal(normalizeTrackPan(2), 1);
+  assert.equal(normalizeTrackPan(null), 0);
   assert.equal(panForVoice(0, 1, 1), 0);
   assert.equal(panForVoice(0, 3, 0), 0);
   assert.equal(panForVoice(0, 3, 0.5), -0.5);

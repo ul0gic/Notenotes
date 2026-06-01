@@ -184,4 +184,16 @@ export class AudioEngine {
     gain.connect(this.masterGain);
     return gain;
   }
+
+  setTrackBusPan(gain, pan = 0) {
+    if (!gain || !this.ctx || !this.masterGain || !this.ctx.createStereoPanner) return;
+    const value = Math.max(-1, Math.min(1, Number(pan) || 0));
+    if (!gain._notenotesPanner) {
+      try { gain.disconnect(this.masterGain); } catch (_) {}
+      gain._notenotesPanner = this.ctx.createStereoPanner();
+      gain.connect(gain._notenotesPanner);
+      gain._notenotesPanner.connect(this.masterGain);
+    }
+    gain._notenotesPanner.pan.setTargetAtTime(value, this.currentTime, 0.01);
+  }
 }

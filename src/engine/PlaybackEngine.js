@@ -11,6 +11,7 @@ import { DRUM_KITS, SketchKit } from '../instruments/SketchKit.js';
 import { AudioEngine } from './AudioEngine.js';
 import { TransportState } from './Transport.js';
 import { normalizeClipTimeScale } from './ClipTimeScale.js';
+import { normalizeTrackPan } from './StereoWidth.js';
 
 /** Available instruments for track assignment */
 export const TRACK_INSTRUMENTS = {
@@ -45,8 +46,8 @@ export class PlaybackEngine {
 
     /** One synth instance per track (keyed by track ID) */
     this._trackSynths = new Map();
-    /** Shared drum kit for all kit tracks */
-    this._kit = null;
+    /** One drum kit instance per track so track pan remains independent */
+    this._trackKits = new Map();
     /** Currently active notes (for noteOff scheduling) */
     this._activeNotes = new Map(); // key: `${trackId}-${pitch}`, value: { synth, noteOffTick }
 
@@ -66,11 +67,6 @@ export class PlaybackEngine {
    */
   init() {
     if (this._initialized) return;
-
-    // Create shared drum kit
-    this._kit = new SketchKit();
-    this._kit.init();
-    this._kit.setSoundTraits(this.project?.settings?.soundTraits);
 
     // Subscribe to transport tick events
     this.transport.onTick((tick, nextTickTime) => {
@@ -119,6 +115,7 @@ export class PlaybackEngine {
     // Check if we already have a synth for this track
     let entry = this._trackSynths.get(track.id);
     if (entry && entry.instrumentId === instId) {
+      entry.synth.setPan?.(normalizeTrackPan(track.pan));
       return entry.synth;
     }
 
@@ -138,9 +135,26 @@ export class PlaybackEngine {
       if (preset) synth.loadPatch(preset);
     }
     synth.setSoundTraits(this.project?.settings?.soundTraits);
+    synth.setPan?.(normalizeTrackPan(track.pan));
 
     this._trackSynths.set(track.id, { synth, instrumentId: instId });
     return synth;
+  }
+
+  _getKitForTrack(track, kitId = 'classic') {
+    const id = kitId || 'classic';
+    let entry = this._trackKits.get(track.id);
+    if (!entry || entry.kitId !== id) {
+      entry?.kit.panic?.();
+      const kit = new SketchKit();
+      kit.init();
+      kit.loadKit(id);
+      kit.setSoundTraits(this.project?.settings?.soundTraits);
+      entry = { kit, kitId: id };
+      this._trackKits.set(track.id, entry);
+    }
+    entry.kit.setPan?.(normalizeTrackPan(track.pan));
+    return entry.kit;
   }
 
   _instrumentDef(instId) {
@@ -220,7 +234,9 @@ export class PlaybackEngine {
     for (const [, entry] of this._trackSynths) {
       entry.synth.setSoundTraits(this.project?.settings?.soundTraits);
     }
-    this._kit?.setSoundTraits(this.project?.settings?.soundTraits);
+    for (const [, entry] of this._trackKits) {
+      entry.kit.setSoundTraits(this.project?.settings?.soundTraits);
+    }
   }
 
   /**
@@ -287,20 +303,20 @@ export class PlaybackEngine {
         }
 
         // Play drum hits
-        if (instDef?.type === 'kit' && snippet.hits && this._kit) {
-          this._kit.loadKit(instDef.kitId || 'classic');
+        if (instDef?.type === 'kit' && snippet.hits) {
+          const kit = this._getKitForTrack(track, instDef.kitId || 'classic');
           for (const hit of snippet.hits) {
             const hitStartTick = clipStartTick + Math.round((hit.startTick || 0) * timeScale);
             if (hitStartTick === tick) {
-              this._kit.setSoundTraits(clip.soundTraits || hit.soundTraits || snippet.soundTraits || this.project?.settings?.soundTraits);
-              this._kit._triggerSound(hit.type || 'kick', nextTickTime);
+              kit.setSoundTraits(clip.soundTraits || hit.soundTraits || snippet.soundTraits || this.project?.settings?.soundTraits);
+              kit._triggerSound(hit.type || 'kick', nextTickTime);
             }
           }
         }
 
         // Play audio snippets
         if (snippet.type === 'audio' && this._hasAudioSource(snippet) && timelineLocalTick === 0) {
-          this._playAudioClip(snippet, nextTickTime, timeScale);
+          this._playAudioClip(snippet, nextTickTime, timeScale, normalizeTrackPan(track.pan));
         }
 
         // Apply recorded modulation
@@ -331,6 +347,9 @@ export class PlaybackEngine {
     for (const [, entry] of this._trackSynths) {
       entry.synth.allNotesOff();
     }
+    for (const [, entry] of this._trackKits) {
+      entry.kit.panic?.();
+    }
   }
 
   panic() {
@@ -338,7 +357,7 @@ export class PlaybackEngine {
     for (const [, entry] of this._trackSynths) {
       entry.synth.panic?.();
     }
-    this._kit?.panic?.();
+    for (const [, entry] of this._trackKits) entry.kit.panic?.();
   }
 
   _releaseActiveNotes(time = null) {
@@ -358,9 +377,21 @@ export class PlaybackEngine {
       entry.synth.allNotesOff();
       this._trackSynths.delete(trackId);
     }
+    const kitEntry = this._trackKits.get(trackId);
+    if (kitEntry) {
+      kitEntry.kit.panic?.();
+      this._trackKits.delete(trackId);
+    }
     const track = this.project?.tracks?.find(item => item.id === trackId);
     const instDef = this._instrumentDef(track?.instrumentId);
     if (instDef?.customInstrument) this._prepareCustomInstrument(instDef.customInstrument);
+  }
+
+  onTrackMixChanged(trackId) {
+    const track = this.project?.tracks?.find(item => item.id === trackId);
+    if (!track) return;
+    this._trackSynths.get(trackId)?.synth.setPan?.(normalizeTrackPan(track.pan));
+    this._trackKits.get(trackId)?.kit.setPan?.(normalizeTrackPan(track.pan));
   }
 
   onCustomInstrumentsChanged(instrumentId = null) {
@@ -380,6 +411,13 @@ export class PlaybackEngine {
       }
     }
 
+    for (const [trackId, entry] of this._trackKits) {
+      if (!customRef || entry.kitId === customRef) {
+        entry.kit.panic?.();
+        this._trackKits.delete(trackId);
+      }
+    }
+
     for (const track of this.project?.tracks || []) {
       if (track.instrumentId?.startsWith?.('custom:')) {
         const instDef = this._instrumentDef(track.instrumentId);
@@ -388,7 +426,7 @@ export class PlaybackEngine {
     }
   }
 
-  async _playAudioClip(snippet, audioTime = null, timeScale = 1) {
+  async _playAudioClip(snippet, audioTime = null, timeScale = 1, pan = 0) {
     const ctx = this._engine.ctx;
     if (!ctx || !this._hasAudioSource(snippet)) return;
 
@@ -411,9 +449,16 @@ export class PlaybackEngine {
       source.buffer = buffer;
       source.playbackRate.value = 1 / Math.max(0.01, normalizeClipTimeScale(timeScale));
       const gain = ctx.createGain();
+      const panner = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
       gain.gain.value = 0.7;
       source.connect(gain);
-      gain.connect(this._engine.masterGain || ctx.destination);
+      if (panner) {
+        panner.pan.setValueAtTime(normalizeTrackPan(pan), audioTime ?? ctx.currentTime);
+        gain.connect(panner);
+        panner.connect(this._engine.masterGain || ctx.destination);
+      } else {
+        gain.connect(this._engine.masterGain || ctx.destination);
+      }
       source.start(audioTime ?? ctx.currentTime);
     } catch (err) {
       console.warn('[PlaybackEngine] Audio playback failed:', err);
