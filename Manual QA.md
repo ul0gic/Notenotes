@@ -266,7 +266,7 @@ Expected:
 Steps:
 
 1. Open Create on an iPhone 15-width viewport.
-2. Confirm the Patch row shows `Patch` plus a readable picker on the first row, with Create/Edit Instrument, Tone, AI, Controller, Layout, and Stage arranged as compact action buttons below it.
+2. Confirm the Patch picker gets a full-width readable row, with Create/Edit Instrument, Tone, AI, Controller, Layout, and Stage arranged as compact action buttons below it.
 3. Open Pads, enable Extensions, and confirm all 13 pads can be reached without the snippets tray permanently hiding the final row.
 4. Drag vertically inside the pad grid and horizontally through the instrument tabs/snippet tray.
 5. Open Tone, AI, Controller, Layout, Stage, and Create/Edit Instrument from the mobile action row.
@@ -274,7 +274,7 @@ Steps:
 Expected:
 
 - No Create toolbar action balloons into a full-width accidental button while another action is clipped.
-- The Pad Mode, octave, and Extensions controls share the mobile control row cleanly.
+- Pad Mode gets a readable row, while octave and Extensions share the next mobile control row cleanly.
 - Pad hotkey badges remain hidden on phone layouts.
 - Mobile toolbar panels open as modal-style overlays instead of pushing the page down.
 - Dragging inside scrollable mobile areas scrolls the intended area instead of immediately activating unrelated controls.

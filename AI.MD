@@ -865,6 +865,28 @@ Future mobile work should still test on real iPhone Chrome/Safari. The current
 pass makes controls reachable and less hostile to touch, but browser chrome,
 safe-area height, and drag-and-drop still need device QA.
 
+## Mobile Create Layout Refinement 0.1.95
+
+The Create mobile grid was tightened again after iPhone 15 QA showed the Patch
+picker and toolbar actions still competing for width and height:
+
+- Under 700px, `.patch-selector` is now a six-column grid. The Patch label is
+  visually hidden on mobile and the searchable Patch picker occupies the full
+  first row. Create/Edit spans three columns, Delete/Tone/AI use compact single
+  cells, and Controller/Layout/Stage occupy the second action row. This keeps
+  Patch readable without letting Tone or Layout balloon into oversized blocks.
+- The instrument switcher tabs use smaller phone-width minimums so the active
+  instrument row consumes less vertical space before the pads.
+- Pads controls now use a mobile two-row structure: Pad Mode gets the readable
+  first row, while octave and Extensions share the next row. This avoids the
+  earlier state where Extensions could sit alone as a large row and push the pad
+  grid down.
+- Keyboard hint labels remain hidden on mobile. They are useful on desktop, but
+  on phones they reduce the available note area while offering no touch value.
+
+This is CSS-only responsive hardening. It does not change Pad Mode, Patch,
+Tone, Controller, AI, Stage, BPM, snippet, or audio behavior.
+
 ## Step Play Stable Notes 0.1.52
 
 Step Play pattern storage moved from "degree formulas that re-resolve every time
