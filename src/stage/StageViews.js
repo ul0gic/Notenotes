@@ -19,6 +19,12 @@ export const STAGE_VIEW_REGISTRY = [
     description: 'Radial lane energy for rhythm, velocity, and recent hits.',
     modes: ['live'],
   },
+  {
+    id: 'halo',
+    label: 'Halo',
+    description: 'Circle-of-fifths bloom for pitch classes and harmony.',
+    modes: ['live'],
+  },
 ];
 
 export function stageViewOptionsForMode(mode = 'live') {
@@ -30,4 +36,14 @@ export function resolveStageView(id = DEFAULT_STAGE_VIEW_ID, mode = null) {
   return candidates.find(view => view.id === id)
     || candidates.find(view => view.id === DEFAULT_STAGE_VIEW_ID)
     || STAGE_VIEW_REGISTRY[0];
+}
+
+export function stageViewNeighbor(id = DEFAULT_STAGE_VIEW_ID, mode = 'live', direction = 1) {
+  const options = stageViewOptionsForMode(mode);
+  if (options.length < 2) return options[0] || STAGE_VIEW_REGISTRY[0];
+  const current = resolveStageView(id, mode);
+  const index = Math.max(0, options.findIndex(view => view.id === current.id));
+  const step = direction < 0 ? -1 : 1;
+  const nextIndex = (index + step + options.length) % options.length;
+  return options[nextIndex];
 }

@@ -1,7 +1,7 @@
 import './stage.css';
 
 import { STAGE_CANVAS_TRACK_LIMIT, STAGE_LIVE_LANE_LIMIT } from './StageModel.js';
-import { resolveStageView, stageViewOptionsForMode } from './StageViews.js';
+import { resolveStageView, stageViewNeighbor, stageViewOptionsForMode } from './StageViews.js';
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -20,6 +20,9 @@ function rgba(hex, alpha = 1) {
   const { r, g, b } = hexToRgb(hex);
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
+
+const FIFTHS_PITCH_CLASSES = [0, 7, 2, 9, 4, 11, 6, 1, 8, 3, 10, 5];
+const PITCH_CLASS_LABELS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
 function normalizeEvent(event = {}) {
   return {
@@ -64,6 +67,7 @@ export class CanvasStageRenderer {
     this._unsubscribe = null;
     this._liveEvents = [];
     this._liveLimit = 260;
+    this._swipeStart = null;
   }
 
   open() {
@@ -90,10 +94,12 @@ export class CanvasStageRenderer {
     this.ctx = this.canvas.getContext('2d', { alpha: true });
     this.el.querySelector('.stage-overlay__close')?.addEventListener('click', () => this.close());
     this.el.querySelector('#stage-view-select')?.addEventListener('change', (event) => {
-      this.viewId = resolveStageView(event.target.value, this.mode).id;
-      this._storeViewId(this.viewId);
+      this._setViewId(event.target.value);
     });
+    this.el.querySelector('[data-stage-view-prev]')?.addEventListener('click', () => this._shiftView(-1));
+    this.el.querySelector('[data-stage-view-next]')?.addEventListener('click', () => this._shiftView(1));
     this._bindInputStrip();
+    this._bindViewSwipe();
     document.body.appendChild(this.el);
 
     if (this.eventStream) {
@@ -116,12 +122,26 @@ export class CanvasStageRenderer {
     } catch { /* non-critical preference */ }
   }
 
+  _setViewId(viewId) {
+    this.viewId = resolveStageView(viewId, this.mode).id;
+    this._storeViewId(this.viewId);
+    const select = this.el?.querySelector('#stage-view-select');
+    if (select && select.value !== this.viewId) select.value = this.viewId;
+  }
+
+  _shiftView(direction) {
+    const options = stageViewOptionsForMode(this.mode);
+    if (options.length < 2) return;
+    this._setViewId(stageViewNeighbor(this.viewId, this.mode, direction).id);
+  }
+
   _renderViewSelector() {
     const options = stageViewOptionsForMode(this.mode);
     if (options.length < 2) return '';
     return `
       <label class="stage-overlay__view">
         <span>View</span>
+        <button class="stage-overlay__view-nav" type="button" data-stage-view-prev aria-label="Previous Stage view">‹</button>
         <select id="stage-view-select" aria-label="Stage view">
           ${options.map(view => `
             <option value="${this._escapeAttr(view.id)}" ${view.id === this.viewId ? 'selected' : ''}>
@@ -129,6 +149,7 @@ export class CanvasStageRenderer {
             </option>
           `).join('')}
         </select>
+        <button class="stage-overlay__view-nav" type="button" data-stage-view-next aria-label="Next Stage view">›</button>
       </label>
     `;
   }
@@ -177,6 +198,31 @@ export class CanvasStageRenderer {
         this.onInputUp?.(index);
       });
     });
+  }
+
+  _bindViewSwipe() {
+    this.canvas?.addEventListener('pointerdown', (event) => {
+      if (stageViewOptionsForMode(this.mode).length < 2) return;
+      this._swipeStart = {
+        id: event.pointerId,
+        x: event.clientX,
+        y: event.clientY,
+      };
+    });
+    this.canvas?.addEventListener('pointerup', (event) => this._finishViewSwipe(event));
+    this.canvas?.addEventListener('pointercancel', () => {
+      this._swipeStart = null;
+    });
+  }
+
+  _finishViewSwipe(event) {
+    const start = this._swipeStart;
+    this._swipeStart = null;
+    if (!start || start.id !== event.pointerId) return;
+    const dx = event.clientX - start.x;
+    const dy = event.clientY - start.y;
+    if (Math.abs(dx) < 64 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    this._shiftView(dx < 0 ? 1 : -1);
   }
 
   close({ silent = false } = {}) {
@@ -265,6 +311,8 @@ export class CanvasStageRenderer {
       this._drawThread(ctx, width, height);
     } else if (this.viewId === 'pulse') {
       this._drawPulse(ctx, width, height);
+    } else if (this.viewId === 'halo') {
+      this._drawHalo(ctx, width, height);
     } else {
       this._drawHighway(ctx, width, height);
       this._drawEvents(ctx, width, height);
@@ -803,6 +851,132 @@ export class CanvasStageRenderer {
       });
       ctx.restore();
     }
+  }
+
+  _haloGeometry(width, height) {
+    const radius = Math.min(width, height) * 0.34;
+    return {
+      cx: width * 0.5,
+      cy: height * 0.52,
+      inner: Math.max(42, radius * 0.38),
+      outer: Math.max(110, radius),
+      labelRadius: Math.max(126, radius + 28),
+    };
+  }
+
+  _drawHalo(ctx, width, height) {
+    const geom = this._haloGeometry(width, height);
+    const events = this._eventsForFrame();
+    const now = performance.now();
+    const decayMs = 4200;
+    const pitchEnergy = Array.from({ length: 12 }, () => ({
+      value: 0,
+      color: '#7bd88f',
+      active: false,
+    }));
+
+    for (const event of events) {
+      const pitch = Number(event.pitch);
+      if (!Number.isFinite(pitch)) continue;
+      const pitchClass = ((Math.round(pitch) % 12) + 12) % 12;
+      const eventEnd = event._active ? now : (event._visualEndMs || event._visualStartMs || now);
+      const age = Math.max(0, now - eventEnd);
+      const recency = event._active ? 1 : Math.max(0, 1 - age / decayMs);
+      if (recency <= 0) continue;
+      const value = recency * (0.34 + (event.velocity || 0.8) * 0.42 + (event.intensity?.glow || 0.2) * 0.35);
+      if (value > pitchEnergy[pitchClass].value) {
+        pitchEnergy[pitchClass].value = value;
+        pitchEnergy[pitchClass].color = event.accentColor || event.color || pitchEnergy[pitchClass].color;
+      }
+      pitchEnergy[pitchClass].active = pitchEnergy[pitchClass].active || event._active;
+    }
+
+    const pointForPitchClass = (pitchClass, radius = geom.outer) => {
+      const orderIndex = Math.max(0, FIFTHS_PITCH_CLASSES.indexOf(pitchClass));
+      const angle = -Math.PI / 2 + orderIndex * (Math.PI * 2 / 12);
+      return {
+        x: geom.cx + Math.cos(angle) * radius,
+        y: geom.cy + Math.sin(angle) * radius,
+        angle,
+      };
+    };
+
+    ctx.save();
+    const field = ctx.createRadialGradient(geom.cx, geom.cy, geom.inner * 0.2, geom.cx, geom.cy, geom.labelRadius * 1.25);
+    field.addColorStop(0, 'rgba(255,255,255,0.08)');
+    field.addColorStop(0.48, 'rgba(108, 226, 255, 0.08)');
+    field.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = field;
+    ctx.beginPath();
+    ctx.arc(geom.cx, geom.cy, geom.labelRadius * 1.25, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.arc(geom.cx, geom.cy, geom.outer, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+    ctx.beginPath();
+    ctx.arc(geom.cx, geom.cy, geom.inner, 0, Math.PI * 2);
+    ctx.stroke();
+
+    const activePoints = FIFTHS_PITCH_CLASSES
+      .filter(pitchClass => pitchEnergy[pitchClass].value > 0.08)
+      .map(pitchClass => ({ pitchClass, ...pointForPitchClass(pitchClass, geom.outer * 0.76) }));
+
+    if (activePoints.length > 1) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255,255,255,0.24)';
+      ctx.lineWidth = 1.4;
+      ctx.shadowColor = 'rgba(125,216,255,0.34)';
+      ctx.shadowBlur = 16;
+      ctx.beginPath();
+      activePoints.forEach((point, index) => {
+        if (index === 0) ctx.moveTo(point.x, point.y);
+        else ctx.lineTo(point.x, point.y);
+      });
+      ctx.closePath();
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    for (const pitchClass of FIFTHS_PITCH_CLASSES) {
+      const energy = clamp(pitchEnergy[pitchClass].value, 0, 1.18);
+      const color = pitchEnergy[pitchClass].color;
+      const point = pointForPitchClass(pitchClass, geom.outer);
+      const labelPoint = pointForPitchClass(pitchClass, geom.labelRadius);
+      const dotRadius = 9 + energy * 22;
+
+      ctx.save();
+      ctx.shadowColor = rgba(color, 0.65);
+      ctx.shadowBlur = 8 + energy * 26;
+      ctx.fillStyle = rgba(color, 0.18 + energy * 0.72);
+      ctx.strokeStyle = rgba(color, 0.36 + energy * 0.52);
+      ctx.lineWidth = 1 + energy * 2;
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, dotRadius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.fillStyle = pitchEnergy[pitchClass].active ? '#fff' : 'rgba(255,255,255,0.68)';
+      ctx.font = `${pitchEnergy[pitchClass].active ? 850 : 750} ${energy > 0.3 ? 13 : 11}px system-ui, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(PITCH_CLASS_LABELS[pitchClass], labelPoint.x, labelPoint.y);
+    }
+
+    ctx.fillStyle = 'rgba(255,255,255,0.92)';
+    ctx.font = '850 14px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('HALO', geom.cx, geom.cy - 8);
+    ctx.fillStyle = 'rgba(255,255,255,0.54)';
+    ctx.font = '750 10px system-ui, sans-serif';
+    const activeCount = pitchEnergy.filter(item => item.value > 0.08).length;
+    ctx.fillText(`${activeCount} tones`, geom.cx, geom.cy + 12);
+    ctx.restore();
   }
 
   _drawEventShape(ctx, geom, lane, zStart, zEnd, event) {

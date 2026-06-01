@@ -217,14 +217,17 @@ Shipped first slice:
 - **Pulse** is the second live Canvas2D view: a radial energy meter where recent
   hits and held notes expand colored slices by lane. It is the cheap rhythm /
   velocity counterpoint to Trace and Thread, not a WebGL commitment.
+- **Halo** is the first tonal live Canvas2D view: it maps live notes onto a
+  circle-of-fifths bloom so chords and pitch classes read as harmonic gravity
+  instead of lane position.
+- Live Stage view switching now has previous/next buttons and left/right swipe
+  in addition to the selector.
 - Canvas Stage still uses the horizontal track map only. That view already shows
   internal note/drum/audio sublanes and should not be forced through every live
   view metaphor.
 
 Still pending:
 
-- Add left/right arrows or swipe to move between views; the first slice uses a
-  simple selector in the Stage header.
 - Cache gradients and reduce hot-path shadow blur before adding more Stage
   views; Stage must stay a read-only mirror of transport/events and never drive
   audio.
@@ -234,8 +237,6 @@ Still pending:
 
 Viable future views from Opus/Grok review:
 
-- **Halo**: circle-of-fifths / tonal compass bloom. Best unique Notenotes view
-  because key, scale, and harmonic gravity are first-class in the app.
 - **Pocket**: groove clock. Strongest guide view for timing, drums, swing, and
   early/late feel.
 - **Ink/Bloom**: one organic expressive Canvas2D view merging the better parts
@@ -247,7 +248,8 @@ Viable future views from Opus/Grok review:
 
 Open decisions:
 
-- Whether Halo or Pocket should be the next Canvas2D view after Pulse.
+- Whether Pocket should be the next Canvas2D view, or whether the next slice
+  should pause new views and optimize shared render paths.
 - Whether WebGL is in scope soon or only architected-for.
 - Whether each future view must support Canvas mode; default should be no unless
   it can show dense track detail better than the existing map.

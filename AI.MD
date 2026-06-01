@@ -726,13 +726,17 @@ moving musical input or transport logic.
   and persists the chosen view in `localStorage` per Stage mode. In `live` mode
   the default `trace` view renders the Create performance highway, `thread`
   renders pitch-contour ribbons where sustain is literal line length and chords
-  appear as parallel strands, and `pulse` renders radial lane energy for recent
-  rhythm/velocity hits. Live Stage keeps a longer recent-event tail than the
+  appear as parallel strands, `pulse` renders radial lane energy for recent
+  rhythm/velocity hits, and `halo` renders circle-of-fifths pitch-class energy
+  so chords bloom as connected tones. Live Stage keeps a longer recent-event tail than the
   first Stage slice so Thread phrases can travel across the full field instead
   of disappearing around mid-screen. The Stage view selector is a native
   `<select>` for footprint/accessibility, but its closed control and option rows
   are explicitly dark-styled because platform defaults can otherwise render a
-  white popup against the black Stage chrome. All live views subscribe to
+  white popup against the black Stage chrome. Live mode also has previous/next
+  arrow buttons and left/right swipe on the canvas field. Those controls must use
+  `stageViewNeighbor()` so navigation wraps within the current mode and never
+  exposes live-only views in Canvas Stage. All live views subscribe to
   `StageEventStream` so idle playing, armed recording, and active recording
   visualize the same way. In `canvas` mode it switches to a horizontal track map
   rather than the highway:

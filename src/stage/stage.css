@@ -70,6 +70,24 @@
   text-transform: uppercase;
 }
 
+.stage-overlay__view-nav {
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.9);
+  font: 900 1.1rem/1 system-ui, sans-serif;
+  box-shadow: 0 0 16px rgba(255, 255, 255, 0.05);
+}
+
+.stage-overlay__view-nav:hover,
+.stage-overlay__view-nav:focus-visible {
+  border-color: rgba(125, 216, 255, 0.58);
+  background: rgba(125, 216, 255, 0.14);
+  outline: none;
+}
+
 .stage-overlay__view select {
   min-height: 34px;
   min-width: 118px;
@@ -99,6 +117,7 @@
   width: 100%;
   height: 100%;
   min-height: 0;
+  touch-action: pan-y;
 }
 
 .stage-overlay__input-strip {
@@ -200,6 +219,11 @@
   .stage-overlay__view select {
     min-width: 108px;
     min-height: 36px;
+  }
+
+  .stage-overlay__view-nav {
+    width: 36px;
+    height: 36px;
   }
 
   .stage-overlay__input-strip {

@@ -57,6 +57,7 @@ import {
 import {
   DEFAULT_STAGE_VIEW_ID,
   resolveStageView,
+  stageViewNeighbor,
   stageViewOptionsForMode,
 } from '../src/stage/StageViews.js';
 import { auditProjectAudioAssets, createProject } from '../src/data/ProjectStore.js';
@@ -499,12 +500,22 @@ test('stage view registry exposes live views without leaking them into canvas st
   assert.equal(resolveStageView('missing').id, 'trace');
   assert.equal(resolveStageView('thread').label, 'Thread');
   assert.equal(resolveStageView('pulse').label, 'Pulse');
+  assert.equal(resolveStageView('halo').label, 'Halo');
 
   const liveIds = stageViewOptionsForMode('live').map(view => view.id);
-  assert.deepEqual(liveIds, ['trace', 'thread', 'pulse']);
+  assert.deepEqual(liveIds, ['trace', 'thread', 'pulse', 'halo']);
 
   const canvasIds = stageViewOptionsForMode('canvas').map(view => view.id);
   assert.deepEqual(canvasIds, ['trace']);
+});
+
+test('stage view navigation wraps within the current Stage mode', () => {
+  assert.equal(stageViewNeighbor('trace', 'live', 1).id, 'thread');
+  assert.equal(stageViewNeighbor('thread', 'live', 1).id, 'pulse');
+  assert.equal(stageViewNeighbor('pulse', 'live', 1).id, 'halo');
+  assert.equal(stageViewNeighbor('halo', 'live', 1).id, 'trace');
+  assert.equal(stageViewNeighbor('trace', 'live', -1).id, 'halo');
+  assert.equal(stageViewNeighbor('pulse', 'canvas', 1).id, 'trace');
 });
 
 test('audio audit reports missing, orphaned, and backup readiness without mutating project', () => {
