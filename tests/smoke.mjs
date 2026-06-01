@@ -41,6 +41,10 @@ import {
   velocityAdjustedFilterFrequency,
 } from '../src/engine/VelocityResponse.js';
 import {
+  panForVoice,
+  stereoGainsForPan,
+} from '../src/engine/StereoWidth.js';
+import {
   activeProgressionResolution,
   normalizeProgressionContext,
   normalizeProgressionGlow,
@@ -212,6 +216,7 @@ test('modern synth presets keep a richer produced-voice floor', () => {
     assert.ok(Number.isFinite(patch.keyTrack), `${id} has explicit key tracking`);
     assert.ok((patch.drive || 0) > 0, `${id} has a touch of patch drive`);
     assert.ok((patch.velocityResponse?.filter || 0) > 0, `${id} responds to velocity brightness`);
+    assert.ok((patch.stereoWidth || 0) > 0, `${id} has stereo width`);
   }
 });
 
@@ -224,6 +229,20 @@ test('velocity response changes timbre without changing legacy patches', () => {
   assert.ok(velocityAdjustedFilterFrequency(2000, 0.2, response) < 2000);
   assert.ok(velocityAdjustedDrive(0.1, 1, response) > 0.1);
   assert.equal(velocityAdjustedDrive(0.1, 0.2, response), 0.1);
+});
+
+test('stereo width helper keeps center stable and spreads unison voices', () => {
+  assert.equal(panForVoice(0, 1, 1), 0);
+  assert.equal(panForVoice(0, 3, 0), 0);
+  assert.equal(panForVoice(0, 3, 0.5), -0.5);
+  assert.equal(panForVoice(2, 3, 0.5), 0.5);
+
+  const center = stereoGainsForPan(0);
+  assert.ok(Math.abs(center.left - center.right) < 0.000001);
+  const left = stereoGainsForPan(-1);
+  const right = stereoGainsForPan(1);
+  assert.ok(left.left > left.right);
+  assert.ok(right.right > right.left);
 });
 
 test('backup validation accepts current workspace backups and rejects newer app versions', () => {

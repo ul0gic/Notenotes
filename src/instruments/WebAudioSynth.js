@@ -14,6 +14,7 @@ import {
   velocityAdjustedDrive,
   velocityAdjustedFilterFrequency,
 } from '../engine/VelocityResponse.js';
+import { normalizeStereoWidth, panForVoice } from '../engine/StereoWidth.js';
 
 /** Maximum simultaneous voices */
 const MAX_VOICES = 8;
@@ -76,6 +77,7 @@ const DEFAULT_PATCH = {
   unison: null,
   keyTrack: 0,
   velocityResponse: null,
+  stereoWidth: 0,
 };
 
 /** Built-in preset patches */
@@ -151,6 +153,7 @@ export const PRESETS = {
     unison: { voices: 3, spread: 10 },
     keyTrack: 0.24,
     velocityResponse: { filter: 0.34, drive: 0.015 },
+    stereoWidth: 0.34,
     gain: 0.34,
     drive: 0.012,
   },
@@ -167,6 +170,7 @@ export const PRESETS = {
     unison: { voices: 3, spread: 8 },
     keyTrack: 0.3,
     velocityResponse: { filter: 0.42, drive: 0.03 },
+    stereoWidth: 0.28,
     gain: 0.28,
     drive: 0.04,
   },
@@ -185,6 +189,7 @@ export const PRESETS = {
     unison: { voices: 2, spread: 6 },
     keyTrack: 0.22,
     velocityResponse: { filter: 0.36, drive: 0.035 },
+    stereoWidth: 0.26,
     gain: 0.34,
     drive: 0.08,
   },
@@ -200,6 +205,7 @@ export const PRESETS = {
     unison: { voices: 2, spread: 4 },
     keyTrack: 0.15,
     velocityResponse: { filter: 0.32, drive: 0.06 },
+    stereoWidth: 0.16,
     gain: 0.46,
     drive: 0.18,
   },
@@ -226,6 +232,7 @@ export const PRESETS = {
     unison: { voices: 2, spread: 3 },
     keyTrack: 0.08,
     velocityResponse: { filter: 0.22, drive: 0.015 },
+    stereoWidth: 0.18,
     gain: 0.34,
     drive: 0.025,
   },
@@ -242,6 +249,7 @@ export const PRESETS = {
     unison: { voices: 3, spread: 9 },
     keyTrack: 0.25,
     velocityResponse: { filter: 0.44, drive: 0.025 },
+    stereoWidth: 0.3,
     gain: 0.34,
     drive: 0.035,
   },
@@ -258,6 +266,7 @@ export const PRESETS = {
     unison: { voices: 3, spread: 14 },
     keyTrack: 0.36,
     velocityResponse: { filter: 0.3, drive: 0.012 },
+    stereoWidth: 0.42,
     gain: 0.28,
     drive: 0.015,
   },
@@ -274,6 +283,7 @@ export const PRESETS = {
     unison: { voices: 2, spread: 5 },
     keyTrack: 0.18,
     velocityResponse: { filter: 0.34, drive: 0.06 },
+    stereoWidth: 0.18,
     gain: 0.46,
     drive: 0.22,
   },
@@ -290,6 +300,7 @@ export const PRESETS = {
     unison: { voices: 3, spread: 7 },
     keyTrack: 0.42,
     velocityResponse: { filter: 0.48, drive: 0.02 },
+    stereoWidth: 0.24,
     gain: 0.36,
     drive: 0.02,
   },
@@ -349,6 +360,7 @@ export class WebAudioSynth {
       unison: patch.unison ? { ...patch.unison } : null,
       keyTrack: patch.keyTrack ?? DEFAULT_PATCH.keyTrack,
       velocityResponse: patch.velocityResponse ? normalizeVelocityResponse(patch.velocityResponse) : null,
+      stereoWidth: normalizeStereoWidth(patch.stereoWidth ?? DEFAULT_PATCH.stereoWidth),
     };
     if (this._output) {
       this._output.gain.setTargetAtTime(this.patch.gain, this.engine.currentTime, 0.01);
@@ -419,26 +431,32 @@ export class WebAudioSynth {
     return velocity * sustain;
   }
 
-  _createOscillatorStack(midi, oscPatch, gainAmount, now) {
+  _createOscillatorStack(midi, oscPatch, gainAmount, now, layerOffset = 0) {
     const ctx = this.engine.ctx;
     const unison = this.patch.unison || {};
     const voices = Math.max(1, Math.min(5, Math.round(unison.voices || 1)));
     const spread = Math.max(0, Math.min(40, unison.spread || 0));
+    const stereoWidth = normalizeStereoWidth(this.patch.stereoWidth || 0);
     const oscillators = [];
-    const oscillatorGains = [];
+    const oscillatorOutputs = [];
     for (let i = 0; i < voices; i++) {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
+      const panner = stereoWidth > 0 && ctx.createStereoPanner ? ctx.createStereoPanner() : null;
       const spreadOffset = voices === 1 ? 0 : ((i / (voices - 1)) - 0.5) * spread;
       osc.type = oscPatch.type || this.patch.oscillator.type;
       osc.frequency.setValueAtTime(midiToFreq(midi), now);
       osc.detune.setValueAtTime((oscPatch.detune || 0) + spreadOffset, now);
       gain.gain.setValueAtTime((gainAmount ?? 1) / voices, now);
       osc.connect(gain);
+      if (panner) {
+        panner.pan.setValueAtTime(panForVoice(i, voices, stereoWidth, layerOffset), now);
+        gain.connect(panner);
+      }
       oscillators.push(osc);
-      oscillatorGains.push(gain);
+      oscillatorOutputs.push(panner || gain);
     }
-    return { oscillators, oscillatorGains };
+    return { oscillators, oscillatorGains: oscillatorOutputs };
   }
 
   _createVibrato(oscillators, now) {
@@ -557,7 +575,7 @@ export class WebAudioSynth {
       ? this._createOscillatorStack(midi, {
         type: p.oscillator2.type || p.oscillator.type,
         detune: p.oscillator2.detune || 0,
-      }, p.oscillator2.gain ?? 0.35, now)
+      }, p.oscillator2.gain ?? 0.35, now, -1)
       : { oscillators: [], oscillatorGains: [] };
 
     const toneInput = drive || filter;

@@ -1440,3 +1440,48 @@ stay direct and old-school for now. The smoke tests now guard both halves:
 patches to expose filter velocity response, and
 `velocity response changes timbre without changing legacy patches` confirms
 that null response remains a no-op.
+
+## Modern Stereo Width 0.1.91
+
+Modern-family synth patches now have a restrained `stereoWidth` field:
+
+```js
+stereoWidth: 0.3 // 0-1, additive patch data; legacy default is 0
+```
+
+This is intentionally patch-level, not a global widening effect. Chip presets
+stay centered and direct. Old/custom patches without the field remain mono.
+
+Shared math lives in `src/engine/StereoWidth.js`:
+
+- `normalizeStereoWidth(width)` clamps to `0..1`.
+- `panForVoice(index, voiceCount, width, layerOffset)` spreads unison voices
+  across the stereo field while keeping one-voice patches centered.
+- `stereoGainsForPan(pan)` returns equal-power left/right gains for export.
+
+Live path:
+
+- `WebAudioSynth.loadPatch()` normalizes `stereoWidth`.
+- `_createOscillatorStack()` inserts a `StereoPannerNode` per unison voice when
+  the patch asks for width and the browser supports it.
+- Primary and secondary oscillator layers can use a small offset so supporting
+  oscillators do not sit exactly on top of the main layer. The result is width
+  from the voice graph itself, not a master-bus effect that would smear drums or
+  Tone globally.
+
+Export path:
+
+- `WavExporter.encodeWav()` now supports mono or stereo buffers.
+- Export buffers remain mono unless the selected MIDI patch/custom instrument
+  has nonzero `stereoWidth`; this avoids doubling file size for ordinary mono
+  sketches.
+- `renderPatchTone()` uses the same `panForVoice()` and equal-power gains as the
+  live synth. Tone traits can process stereo buffers channel-by-channel.
+- Audio clips, drums, and custom samples without width mix to the center when
+  the containing export is stereo.
+
+The smoke test `stereo width helper keeps center stable and spreads unison
+voices` guards the shared math, and the Modern preset floor test now requires
+Modern patches to include nonzero `stereoWidth`. If a future Modern patch is
+intentionally narrow, document the exception instead of silently weakening the
+family baseline.

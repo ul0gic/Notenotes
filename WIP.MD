@@ -545,6 +545,15 @@ A future `PHILOSOPHY.md` and `CONTRIBUTING.md` should make the boundaries explic
 
 Pitch contour drawing, rhythm painting, Tone painting, and gesture-as-modulation all fit the app's values. The simplest future version is probably scale-snapped pitch contour drawing on a grid.
 
+### Touch Velocity Instrument
+
+Keep ordinary touch, mouse, and QWERTY note velocity fixed for now so the core
+Pads/Piano/Kit surfaces stay predictable. Consider a separate expressive
+instrument or pad mode for touch/mouse users who want velocity-like control: a
+string/pluck surface, elastic lane, pressure-free strum, or other gesture where
+drag distance/speed naturally maps to velocity without making normal taps
+erratic.
+
 ## Parking Lot
 
 - Snippet dock icon polish for audio snippets.

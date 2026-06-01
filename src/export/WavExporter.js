@@ -7,6 +7,7 @@ import {
   velocityAdjustedDrive,
   velocityAdjustedFilterFrequency,
 } from '../engine/VelocityResponse.js';
+import { normalizeStereoWidth, panForVoice, stereoGainsForPan } from '../engine/StereoWidth.js';
 
 const TICKS_PER_BEAT = 480;
 const SAMPLE_RATE = 44100;
@@ -25,6 +26,7 @@ const DEFAULT_EXPORT_PATCH = {
   unison: null,
   keyTrack: 0,
   velocityResponse: null,
+  stereoWidth: 0,
   schemaVersion: 1,
 };
 
@@ -57,6 +59,7 @@ function normalizeExportPatch(patch = {}) {
     unison: patch.unison ? { ...patch.unison } : null,
     keyTrack: Number(patch.keyTrack) || 0,
     velocityResponse: patch.velocityResponse ? normalizeVelocityResponse(patch.velocityResponse) : null,
+    stereoWidth: normalizeStereoWidth(patch.stereoWidth || 0),
     schemaVersion: patch.schemaVersion || 1,
   };
 }
@@ -124,12 +127,36 @@ function driveSample(sample, amount = 0) {
   return ((1 + k) * sample) / (1 + k * Math.abs(sample));
 }
 
-function ensureLength(samples, seconds) {
+function isStereoBuffer(samples) {
+  return !!samples && !!samples.left && !!samples.right;
+}
+
+function sampleLength(samples) {
+  return isStereoBuffer(samples) ? samples.length : samples?.length || 0;
+}
+
+function ensureLength(samples, seconds, stereo = false) {
   const length = Math.max(1, Math.ceil(seconds * SAMPLE_RATE));
+  if (isStereoBuffer(samples)) {
+    return samples.length >= length ? samples : {
+      left: ensureLength(samples.left, seconds),
+      right: ensureLength(samples.right, seconds),
+      length,
+    };
+  }
+  if (stereo) return { left: new Float32Array(length), right: new Float32Array(length), length };
   return samples?.length >= length ? samples : new Float32Array(length);
 }
 
-function mixSample(buffer, index, value) {
+function mixSample(buffer, index, value, pan = 0) {
+  if (isStereoBuffer(buffer)) {
+    if (index >= 0 && index < buffer.length) {
+      const gains = stereoGainsForPan(pan);
+      buffer.left[index] = Math.max(-1, Math.min(1, buffer.left[index] + value * gains.left));
+      buffer.right[index] = Math.max(-1, Math.min(1, buffer.right[index] + value * gains.right));
+    }
+    return;
+  }
   if (index >= 0 && index < buffer.length) {
     buffer[index] = Math.max(-1, Math.min(1, buffer[index] + value));
   }
@@ -159,6 +186,13 @@ function hasSnippetTone(snippet, fallbackTraits = {}) {
 }
 
 function applyToneTraits(input, traits = {}) {
+  if (isStereoBuffer(input)) {
+    return {
+      left: applyToneTraits(input.left, traits),
+      right: applyToneTraits(input.right, traits),
+      length: input.length,
+    };
+  }
   if (!hasToneTraits(traits)) return input;
   const out = new Float32Array(input);
 
@@ -252,8 +286,18 @@ function clampGain(value, fallback = 1) {
 
 function mixBuffer(target, source, startSec = 0, gain = 1) {
   const offset = Math.max(0, Math.floor(startSec * SAMPLE_RATE));
-  for (let i = 0; i < source.length; i++) {
-    mixSample(target, offset + i, source[i] * gain);
+  const length = sampleLength(source);
+  for (let i = 0; i < length; i++) {
+    if (isStereoBuffer(source)) {
+      if (isStereoBuffer(target)) {
+        mixSample(target.left, offset + i, source.left[i] * gain);
+        mixSample(target.right, offset + i, source.right[i] * gain);
+      } else {
+        mixSample(target, offset + i, ((source.left[i] || 0) + (source.right[i] || 0)) * 0.5 * gain);
+      }
+    } else {
+      mixSample(target, offset + i, source[i] * gain);
+    }
   }
 }
 
@@ -261,7 +305,7 @@ function renderPatchTone(buffer, startSec, durationSec, midi, velocity = 0.8, pa
   const patch = normalizeExportPatch(patchInput || PRESETS.chip_lead || DEFAULT_EXPORT_PATCH);
   const start = Math.max(0, Math.floor(startSec * SAMPLE_RATE));
   const release = Math.max(0.02, patch.envelope.release || 0.02);
-  const end = Math.min(buffer.length, Math.ceil((startSec + durationSec + release + 0.02) * SAMPLE_RATE));
+  const end = Math.min(sampleLength(buffer), Math.ceil((startSec + durationSec + release + 0.02) * SAMPLE_RATE));
   const baseFreq = midiToFreq(midi);
   const amp = 0.58 * clamp(velocity, 0, 1.25) * clamp(patch.gain ?? 0.5, 0, 1.5);
   const unison = patch.unison || {};
@@ -271,6 +315,7 @@ function renderPatchTone(buffer, startSec, durationSec, midi, velocity = 0.8, pa
   const filterState = { low: 0, band: 0 };
   const phases = Array.from({ length: unisonVoices }, () => 0);
   const phases2 = Array.from({ length: unisonVoices }, () => 0);
+  const stereoWidth = normalizeStereoWidth(patch.stereoWidth || 0);
 
   for (let i = start; i < end; i++) {
     const n = i - start;
@@ -280,24 +325,42 @@ function renderPatchTone(buffer, startSec, durationSec, midi, velocity = 0.8, pa
       : 0;
     let primaryWave = 0;
     let secondaryWave = 0;
+    let primaryPan = 0;
+    let secondaryPan = 0;
+    let primaryWeight = 0;
+    let secondaryWeight = 0;
     for (let v = 0; v < unisonVoices; v++) {
       const spreadOffset = unisonVoices === 1 ? 0 : ((v / (unisonVoices - 1)) - 0.5) * spread;
       const cents = (patch.oscillator.detune || 0) + spreadOffset + vibrato;
       const freq = baseFreq * Math.pow(2, cents / 1200);
       phases[v] += freq / SAMPLE_RATE;
-      primaryWave += oscillatorValue(patch.oscillator.type, phases[v]);
+      const voiceWave = oscillatorValue(patch.oscillator.type, phases[v]);
+      const voicePan = panForVoice(v, unisonVoices, stereoWidth);
+      const voiceWeight = Math.abs(voiceWave);
+      primaryWave += voiceWave;
+      primaryPan += voicePan * voiceWeight;
+      primaryWeight += voiceWeight;
       if (patch.oscillator2) {
         const cents2 = (patch.oscillator2.detune || 0) + spreadOffset + vibrato;
         const freq2 = baseFreq * Math.pow(2, cents2 / 1200);
         phases2[v] += freq2 / SAMPLE_RATE;
-        secondaryWave += oscillatorValue(patch.oscillator2.type || patch.oscillator.type, phases2[v]);
+        const voiceWave2 = oscillatorValue(patch.oscillator2.type || patch.oscillator.type, phases2[v]);
+        const voicePan2 = panForVoice(v, unisonVoices, stereoWidth, -1);
+        const voiceWeight2 = Math.abs(voiceWave2);
+        secondaryWave += voiceWave2;
+        secondaryPan += voicePan2 * voiceWeight2;
+        secondaryWeight += voiceWeight2;
       }
     }
     let wave = (primaryWave / unisonVoices) + (secondaryWave / unisonVoices) * osc2Gain;
+    const panWeight = primaryWeight + secondaryWeight * osc2Gain;
+    const pan = panWeight > 0
+      ? (primaryPan + secondaryPan * osc2Gain) / panWeight
+      : 0;
     wave = driveSample(wave, velocityAdjustedDrive(patch.drive || 0, velocity, patch.velocityResponse));
     const cutoff = filterFrequencyForPatch(patch, midi, t, velocity);
     const filtered = filterStep(wave, filterState, patch.filter.type, cutoff);
-    mixSample(buffer, i, filtered * amp * envelopeValue(t, durationSec, patch.envelope));
+    mixSample(buffer, i, filtered * amp * envelopeValue(t, durationSec, patch.envelope), pan);
   }
 }
 
@@ -368,7 +431,7 @@ function renderSnippetEvents(buffer, snippet, startSec, bpm, options = {}) {
       const hitWithGain = { ...hit, velocity: (hit.velocity || 0.8) * gain };
       const traits = hasClipTraits ? options.toneTraits : (hit.soundTraits || options.toneTraits || snippet.soundTraits);
       if (hasToneTraits(traits)) {
-        const hitSamples = ensureLength(null, buffer.length / SAMPLE_RATE);
+        const hitSamples = ensureLength(null, sampleLength(buffer) / SAMPLE_RATE, isStereoBuffer(buffer));
         renderHit(hitSamples, { ...hitWithGain, startTick: (hitWithGain.startTick || 0) * timeScale }, startSec, secPerTick, options.kitId);
         mixBuffer(buffer, applyToneTraits(hitSamples, traits));
       } else {
@@ -387,7 +450,7 @@ function renderMidiWithTone(target, snippet, startSec, bpm, baseTraits = {}, gai
   const hasClipTraits = hasToneTraits(baseTraits);
   for (const note of snippet.notes || []) {
     const noteTraits = hasClipTraits ? baseTraits : (note.soundTraits || baseTraits);
-    const noteSamples = ensureLength(null, target.length / SAMPLE_RATE);
+    const noteSamples = ensureLength(null, sampleLength(target) / SAMPLE_RATE, isStereoBuffer(target));
     renderPatchTone(
       noteSamples,
       startSec + (note.startTick || 0) * secPerTick * timeScale,
@@ -526,7 +589,7 @@ function renderSampleNote(target, decoded, instrument, note, startSec, bpm, gain
 
   for (let i = 0; i < len; i++) {
     const targetIndex = start + i;
-    if (targetIndex >= target.length) break;
+    if (targetIndex >= sampleLength(target)) break;
     const sourceIndex = i * rate * (decoded.sampleRate / SAMPLE_RATE);
     if (sourceIndex >= decoded.length) break;
     const a = Math.min(1, i / attack);
@@ -551,18 +614,33 @@ function renderMidiWithCustomInstrument(target, snippet, decoded, instrument, st
 
 function normalize(buffer) {
   let peak = 0;
-  for (let i = 0; i < buffer.length; i++) peak = Math.max(peak, Math.abs(buffer[i]));
+  if (isStereoBuffer(buffer)) {
+    for (let i = 0; i < buffer.length; i++) {
+      peak = Math.max(peak, Math.abs(buffer.left[i] || 0), Math.abs(buffer.right[i] || 0));
+    }
+  } else {
+    for (let i = 0; i < buffer.length; i++) peak = Math.max(peak, Math.abs(buffer[i]));
+  }
   if (peak <= 0.98) return buffer;
   const gain = 0.98 / peak;
-  for (let i = 0; i < buffer.length; i++) buffer[i] *= gain;
+  if (isStereoBuffer(buffer)) {
+    for (let i = 0; i < buffer.length; i++) {
+      buffer.left[i] *= gain;
+      buffer.right[i] *= gain;
+    }
+  } else {
+    for (let i = 0; i < buffer.length; i++) buffer[i] *= gain;
+  }
   return buffer;
 }
 
 function encodeWav(samples) {
   normalize(samples);
+  const channels = isStereoBuffer(samples) ? 2 : 1;
+  const frameCount = sampleLength(samples);
   const bytesPerSample = 2;
-  const blockAlign = bytesPerSample;
-  const dataSize = samples.length * bytesPerSample;
+  const blockAlign = bytesPerSample * channels;
+  const dataSize = frameCount * blockAlign;
   const buffer = new ArrayBuffer(44 + dataSize);
   const view = new DataView(buffer);
   let offset = 0;
@@ -576,7 +654,7 @@ function encodeWav(samples) {
   writeString('fmt ');
   view.setUint32(offset, 16, true); offset += 4;
   view.setUint16(offset, 1, true); offset += 2;
-  view.setUint16(offset, 1, true); offset += 2;
+  view.setUint16(offset, channels, true); offset += 2;
   view.setUint32(offset, SAMPLE_RATE, true); offset += 4;
   view.setUint32(offset, SAMPLE_RATE * blockAlign, true); offset += 4;
   view.setUint16(offset, blockAlign, true); offset += 2;
@@ -584,9 +662,16 @@ function encodeWav(samples) {
   writeString('data');
   view.setUint32(offset, dataSize, true); offset += 4;
 
-  for (let i = 0; i < samples.length; i++, offset += 2) {
-    const s = Math.max(-1, Math.min(1, samples[i]));
-    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+  for (let i = 0; i < frameCount; i++) {
+    if (isStereoBuffer(samples)) {
+      const left = Math.max(-1, Math.min(1, samples.left[i] || 0));
+      const right = Math.max(-1, Math.min(1, samples.right[i] || 0));
+      view.setInt16(offset, left < 0 ? left * 0x8000 : left * 0x7fff, true); offset += 2;
+      view.setInt16(offset, right < 0 ? right * 0x8000 : right * 0x7fff, true); offset += 2;
+    } else {
+      const s = Math.max(-1, Math.min(1, samples[i]));
+      view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true); offset += 2;
+    }
   }
 
   return new Blob([buffer], { type: 'audio/wav' });
@@ -603,10 +688,11 @@ export async function snippetToWavBlob(snippet, project = {}, options = {}) {
     if (!decoded) throw new Error('Audio recording is unavailable');
     durationSec = Math.max(durationSec, decoded?.duration || 0);
   }
-  const samples = ensureLength(null, durationSec);
+  const patch = snippet?.type === 'midi' ? patchForSnippetExport(snippet, options) : null;
+  const samples = ensureLength(null, durationSec, normalizeStereoWidth(patch?.stereoWidth || 0) > 0);
   if (decoded) mixAudioBuffer(samples, decoded, 0);
   else if (snippet?.type === 'midi') {
-    renderMidiWithTone(samples, snippet || {}, 0, bpm, traits, 1, { patch: patchForSnippetExport(snippet, options) });
+    renderMidiWithTone(samples, snippet || {}, 0, bpm, traits, 1, { patch });
   } else {
     renderSnippetEvents(samples, snippet || {}, 0, bpm, { toneTraits: traits });
   }
@@ -618,7 +704,7 @@ export function debugRenderBuiltInPatchWav(presetId = 'chip_lead', options = {})
   const midi = options.midi || 60;
   const durationSec = options.durationSec || 1.5;
   const traits = options.traits || {};
-  const samples = ensureLength(null, durationSec + 2.2);
+  const samples = ensureLength(null, durationSec + 2.2, normalizeStereoWidth(patch.stereoWidth || 0) > 0);
   renderPatchTone(samples, 0, durationSec, midi, options.velocity || 0.85, patch);
   return encodeWav(applyToneTraits(samples, traits));
 }
@@ -684,7 +770,8 @@ export async function projectToWavBlob(project, options = {}) {
   }
 
   const hasAnyClipTone = jobs.some(job => hasSnippetTone(job.snippet, job.traits));
-  const samples = ensureLength(null, maxSec + (hasAnyClipTone ? 3 : 1));
+  const wantsStereo = jobs.some(job => normalizeStereoWidth(job.patch?.stereoWidth || job.customInstrument?.stereoWidth || 0) > 0);
+  const samples = ensureLength(null, maxSec + (hasAnyClipTone ? 3 : 1), wantsStereo);
   if (options.stats) options.stats.renderedClips = jobs.length;
 
   for (const job of jobs) {
@@ -694,7 +781,7 @@ export async function projectToWavBlob(project, options = {}) {
     } else if (trackType === 'midi' && snippet.type === 'midi') {
       if (job.customInstrument && job.customDecoded) {
         if (hasToneTraits(traits)) {
-          const toneLayer = ensureLength(null, samples.length / SAMPLE_RATE);
+          const toneLayer = ensureLength(null, sampleLength(samples) / SAMPLE_RATE, isStereoBuffer(samples));
           renderMidiWithCustomInstrument(toneLayer, snippet, job.customDecoded, job.customInstrument, startSec, bpm, gain, { useSnippetBpm: false, meterSource: project, timeScale: job.timeScale });
           mixBuffer(samples, applyToneTraits(toneLayer, traits));
         } else {

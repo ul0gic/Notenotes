@@ -763,12 +763,14 @@ Steps:
 3. Hold longer notes to confirm the smoother modern character still exists.
 4. Export a short WAV from at least one older Modern preset such as Soft Pad or Organ.
 5. If a velocity-sensitive MIDI keyboard is available, play the same Modern preset softly and hard.
+6. Listen on headphones and compare a Modern preset to a Chip preset.
 
 Expected:
 
 - Short taps produce audible sound.
 - Held notes feel fuller than chip presets, with mild width/motion instead of a bone-dry single oscillator.
 - Harder MIDI notes are a little brighter/more present; QWERTY and pad taps still behave as before.
+- Modern presets have tasteful stereo width live and in WAV export; Chip presets remain focused and centered.
 - WAV export sounds recognizably like the selected Modern preset.
 
 ## 8. Controller
