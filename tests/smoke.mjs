@@ -494,13 +494,14 @@ test('stage model gives same canvas track events internal sublanes', () => {
   );
 });
 
-test('stage view registry exposes trace and thread without leaking canvas-only views into live stage', () => {
+test('stage view registry exposes live views without leaking them into canvas stage', () => {
   assert.equal(DEFAULT_STAGE_VIEW_ID, 'trace');
   assert.equal(resolveStageView('missing').id, 'trace');
   assert.equal(resolveStageView('thread').label, 'Thread');
+  assert.equal(resolveStageView('pulse').label, 'Pulse');
 
   const liveIds = stageViewOptionsForMode('live').map(view => view.id);
-  assert.deepEqual(liveIds, ['trace', 'thread']);
+  assert.deepEqual(liveIds, ['trace', 'thread', 'pulse']);
 
   const canvasIds = stageViewOptionsForMode('canvas').map(view => view.id);
   assert.deepEqual(canvasIds, ['trace']);

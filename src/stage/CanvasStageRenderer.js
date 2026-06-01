@@ -63,7 +63,7 @@ export class CanvasStageRenderer {
     this._raf = null;
     this._unsubscribe = null;
     this._liveEvents = [];
-    this._liveLimit = 180;
+    this._liveLimit = 260;
   }
 
   open() {
@@ -263,6 +263,8 @@ export class CanvasStageRenderer {
     }
     if (this.viewId === 'thread') {
       this._drawThread(ctx, width, height);
+    } else if (this.viewId === 'pulse') {
+      this._drawPulse(ctx, width, height);
     } else {
       this._drawHighway(ctx, width, height);
       this._drawEvents(ctx, width, height);
@@ -510,7 +512,7 @@ export class CanvasStageRenderer {
   _eventsForFrame() {
     if (this.mode === 'canvas') return (this.getEvents() || []).map(normalizeEvent);
     const now = performance.now();
-    this._liveEvents = this._liveEvents.filter(event => event._active || now - (event._visualEndMs || event._visualStartMs) < 3200);
+    this._liveEvents = this._liveEvents.filter(event => event._active || now - (event._visualEndMs || event._visualStartMs) < 6800);
     return this._liveEvents.map(event => ({ ...normalizeEvent(event), _visualStartMs: event._visualStartMs, _visualEndMs: event._visualEndMs, _active: event._active }));
   }
 
@@ -576,7 +578,7 @@ export class CanvasStageRenderer {
     const geom = this._threadGeometry(width, height);
     const now = performance.now();
     const events = this._eventsForFrame();
-    const sweepMs = 5200;
+    const sweepMs = 8200;
 
     ctx.save();
     ctx.lineCap = 'round';
@@ -623,8 +625,8 @@ export class CanvasStageRenderer {
       const endMs = event._active ? now : (event._visualEndMs || startMs + 120);
       const startAge = now - startMs;
       const endAge = now - endMs;
-      const xStart = geom.nowX - clamp(startAge / sweepMs, 0, 1.08) * geom.spanX;
-      const xEnd = geom.nowX - clamp(Math.max(0, endAge) / sweepMs, 0, 1.08) * geom.spanX;
+      const xStart = geom.nowX - clamp(startAge / sweepMs, 0, 1.16) * geom.spanX;
+      const xEnd = geom.nowX - clamp(Math.max(0, endAge) / sweepMs, 0, 1.16) * geom.spanX;
       if (Math.max(xStart, xEnd) < geom.left - 20) continue;
       const y = this._threadY(event, geom);
       const velocity = event.velocity || 0.8;
@@ -669,6 +671,138 @@ export class CanvasStageRenderer {
     }
 
     ctx.restore();
+  }
+
+  _pulseGeometry(width, height) {
+    const laneCount = clamp(Math.floor(Number(this.getLaneCount()) || 1), 1, this.maxLanes);
+    const radius = Math.min(width, height) * 0.34;
+    return {
+      laneCount,
+      cx: width * 0.5,
+      cy: height * 0.52,
+      inner: Math.max(36, radius * 0.28),
+      outer: Math.max(82, radius),
+    };
+  }
+
+  _drawPulse(ctx, width, height) {
+    const geom = this._pulseGeometry(width, height);
+    const events = this._eventsForFrame();
+    const now = performance.now();
+    const decayMs = 2200;
+    const laneEnergy = Array.from({ length: geom.laneCount }, (_, index) => ({
+      value: 0,
+      color: '#7bd88f',
+      label: this.getLaneLabel(index),
+      hitCount: 0,
+    }));
+
+    for (const event of events) {
+      const lane = clamp(event.lane, 0, geom.laneCount - 1);
+      const eventEnd = event._active ? now : (event._visualEndMs || event._visualStartMs || now);
+      const age = Math.max(0, now - eventEnd);
+      const recency = event._active ? 1 : Math.max(0, 1 - age / decayMs);
+      if (recency <= 0) continue;
+      const sustainBoost = event._active ? 0.45 : 0;
+      const intensity = event.intensity?.weight ?? 0.35;
+      const value = recency * (0.35 + (event.velocity || 0.8) * 0.45 + intensity * 0.28 + sustainBoost);
+      if (value > laneEnergy[lane].value) {
+        laneEnergy[lane].value = value;
+        laneEnergy[lane].color = event.accentColor || event.color || laneEnergy[lane].color;
+        laneEnergy[lane].label = event.label || this.getLaneLabel(lane);
+      }
+      laneEnergy[lane].hitCount += 1;
+    }
+
+    ctx.save();
+    ctx.translate(geom.cx, geom.cy);
+
+    const halo = ctx.createRadialGradient(0, 0, geom.inner * 0.2, 0, 0, geom.outer * 1.28);
+    halo.addColorStop(0, 'rgba(255,255,255,0.09)');
+    halo.addColorStop(0.34, 'rgba(88, 221, 255, 0.10)');
+    halo.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = halo;
+    ctx.beginPath();
+    ctx.arc(0, 0, geom.outer * 1.28, 0, Math.PI * 2);
+    ctx.fill();
+
+    for (let ring = 0; ring < 4; ring += 1) {
+      const r = geom.inner + ((geom.outer - geom.inner) * ring / 3);
+      ctx.strokeStyle = `rgba(255,255,255,${ring === 0 ? 0.2 : 0.1})`;
+      ctx.lineWidth = ring === 0 ? 1.4 : 0.8;
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    const gap = Math.min(0.03, (Math.PI * 2) / geom.laneCount * 0.16);
+    const startOffset = -Math.PI / 2;
+    for (let lane = 0; lane < geom.laneCount; lane += 1) {
+      const slice = (Math.PI * 2) / geom.laneCount;
+      const start = startOffset + lane * slice + gap;
+      const end = startOffset + (lane + 1) * slice - gap;
+      const energy = clamp(laneEnergy[lane].value, 0, 1.2);
+      const color = laneEnergy[lane].color;
+      const outer = geom.inner + (geom.outer - geom.inner) * (0.42 + energy * 0.58);
+      const alpha = 0.16 + energy * 0.72;
+
+      ctx.save();
+      ctx.shadowColor = rgba(color, 0.58);
+      ctx.shadowBlur = 5 + energy * 24;
+      ctx.fillStyle = rgba(color, alpha);
+      ctx.strokeStyle = rgba(color, 0.58 + energy * 0.34);
+      ctx.lineWidth = 1 + energy * 2.2;
+      ctx.beginPath();
+      ctx.arc(0, 0, outer, start, end);
+      ctx.arc(0, 0, geom.inner, end, start, true);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+
+      const mid = (start + end) / 2;
+      const tickR = geom.outer + 12 + energy * 13;
+      ctx.strokeStyle = rgba(color, 0.28 + energy * 0.54);
+      ctx.lineWidth = 1.2 + energy * 2.4;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(mid) * (geom.outer + 3), Math.sin(mid) * (geom.outer + 3));
+      ctx.lineTo(Math.cos(mid) * tickR, Math.sin(mid) * tickR);
+      ctx.stroke();
+    }
+
+    ctx.fillStyle = 'rgba(255,255,255,0.92)';
+    ctx.font = '850 13px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('PULSE', 0, -7);
+    ctx.fillStyle = 'rgba(255,255,255,0.54)';
+    ctx.font = '750 10px system-ui, sans-serif';
+    const activeCount = laneEnergy.filter(lane => lane.value > 0.08).length;
+    ctx.fillText(`${activeCount} active`, 0, 12);
+
+    ctx.restore();
+
+    if (width > 520) {
+      const hot = laneEnergy
+        .map((lane, index) => ({ ...lane, index }))
+        .filter(lane => lane.value > 0.08)
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 5);
+      ctx.save();
+      ctx.font = '800 11px system-ui, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      hot.forEach((lane, index) => {
+        const x = 22;
+        const y = 36 + index * 24;
+        ctx.fillStyle = rgba(lane.color, 0.18 + lane.value * 0.22);
+        this._roundedRect(ctx, x, y - 9, 142, 18, 9);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.82)';
+        ctx.fillText(String(lane.label || this.getLaneLabel(lane.index)).slice(0, 16), x + 10, y);
+      });
+      ctx.restore();
+    }
   }
 
   _drawEventShape(ctx, geom, lane, zStart, zEnd, event) {

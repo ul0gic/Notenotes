@@ -214,6 +214,9 @@ Shipped first slice:
 - **Thread** is the first alternate live view: pitch-contour ribbons where
   sustain becomes line length, velocity affects thickness, drums sit on a floor
   line, and chords read as parallel strands.
+- **Pulse** is the second live Canvas2D view: a radial energy meter where recent
+  hits and held notes expand colored slices by lane. It is the cheap rhythm /
+  velocity counterpoint to Trace and Thread, not a WebGL commitment.
 - Canvas Stage still uses the horizontal track map only. That view already shows
   internal note/drum/audio sublanes and should not be forced through every live
   view metaphor.
@@ -244,7 +247,7 @@ Viable future views from Opus/Grok review:
 
 Open decisions:
 
-- Whether Halo or Pocket should be the next Canvas2D view.
+- Whether Halo or Pocket should be the next Canvas2D view after Pulse.
 - Whether WebGL is in scope soon or only architected-for.
 - Whether each future view must support Canvas mode; default should be no unless
   it can show dense track detail better than the existing map.

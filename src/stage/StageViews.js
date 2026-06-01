@@ -13,6 +13,12 @@ export const STAGE_VIEW_REGISTRY = [
     description: 'Pitch-contour ribbons for melody, chords, and sustain.',
     modes: ['live'],
   },
+  {
+    id: 'pulse',
+    label: 'Pulse',
+    description: 'Radial lane energy for rhythm, velocity, and recent hits.',
+    modes: ['live'],
+  },
 ];
 
 export function stageViewOptionsForMode(mode = 'live') {

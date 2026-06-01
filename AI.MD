@@ -724,12 +724,18 @@ moving musical input or transport logic.
   fixed full-screen overlay with a design-language-friendly Close Stage button,
   not a corner X. It reads `src/stage/StageViews.js` for the mode-safe view list
   and persists the chosen view in `localStorage` per Stage mode. In `live` mode
-  the default `trace` view renders the Create performance highway, while the
-  `thread` view renders pitch-contour ribbons where sustain is literal line
-  length and chords appear as parallel strands. Both subscribe to
-  `StageEventStream` and keep a short recent-event tail so idle playing, armed
-  recording, and active recording all visualize the same way. In `canvas` mode
-  it switches to a horizontal track map rather than the highway:
+  the default `trace` view renders the Create performance highway, `thread`
+  renders pitch-contour ribbons where sustain is literal line length and chords
+  appear as parallel strands, and `pulse` renders radial lane energy for recent
+  rhythm/velocity hits. Live Stage keeps a longer recent-event tail than the
+  first Stage slice so Thread phrases can travel across the full field instead
+  of disappearing around mid-screen. The Stage view selector is a native
+  `<select>` for footprint/accessibility, but its closed control and option rows
+  are explicitly dark-styled because platform defaults can otherwise render a
+  white popup against the black Stage chrome. All live views subscribe to
+  `StageEventStream` so idle playing, armed recording, and active recording
+  visualize the same way. In `canvas` mode it switches to a horizontal track map
+  rather than the highway:
   each audible Canvas track is a row, internal sublanes show individual notes or
   drum sounds, audio clips render as sustained blocks, and a vertical playhead
   anchors the motion. Keep this split unless a later Three.js renderer can show
