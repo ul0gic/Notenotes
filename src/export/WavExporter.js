@@ -1,5 +1,6 @@
 import { DRUM_KITS } from '../instruments/SketchKit.js';
 import { PRESETS } from '../instruments/WebAudioSynth.js';
+import { applyMasterGlue } from '../engine/MasterGlue.js';
 import { secondsPerTickForMeter, ticksPerBarForMeter } from '../engine/Meter.js';
 import { normalizeClipTimeScale } from '../engine/ClipTimeScale.js';
 import {
@@ -682,6 +683,7 @@ function normalize(buffer) {
 }
 
 function encodeWav(samples) {
+  applyMasterGlue(samples);
   normalize(samples);
   const channels = isStereoBuffer(samples) ? 2 : 1;
   const frameCount = sampleLength(samples);

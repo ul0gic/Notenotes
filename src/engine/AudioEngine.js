@@ -3,6 +3,8 @@
  * All audio routing flows through here.
  */
 
+import { createMasterGlueCurve } from './MasterGlue.js';
+
 let instance = null;
 
 export class AudioEngine {
@@ -14,6 +16,8 @@ export class AudioEngine {
     this.ctx = null;
     /** @type {GainNode|null} */
     this.masterGain = null;
+    /** @type {WaveShaperNode|null} */
+    this.masterGlue = null;
     /** @type {DynamicsCompressorNode|null} */
     this.limiter = null;
     this._initialized = false;
@@ -55,9 +59,13 @@ export class AudioEngine {
 
     this.unlockGesture();
 
-    // Master output chain: source → masterGain → limiter → destination
+    // Master output chain: source → masterGain → subtle glue → limiter → destination
     this.masterGain = this.ctx.createGain();
     this.masterGain.gain.value = 0.8;
+
+    this.masterGlue = this.ctx.createWaveShaper();
+    this.masterGlue.curve = createMasterGlueCurve(2048);
+    this.masterGlue.oversample = '2x';
 
     this.limiter = this.ctx.createDynamicsCompressor();
     this.limiter.threshold.value = -3;
@@ -66,7 +74,8 @@ export class AudioEngine {
     this.limiter.attack.value = 0.003;
     this.limiter.release.value = 0.1;
 
-    this.masterGain.connect(this.limiter);
+    this.masterGain.connect(this.masterGlue);
+    this.masterGlue.connect(this.limiter);
     this.limiter.connect(this.ctx.destination);
 
     this._initialized = true;

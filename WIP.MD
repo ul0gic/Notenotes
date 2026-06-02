@@ -532,6 +532,21 @@ Recording-side channel preference is now a shipped Audio In control. Keep future
 work focused on compressed internal formats and import/export bundle shape, not
 on re-solving Mono/Stereo capture unless users report browser-specific issues.
 
+### Sound Upgrade Progress
+
+Shipped procedural fullness slices so far:
+
+- Modern preset revoicing with richer oscillator/unison/filter/drive defaults.
+- Velocity response for filter brightness and a touch of drive on harder notes.
+- Modern stereo width plus Canvas track pan and stereo WAV export choices.
+- Fixed master glue output stage mirrored in live playback and WAV export.
+
+Next likely sound slices:
+
+- Exponential envelope curves for synth amplitude/filter movement.
+- Better procedural drum noise shaping/transients.
+- A serious design pass for renderer unification before adding heavier DSP.
+
 ### Plugin Architecture
 
 The README says instruments are pluggable, but today that means "fork the repo and add a class." A real plugin surface should wait until the app shape is more settled.

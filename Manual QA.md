@@ -57,7 +57,22 @@ Expected:
 - The pad makes sound.
 - Transport controls still respond normally.
 
-### 1.3 Pads Degree Labels
+### 1.3 Master Glue Live / Export Check
+
+Steps:
+
+1. Create a short MIDI snippet with a Modern preset and several medium-to-loud notes.
+2. Play it live, then export the snippet as WAV.
+3. Put the same snippet on Canvas with a panned MIDI track and export the Canvas as Stereo WAV.
+4. Repeat once with a drum snippet.
+
+Expected:
+
+- Live playback and WAV exports have the same gentle output character: peaks feel controlled, not louder or obviously distorted.
+- Stereo Canvas WAV still preserves track pan.
+- Quiet notes and drum tails are still audible; the master stage should not act like a hard gate.
+
+### 1.4 Pads Degree Labels
 
 Steps:
 
@@ -76,7 +91,7 @@ Expected:
 - Chromatic shows function labels for all 12 pads. Lowered Supertonic may truncate visually, but the tooltip or accessibility label still has the full text.
 - Piano keeps compact shorthand labels such as Root, b3, 5, and b7.
 
-### 1.4 Scale Picker Families
+### 1.5 Scale Picker Families
 
 Steps:
 
@@ -99,7 +114,7 @@ Expected:
 - Extensions is hidden in Chords mode when the selected scale uses curated chord pads.
 - AI Seed still generates valid pad indexes for the selected scale.
 
-### 1.5 Pads Compass Mode
+### 1.6 Pads Compass Mode
 
 Steps:
 
@@ -119,7 +134,7 @@ Expected:
 - Changing project key to G rotates the circle so G is at the top.
 - The recorded snippet contains simultaneous MIDI notes for the chord.
 
-### 1.6 Patch Picker
+### 1.7 Patch Picker
 
 Steps:
 
@@ -138,7 +153,7 @@ Expected:
 - Long custom instrument names truncate cleanly in the toolbar instead of stretching it.
 - Kit mode keeps its kit-specific selector and does not show the synth Patch picker.
 
-### 1.7 Tone Preset Picker
+### 1.8 Tone Preset Picker
 
 Steps:
 

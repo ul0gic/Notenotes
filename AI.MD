@@ -1718,6 +1718,56 @@ or channel preference needs an object. Device IDs still use `{ exact: id }`,
 matching the older behavior for a user-selected input device. Mono adds
 `channelCount: { ideal: 1 }`; Stereo adds `channelCount: { ideal: 2 }`.
 
+## Master Glue Output Stage 0.1.98
+
+The next sound-upgrade slice adds a subtle fixed master-output glue stage. This
+is deliberately not a user-facing Tone control yet; it is a hidden, conservative
+voicing pass so the app can sound a little more finished without adding another
+knob or saving new project data.
+
+Shared DSP lives in `src/engine/MasterGlue.js`:
+
+```js
+MASTER_GLUE_DEFAULTS = {
+  enabled: true,
+  drive: 0.055,
+  inputGain: 1,
+  outputGain: 0.9,
+}
+
+masterGlueSample(sample, options)
+createMasterGlueCurve(length, options)
+applyMasterGlue(buffer, options)
+```
+
+The curve is intentionally gentle: silence remains silence, quiet material stays
+close to its source level, and loud peaks are rounded before final limiting or
+WAV normalization. Do not treat it as a loudness maximizer. If users want a
+visible "Warmth" or "Presence" control later, build that as an additive setting
+on top of this helper instead of hand-rolling a second saturator.
+
+Live path:
+
+- `AudioEngine.initSync()` now routes
+  `masterGain -> masterGlue WaveShaperNode -> limiter -> destination`.
+- The WaveShaper curve comes from `createMasterGlueCurve(2048)` with `2x`
+  oversampling. All instruments, Canvas playback, metronome, and audio clips
+  flow through the same output stage because they already connect to
+  `AudioEngine.masterGain`.
+
+Export path:
+
+- `WavExporter.encodeWav()` calls `applyMasterGlue(samples)` before the existing
+  peak normalization. This means standalone snippet WAVs and Canvas WAVs get the
+  same output rounding heard live.
+- MIDI export remains unchanged because MIDI cannot represent Notenotes output
+  processing.
+
+Smoke tests:
+
+- `master glue gently shapes peaks while preserving silence`
+- `master glue applies equally to mono and stereo buffers`
+
 `MicRecorder` owns the UI and stream reopening:
 
 - Changing Input or Channels reopens the stream when permission is already

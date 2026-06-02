@@ -41,6 +41,11 @@ import {
   velocityAdjustedFilterFrequency,
 } from '../src/engine/VelocityResponse.js';
 import {
+  applyMasterGlue,
+  masterGlueSample,
+  MASTER_GLUE_DEFAULTS,
+} from '../src/engine/MasterGlue.js';
+import {
   audioInputConstraints,
   normalizeAudioInputChannelMode,
 } from '../src/engine/AudioInputChannelMode.js';
@@ -267,6 +272,31 @@ test('velocity response changes timbre without changing legacy patches', () => {
   assert.ok(velocityAdjustedFilterFrequency(2000, 0.2, response) < 2000);
   assert.ok(velocityAdjustedDrive(0.1, 1, response) > 0.1);
   assert.equal(velocityAdjustedDrive(0.1, 0.2, response), 0.1);
+});
+
+test('master glue gently shapes peaks while preserving silence', () => {
+  assert.equal(masterGlueSample(0), 0);
+  const quiet = masterGlueSample(0.1);
+  assert.ok(quiet > 0.08 && quiet < 0.14);
+  assert.ok(Math.abs(masterGlueSample(0.95)) < 0.95);
+  assert.ok(Math.abs(masterGlueSample(-0.95)) < 0.95);
+  assert.ok(MASTER_GLUE_DEFAULTS.drive > 0);
+});
+
+test('master glue applies equally to mono and stereo buffers', () => {
+  const mono = new Float32Array([0, 0.25, -0.75, 1]);
+  const stereo = {
+    left: new Float32Array([0, 0.25, -0.75, 1]),
+    right: new Float32Array([0, -0.25, 0.75, -1]),
+    length: 4,
+  };
+  applyMasterGlue(mono);
+  applyMasterGlue(stereo);
+  assert.equal(mono[0], 0);
+  assert.equal(stereo.left[0], 0);
+  assert.ok(Math.abs(mono[3]) < 1);
+  assert.ok(Math.abs(stereo.left[3]) < 1);
+  assert.ok(Math.abs(stereo.right[3]) < 1);
 });
 
 test('stereo width helper keeps center stable and spreads unison voices', () => {
