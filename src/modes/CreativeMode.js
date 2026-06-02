@@ -1498,6 +1498,7 @@ export class CreativeMode {
       || this.activeInstrument === INSTRUMENTS.PIANO
       || this.activeInstrument === INSTRUMENTS.CONTROLLER;
     patchSel.hidden = !showToolbar;
+    patchSel.style.display = showToolbar ? '' : 'none';
     if (!showToolbar) {
       this._closeTonePopover();
       this._closePadsPopover();

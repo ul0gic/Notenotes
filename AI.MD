@@ -1955,3 +1955,25 @@ audioInputChannelCount
 
 `ProjectStore.saveAudioAsset()` mirrors the same metadata onto the audio asset
 record. Old audio snippets/assets do not have these fields and remain valid.
+
+## Kit Toolbar Visibility 0.1.107
+
+`CreativeMode` renders a global `.patch-selector` toolbar for synth-like Create
+surfaces, while `SketchKit` renders its own Kit toolbar inside
+`src/instruments/SketchKit.js`. Kit must not show the synth Patch picker row.
+
+The visibility guard is `CreativeMode._syncPatchToolbarVisibility()`:
+
+```js
+const showToolbar = activeInstrument is Pads, Piano, or Labs;
+patchSel.hidden = !showToolbar;
+patchSel.style.display = showToolbar ? '' : 'none';
+```
+
+The explicit `style.display` is required because the authored
+`.patch-selector { display: flex; }` rule can override the browser's default
+hidden styling. Without it, Kit appears to have two menu bars: a stale synth
+Patch row plus the real Kit row. Keep the Kit-specific controls in
+`SketchKit.render()` and the synth patch controls in `CreativeMode`; do not
+merge the two toolbars unless the whole Create toolbar architecture is being
+intentionally redesigned.
