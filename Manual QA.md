@@ -57,7 +57,25 @@ Expected:
 - The pad makes sound.
 - Transport controls still respond normally.
 
-### 1.3 Master Glue Live / Export Check
+### 1.3 Saved Output Volumes Apply On Wake
+
+Steps:
+
+1. Open Settings.
+2. Set Master volume to 0 and Metronome volume to 0.
+3. Reload the page.
+4. Tap a Pads pad.
+5. Turn Master volume up and tap the pad again.
+6. Turn on the metronome and move Metronome volume from 0 upward.
+
+Expected:
+
+- The first pad tap after reload is silent while Master volume is still 0.
+- Moving Master volume upward immediately restores instrument sound.
+- The metronome stays silent while its volume is 0, then becomes audible as soon as the slider is raised.
+- The sliders and live audio agree before and after the audio engine wakes.
+
+### 1.4 Master Glue Live / Export Check
 
 Steps:
 
@@ -73,7 +91,7 @@ Expected:
 - Quiet notes and drum tails are still audible; the master stage should not act like a hard gate.
 - Short notes speak promptly, while pad/keys releases feel smoother than an abrupt straight-line fade.
 
-### 1.4 Pads Degree Labels
+### 1.5 Pads Degree Labels
 
 Steps:
 

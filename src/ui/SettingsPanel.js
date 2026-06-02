@@ -642,7 +642,7 @@ export class SettingsPanel {
     // Metronome volume
     body.querySelector('#setting-met-vol')?.addEventListener('input', (e) => {
       const vol = parseInt(e.target.value, 10) / 100;
-      if (this.metronome) this.metronome.volume = vol;
+      if (this.metronome) this.metronome.setVolume(vol);
       if (this.project) this.project.settings.metronomeVolume = vol;
     });
 
@@ -650,9 +650,7 @@ export class SettingsPanel {
       body.querySelector('#setting-master-vol')?.addEventListener('input', (e) => {
         const vol = parseInt(e.target.value, 10) / 100;
         const engine = this.transport?.engine;
-        if (engine?.masterGain) {
-          engine.masterGain.gain.setTargetAtTime(vol, engine.currentTime, 0.01);
-        }
+        engine?.setVolume?.(vol);
         if (this.project) this.project.settings.masterVolume = vol;
       });
 

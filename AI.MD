@@ -36,6 +36,7 @@ notation surfaces.
 src/main.js
   engine/
     AudioEngine.js          Web Audio context, master output, panic/kill audio
+    OutputVolume.js         master/metronome volume normalization
     Transport.js            lookahead scheduler and project meter timing
     Meter.js                canonical meter math and display presets
     Metronome.js            click scheduling from Transport callbacks
@@ -105,6 +106,27 @@ frame time. Use the `audioTime` supplied by Transport callbacks or
 
 Visual updates may use `requestAnimationFrame`; audio scheduling may not depend
 on visual frame timing.
+
+### Output Volume State
+
+Project output volume lives in `project.settings.masterVolume` and
+`project.settings.metronomeVolume`. A saved value of `0` is intentional and must
+not be treated as missing.
+
+- `src/engine/OutputVolume.js` normalizes/clamps both settings and preserves
+  zero values.
+- `AudioEngine.setVolume()` stores the desired master volume even before
+  `AudioContext`/`masterGain` exist. `AudioEngine.initSync()` initializes
+  `masterGain.gain.value` from that stored value instead of hardcoding the
+  default 0.8.
+- `src/main.js` calls `_applyProjectOutputVolumes()` immediately after project
+  load and again after audio wake, so persisted sliders and live gain nodes stay
+  in sync whether settings are changed before or after browser audio unlock.
+- `SettingsPanel` must call `metronome.setVolume()` and `engine.setVolume()`;
+  assigning `metronome.volume` or writing `engine.masterGain` directly bypasses
+  the pre-init memory path and can make the UI lie after reload.
+- `Metronome.init()` is idempotent. Do not remove the guard unless a future
+  lifecycle rewrite also prevents duplicate beat subscriptions.
 
 ### Browser Audio Unlock
 

@@ -4,6 +4,7 @@
  */
 
 import { createMasterGlueCurve } from './MasterGlue.js';
+import { DEFAULT_MASTER_VOLUME, normalizeVolume } from './OutputVolume.js';
 
 let instance = null;
 
@@ -23,6 +24,7 @@ export class AudioEngine {
     this._initialized = false;
     this._mediaRoutePrimed = false;
     this._mediaRoutePrimePromise = null;
+    this._volume = DEFAULT_MASTER_VOLUME;
   }
 
   static getInstance() {
@@ -61,7 +63,7 @@ export class AudioEngine {
 
     // Master output chain: source → masterGain → subtle glue → limiter → destination
     this.masterGain = this.ctx.createGain();
-    this.masterGain.gain.value = 0.8;
+    this.masterGain.gain.value = this._volume;
 
     this.masterGlue = this.ctx.createWaveShaper();
     this.masterGlue.curve = createMasterGlueCurve(2048);
@@ -174,9 +176,10 @@ export class AudioEngine {
    * @param {number} value
    */
   setVolume(value) {
+    this._volume = normalizeVolume(value, DEFAULT_MASTER_VOLUME);
     if (this.masterGain) {
       this.masterGain.gain.setTargetAtTime(
-        Math.max(0, Math.min(1, value)),
+        this._volume,
         this.ctx.currentTime,
         0.01
       );

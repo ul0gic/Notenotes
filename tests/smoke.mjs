@@ -97,6 +97,11 @@ import {
   RHYTHM_FIT_TARGETS,
 } from '../src/engine/RhythmFit.js';
 import { inspectDisplayDurationTicks } from '../src/engine/SnippetTiming.js';
+import {
+  normalizeVolume,
+  projectMasterVolume,
+  projectMetronomeVolume,
+} from '../src/engine/OutputVolume.js';
 import { auditProjectAudioAssets, createProject } from '../src/data/ProjectStore.js';
 
 function test(name, fn) {
@@ -125,6 +130,16 @@ test('compound and asymmetric meter math keeps bar durations pulse-based', () =>
 
   assert.equal(pulseCountForMeter('7/8'), 3);
   assert.equal(Math.round(quarterBpmForMeter('7/8', 120)), 140);
+});
+
+test('output volume settings preserve zero and clamp invalid values', () => {
+  assert.equal(normalizeVolume(-1, 0.8), 0);
+  assert.equal(normalizeVolume(2, 0.8), 1);
+  assert.equal(normalizeVolume('bad', 0.8), 0.8);
+  assert.equal(projectMasterVolume({ settings: { masterVolume: 0 } }), 0);
+  assert.equal(projectMasterVolume({ settings: { masterVolume: 0.25 } }), 0.25);
+  assert.equal(projectMetronomeVolume({ settings: { metronomeVolume: 0 } }), 0);
+  assert.equal(projectMetronomeVolume({ settings: { metronomeVolume: 1.5 } }), 1);
 });
 
 test('inspect display duration follows snippet length instead of forcing four bars', () => {

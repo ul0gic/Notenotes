@@ -34,6 +34,7 @@ import {
   saveWorkspaceBackupToFolder,
 } from './utils/FolderBackup.js';
 import { applyAccessibilityProfilesFromUrl, ensureAccessibilitySettings } from './ui/AccessibilityProfiles.js';
+import { projectMasterVolume, projectMetronomeVolume } from './engine/OutputVolume.js';
 
 if (typeof window !== 'undefined') {
   const params = new URLSearchParams(window.location.search);
@@ -98,6 +99,7 @@ class App {
 
     // Load or create project
     await this._loadOrCreateProject();
+    this._applyProjectOutputVolumes();
 
     // Pass project reference to creative mode
     this._ensureProjectMusicalContext();
@@ -654,6 +656,7 @@ class App {
       }
       this._bindAudioContextState();
       this.metronome.init();
+      this._applyProjectOutputVolumes();
       this.creativeMode.init();
       this.playbackEngine?.init();
       this._initialized = true;
@@ -877,6 +880,13 @@ class App {
     this.project = createProject('My First Sketch');
     await this.store.save(this.project);
     console.log('[App] Created new project:', this.project.name);
+  }
+
+  _applyProjectOutputVolumes() {
+    if (!this.project) return;
+    this.project.settings ||= {};
+    this.engine.setVolume(projectMasterVolume(this.project));
+    this.metronome.setVolume(projectMetronomeVolume(this.project));
   }
 
   /**

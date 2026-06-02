@@ -22,6 +22,7 @@ export class Metronome {
    * Initialize audio nodes. Call after AudioEngine.init().
    */
   init() {
+    if (this._gainNode) return;
     this._gainNode = this.engine.ctx.createGain();
     this._gainNode.gain.value = this.volume;
     this._gainNode.connect(this.engine.output);
