@@ -276,11 +276,12 @@ Steps:
 3. Switch to Piano, open Stage, and play visible keys.
 4. Set Piano to its maximum key count, reopen Stage, and confirm each visible key gets a distinct lane/pill instead of sharing with another key.
 5. Switch to Kit, open Stage, and hit several drum pads.
-6. On a phone-width viewport, confirm Kit Stage lane pills use short readable labels and do not overlap.
-7. Create a MIDI snippet, a drum snippet, and an Audio In snippet, then place them on separate Canvas tracks with different track colors.
-8. Open Canvas and click Stage.
-9. Press Play and watch the Canvas Stage lanes while clips pass the playhead.
-10. Close Stage and confirm normal app controls are usable again.
+6. In Kit Stage, switch between Trace, Thread, Pulse, and Halo while hitting Kick, Snare, Hi-hat, and Shaker.
+7. On a phone-width viewport, confirm Kit Stage lane pills use short readable labels and do not overlap.
+8. Create a MIDI snippet, a drum snippet, and an Audio In snippet, then place them on separate Canvas tracks with different track colors.
+9. Open Canvas and click Stage.
+10. Press Play and watch the Canvas Stage lanes while clips pass the playhead.
+11. Close Stage and confirm normal app controls are usable again.
 
 Expected:
 
@@ -289,6 +290,9 @@ Expected:
 - On mobile/touch, the Stage lane pill strip plays the active surface even when no controller is connected.
 - Pads/Piano lanes use degree colors when degree highlighting is enabled; otherwise they use the surface fallback colors.
 - Kit hits appear as short lane bursts.
+- Kit does not show the generic Patch toolbar above its own Kit toolbar.
+- Kit Thread uses the full vertical field rather than bunching all hits at the bottom.
+- Kit Halo reacts to drum hits even though drum recording/export still stores drum hit types, not melodic notes.
 - Canvas Stage uses a horizontal track map rather than the Create highway.
 - Canvas Stage respects muted/soloed tracks, caps to the audible lane set, keeps track colors, and shows audio clips as sustained blocks instead of omitting them.
 - Multiple notes or drum sounds inside the same Canvas track appear on separate internal sublanes. A chord should not collapse into one undifferentiated block.

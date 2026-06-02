@@ -612,10 +612,10 @@ export class CanvasStageRenderer {
   }
 
   _threadY(event, geom) {
-    if (event.type === 'hit' || !Number.isFinite(Number(event.pitch))) {
+    if (!Number.isFinite(Number(event.pitch))) {
       const sub = clamp(event.lane || 0, 0, geom.laneCount - 1);
-      const spread = geom.laneCount <= 1 ? 0 : (sub / (geom.laneCount - 1));
-      return geom.floorY - spread * 42;
+      const spread = geom.laneCount <= 1 ? 0.5 : (sub / (geom.laneCount - 1));
+      return geom.bottom - spread * (geom.bottom - geom.top);
     }
     const pitch = clamp(Number(event.pitch), 36, 96);
     const normalized = (pitch - 36) / 60;

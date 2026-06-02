@@ -30,11 +30,13 @@ function normalizeStart(input = {}) {
 }
 
 function normalizeHit(input = {}) {
+  const pitch = Number(input.pitch);
   return {
     id: input.id || makeId('stage-hit'),
     type: 'hit',
     source: input.source || 'unknown',
     drum: input.drum || input.hitType || 'hit',
+    pitch: Number.isFinite(pitch) ? pitch : null,
     lane: Number.isFinite(Number(input.lane)) ? Number(input.lane) : 0,
     startTick: Math.max(0, Math.floor(Number(input.startTick) || 0)),
     endTick: null,

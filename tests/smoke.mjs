@@ -559,6 +559,16 @@ test('stage event stream mirrors live notes without depending on recording', () 
   assert.equal(seen.length, 2);
 });
 
+test('stage drum hits can carry pitch metadata for pitch-class views', () => {
+  const stream = new StageEventStream();
+  const seen = [];
+  stream.subscribe(payload => seen.push(payload.event));
+  const event = stream.hit({ source: 'kit', drum: 'snare', lane: 1, pitch: 38, startTick: 0, color: '#ffffff' });
+  assert.equal(event.pitch, 38);
+  assert.equal(seen[0].pitch, 38);
+  assert.equal(stream.hit({ source: 'kit', drum: 'kick', lane: 0 }).pitch, null);
+});
+
 test('stage model caps canvas tracks and scales intensity by musical units', () => {
   assert.equal(STAGE_TRACK_LIMIT, STAGE_CANVAS_TRACK_LIMIT);
   assert.ok(STAGE_LIVE_LANE_LIMIT >= 32);

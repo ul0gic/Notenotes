@@ -479,6 +479,27 @@ a small procedural shaping layer between live playback and WAV export:
 Do not replace this with bundled samples without a separate licensing/storage
 plan and live/export parity design.
 
+### Kit Stage View Fix 0.1.102
+
+Kit owns its own toolbar (`.sk-kit-selector`) because it needs kit selection,
+Kit Tone, Kit AI, Controller, and Stage controls. The generic Create patch
+toolbar (`#patch-selector`) is for Pads, Piano, and Labs only. Keep
+`CreativeMode._syncPatchToolbarVisibility()` as the single owner of that
+visibility, and call it both during initial render and instrument switches; if
+Kit shows both toolbars, this is the first place to inspect.
+
+Live Stage drum events now carry GM-ish `pitch` metadata:
+
+```text
+kick 36, snare 38, clap 39, hihat 42, toms 45/47/50, cymbal 49,
+rim 37, shaker 82
+```
+
+This pitch is visual metadata for Stage Thread/Halo only. It must not change
+RecordingManager drum hits, MIDI export semantics, or Kit playback. Thread no
+longer forces all hit events into a tiny strip at the bottom; events without
+pitch still spread by lane across the full field.
+
 ## Instruments
 
 ### Pads / ScaleBoard

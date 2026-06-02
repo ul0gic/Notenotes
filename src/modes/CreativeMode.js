@@ -50,6 +50,19 @@ const INSTRUMENTS = {
 
 const CONTROLLER_MODIFIER_BUTTONS = new Set([4, 5, 6, 7]);
 
+const STAGE_DRUM_PITCHES = {
+  kick: 36,
+  snare: 38,
+  clap: 39,
+  hihat: 42,
+  cymbal: 49,
+  tomlo: 45,
+  tommid: 47,
+  tomhi: 50,
+  rim: 37,
+  shaker: 82,
+};
+
 export class CreativeMode {
   constructor(engine, transport, quantizer, store, project, modManager) {
     this.engine = engine;
@@ -531,6 +544,7 @@ export class CreativeMode {
       this._toggleStageOverlay();
     });
     this.el.appendChild(patchSel);
+    this._syncPatchToolbarVisibility();
     this._syncInstrumentButtons();
 
     // Instrument views container
@@ -1351,6 +1365,7 @@ export class CreativeMode {
     this.stageEvents.hit({
       source: INSTRUMENTS.KIT,
       drum: drumName,
+      pitch: STAGE_DRUM_PITCHES[drumName] || (36 + index * 3),
       lane: index,
       startTick: this.transport?.currentTick || 0,
       color: this._stageColorForDrum(drumName),
@@ -1411,14 +1426,7 @@ export class CreativeMode {
       view.classList.toggle('is-active', view.id === `instrument-${id}`);
     });
 
-    const patchSel = this.el.querySelector('#patch-selector');
-    const showToolbar = id === INSTRUMENTS.SCALEBOARD || id === INSTRUMENTS.PIANO || id === INSTRUMENTS.CONTROLLER;
-    patchSel.hidden = !showToolbar;
-    if (!showToolbar) {
-      this._closeTonePopover();
-      this._closePadsPopover();
-      this._closeKeysPopover();
-    }
+    this._syncPatchToolbarVisibility();
     this._closeControllerMapperPopover();
     this._syncInstrumentButtons();
 
@@ -1464,6 +1472,7 @@ export class CreativeMode {
   }
 
   _syncCreateToolbarButtons() {
+    this._syncPatchToolbarVisibility();
     this._syncAISeedButtonVisibility();
     this._syncControllerMapperButtonVisibility();
     this._syncStageButton();
@@ -1479,6 +1488,21 @@ export class CreativeMode {
       if (!isScale) this._closePadsPopover();
       if (!isPiano) this._closeKeysPopover();
     }
+  }
+
+  _syncPatchToolbarVisibility() {
+    const patchSel = this.el?.querySelector('#patch-selector');
+    if (!patchSel) return false;
+    const showToolbar = this.activeInstrument === INSTRUMENTS.SCALEBOARD
+      || this.activeInstrument === INSTRUMENTS.PIANO
+      || this.activeInstrument === INSTRUMENTS.CONTROLLER;
+    patchSel.hidden = !showToolbar;
+    if (!showToolbar) {
+      this._closeTonePopover();
+      this._closePadsPopover();
+      this._closeKeysPopover();
+    }
+    return showToolbar;
   }
 
   _syncControllerMapperButtonVisibility() {
