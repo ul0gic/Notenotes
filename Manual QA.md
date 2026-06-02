@@ -826,7 +826,23 @@ Expected:
 - Noise adds texture but does not explode into constant static as Drive increases.
 - Live playback and WAV export both keep the reduced-noise behavior.
 
-### 7.6 Modern Presets Sound Fuller But Still Speak On Short Taps
+### 7.6 Drum Noise Shaping
+
+Steps:
+
+1. Go to Kit.
+2. Tap Snare, Clap, Hi-hat, Rim, and Shaker in the Classic kit.
+3. Switch to 808, Electronic, and Acoustic and repeat.
+4. Record a short drum snippet with Snare, Hi-hat, and Clap.
+5. Export the snippet as WAV.
+
+Expected:
+
+- Noise-based drums still sound synthetic and responsive, but less like raw white noise.
+- Snare and Clap keep body; Hi-hat and Shaker stay bright without turning into static.
+- The exported WAV has the same general drum character as live playback.
+
+### 7.7 Modern Presets Sound Fuller But Still Speak On Short Taps
 
 Steps:
 

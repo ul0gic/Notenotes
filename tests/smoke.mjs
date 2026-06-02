@@ -102,6 +102,11 @@ import {
   projectMasterVolume,
   projectMetronomeVolume,
 } from '../src/engine/OutputVolume.js';
+import {
+  createDrumNoiseState,
+  drumTransientEnvelope,
+  shapedDrumNoiseSample,
+} from '../src/engine/DrumSynthesis.js';
 import { auditProjectAudioAssets, createProject } from '../src/data/ProjectStore.js';
 
 function test(name, fn) {
@@ -140,6 +145,17 @@ test('output volume settings preserve zero and clamp invalid values', () => {
   assert.equal(projectMasterVolume({ settings: { masterVolume: 0.25 } }), 0.25);
   assert.equal(projectMetronomeVolume({ settings: { metronomeVolume: 0 } }), 0);
   assert.equal(projectMetronomeVolume({ settings: { metronomeVolume: 1.5 } }), 1);
+});
+
+test('drum noise shaping reduces raw white noise hash and keeps bounded output', () => {
+  const state = createDrumNoiseState();
+  const first = shapedDrumNoiseSample('snare', 1, state, 0);
+  const second = shapedDrumNoiseSample('snare', -1, state, 0.002);
+  assert.ok(first <= 1 && first >= -1);
+  assert.ok(second <= 1 && second >= -1);
+  assert.notEqual(first, 1);
+  assert.ok(drumTransientEnvelope('hihat', 0, 0.06) > drumTransientEnvelope('hihat', 0.05, 0.06));
+  assert.ok(drumTransientEnvelope('cymbal', 0.1, 0.4) > drumTransientEnvelope('hihat', 0.1, 0.06));
 });
 
 test('inspect display duration follows snippet length instead of forcing four bars', () => {

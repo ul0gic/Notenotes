@@ -10,6 +10,7 @@ import { showToast } from '../ui/Toast.js';
 import { ChoicePicker } from '../ui/ChoicePicker.js';
 import { dwellSettings, tremorAllows } from '../ui/AccessibilityProfiles.js';
 import { performanceKeyLabel } from '../ui/PerformanceKeys.js';
+import { createDrumNoiseState, shapedDrumNoiseSample } from '../engine/DrumSynthesis.js';
 
 export const DRUM_KITS = {
   classic: {
@@ -463,9 +464,7 @@ export class SketchKit {
 
   _synthSnare(ctx, t, p) {
     const noiselen = p.noiseDecay, bs = ctx.sampleRate * noiselen;
-    const buf = ctx.createBuffer(1, bs, ctx.sampleRate);
-    const d = buf.getChannelData(0);
-    for (let i = 0; i < bs; i++) d[i] = Math.random() * 2 - 1;
+    const buf = this._drumNoiseBuffer(ctx, noiselen, 'snare');
     const n = ctx.createBufferSource(); n.buffer = buf;
     const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = p.noiseHp;
     const g = ctx.createGain(); g.gain.setValueAtTime(p.vol, t);
@@ -483,9 +482,7 @@ export class SketchKit {
   _synthClap(ctx, t, p) {
     for (let i = 0; i < 3; i++) {
       const off = t + i * 0.012, bs = ctx.sampleRate * 0.04;
-      const buf = ctx.createBuffer(1, bs, ctx.sampleRate);
-      const d = buf.getChannelData(0);
-      for (let j = 0; j < bs; j++) d[j] = Math.random() * 2 - 1;
+      const buf = this._drumNoiseBuffer(ctx, bs / ctx.sampleRate, 'clap');
       const n = ctx.createBufferSource(); n.buffer = buf;
       const f = ctx.createBiquadFilter(); f.type = 'bandpass';
       f.frequency.value = p.bpFreq; f.Q.value = p.bpQ;
@@ -497,10 +494,7 @@ export class SketchKit {
 
   _synthHiHat(ctx, t, p, long) {
     const dur = long ? p.decay : (p.decay || 0.06);
-    const bs = ctx.sampleRate * dur;
-    const buf = ctx.createBuffer(1, bs, ctx.sampleRate);
-    const d = buf.getChannelData(0);
-    for (let i = 0; i < bs; i++) d[i] = Math.random() * 2 - 1;
+    const buf = this._drumNoiseBuffer(ctx, dur, long ? 'cymbal' : 'hihat');
     const n = ctx.createBufferSource(); n.buffer = buf;
     const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = p.hpFreq;
     const g = ctx.createGain(); g.gain.setValueAtTime(p.vol, t);
@@ -510,9 +504,7 @@ export class SketchKit {
 
   _synthRim(ctx, t, p) {
     const noiselen = p.noiseDecay, bs = ctx.sampleRate * noiselen;
-    const buf = ctx.createBuffer(1, bs, ctx.sampleRate);
-    const d = buf.getChannelData(0);
-    for (let i = 0; i < bs; i++) d[i] = Math.random() * 2 - 1;
+    const buf = this._drumNoiseBuffer(ctx, noiselen, 'rim');
     const n = ctx.createBufferSource(); n.buffer = buf;
     const f = ctx.createBiquadFilter(); f.type = 'bandpass';
     f.frequency.value = p.bpFreq; f.Q.value = p.bpQ;
@@ -533,9 +525,7 @@ export class SketchKit {
     for (let i = 0; i < steps; i++) {
       const off = t + i * (dur / steps);
       const bs = ctx.sampleRate * 0.015;
-      const buf = ctx.createBuffer(1, bs, ctx.sampleRate);
-      const d = buf.getChannelData(0);
-      for (let j = 0; j < bs; j++) d[j] = Math.random() * 2 - 1;
+      const buf = this._drumNoiseBuffer(ctx, bs / ctx.sampleRate, 'shaker');
       const n = ctx.createBufferSource(); n.buffer = buf;
       const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = p.hpFreq;
       const g = ctx.createGain();
@@ -543,6 +533,17 @@ export class SketchKit {
       g.gain.exponentialRampToValueAtTime(0.001, off + 0.025);
       n.connect(f); f.connect(g); g.connect(this._drumOutput()); n.start(off);
     }
+  }
+
+  _drumNoiseBuffer(ctx, seconds, kind) {
+    const length = Math.max(1, Math.floor(ctx.sampleRate * seconds));
+    const buf = ctx.createBuffer(1, length, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    const state = createDrumNoiseState();
+    for (let i = 0; i < length; i++) {
+      data[i] = shapedDrumNoiseSample(kind, Math.random() * 2 - 1, state, i / ctx.sampleRate);
+    }
+    return buf;
   }
 
   _drumOutput() {

@@ -36,6 +36,7 @@ notation surfaces.
 src/main.js
   engine/
     AudioEngine.js          Web Audio context, master output, panic/kill audio
+    DrumSynthesis.js        shared procedural drum noise/envelope helpers
     OutputVolume.js         master/metronome volume normalization
     Transport.js            lookahead scheduler and project meter timing
     Meter.js                canonical meter math and display presets
@@ -457,6 +458,26 @@ Tone traits:
 Use `normalizeSoundTraits()` before storing or applying Tone. Noise is ducked
 when Drive is high to avoid static walls. Echo/Space/Wobble have parity-sensitive
 math, so update live and export together.
+
+### Procedural Drum Noise Shaping 0.1.101
+
+SketchKit remains fully synthesized and asset-free. The noise-based drums share
+a small procedural shaping layer between live playback and WAV export:
+
+- `src/engine/DrumSynthesis.js` contains `shapedDrumNoiseSample()`,
+  `drumTransientEnvelope()`, and state/profile helpers for snare, clap, hi-hat,
+  cymbal, rim, and shaker.
+- `SketchKit._drumNoiseBuffer()` fills Web Audio buffers with shaped procedural
+  noise before the existing Biquad filters and gain envelopes. This keeps the
+  existing kit presets and Tone routing intact while reducing raw white-noise
+  hash.
+- `WavExporter.renderNoiseHit()` uses the same helper and transient envelope so
+  exported drum snippets follow the same character as live Kit playback.
+- Kick and toms are unchanged in this slice; they are oscillator/body sounds and
+  should get separate treatment if a future slice adds pitch/envelope punch.
+
+Do not replace this with bundled samples without a separate licensing/storage
+plan and live/export parity design.
 
 ## Instruments
 

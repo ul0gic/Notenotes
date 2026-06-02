@@ -2,6 +2,7 @@ import { DRUM_KITS } from '../instruments/SketchKit.js';
 import { PRESETS } from '../instruments/WebAudioSynth.js';
 import { adsrEnvelopeValueAt, envelopeSegmentProgress } from '../engine/EnvelopeCurves.js';
 import { applyMasterGlue } from '../engine/MasterGlue.js';
+import { createDrumNoiseState, drumTransientEnvelope, shapedDrumNoiseSample } from '../engine/DrumSynthesis.js';
 import { secondsPerTickForMeter, ticksPerBarForMeter } from '../engine/Meter.js';
 import { normalizeClipTimeScale } from '../engine/ClipTimeScale.js';
 import {
@@ -411,11 +412,12 @@ function renderNoiseHit(buffer, startSec, kind = 'snare', velocity = 0.75, param
   let last = 0;
   const vol = params?.vol || 0.75;
   const bodyFreq = params?.bodyFreq || params?.rimFreq || 190;
+  const noiseState = createDrumNoiseState();
   for (let i = 0; i < len; i++) {
     const t = i / SAMPLE_RATE;
-    const env = Math.exp(-t * (kind === 'cymbal' ? 7 : 16));
-    const noise = (Math.random() * 2 - 1);
-    last = kind === 'snare' || kind === 'clap' ? (last * 0.55 + noise * 0.45) : noise;
+    const env = drumTransientEnvelope(kind, t, lenSec);
+    const noise = shapedDrumNoiseSample(kind, Math.random() * 2 - 1, noiseState, t);
+    last = kind === 'snare' || kind === 'clap' ? (last * 0.5 + noise * 0.5) : noise;
     const body = kind === 'snare' || kind === 'rim' ? Math.sin(2 * Math.PI * bodyFreq * t) * 0.25 : 0;
     mixSample(buffer, start + i, (last * 0.55 + body) * env * vol * velocity, pan);
   }
