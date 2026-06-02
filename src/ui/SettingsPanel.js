@@ -26,6 +26,7 @@ import { AnthropicProvider } from '../ai/AnthropicProvider.js';
 import { GeminiProvider } from '../ai/GeminiProvider.js';
 import { showToast } from './Toast.js';
 import { formatRelativeTime, workspaceBackupStatus } from '../utils/BackupStatus.js';
+import { compareAppVersions, latestVersionFromSourceText } from '../utils/AppVersion.js';
 import {
   LOCAL_BACKUP_FOLDER_KEY,
   backupFolderPermission,
@@ -42,7 +43,7 @@ const BACKUP_CONTENT_OPTIONS = [
   { id: 'archive', label: 'Full archive' },
 ];
 
-const LATEST_VERSION_URL = 'https://raw.githubusercontent.com/zeidalidiez/Notenotes/main/package.json';
+const LATEST_VERSION_URL = 'https://raw.githubusercontent.com/zeidalidiez/Notenotes/main/src/version.js';
 
 function byteLength(text = '') {
   return new TextEncoder().encode(text).length;
@@ -64,17 +65,6 @@ function formatBytes(bytes = 0) {
 function percent(value, total) {
   if (!Number.isFinite(value) || !Number.isFinite(total) || total <= 0) return 0;
   return Math.max(0, Math.min(100, (value / total) * 100));
-}
-
-function compareVersions(a, b) {
-  const left = String(a || '').split('.').map(part => parseInt(part, 10) || 0);
-  const right = String(b || '').split('.').map(part => parseInt(part, 10) || 0);
-  const length = Math.max(left.length, right.length);
-  for (let i = 0; i < length; i++) {
-    if ((left[i] || 0) > (right[i] || 0)) return 1;
-    if ((left[i] || 0) < (right[i] || 0)) return -1;
-  }
-  return 0;
 }
 
 function escapeHtml(s) {
@@ -1041,11 +1031,10 @@ export class SettingsPanel {
     try {
       const response = await fetch(LATEST_VERSION_URL, { cache: 'no-store' });
       if (!response.ok) throw new Error(`GitHub returned ${response.status}`);
-      const data = await response.json();
-      const latest = String(data?.version || '').trim();
+      const latest = latestVersionFromSourceText(await response.text());
       if (!latest) throw new Error('No version field found');
 
-      const comparison = compareVersions(latest, APP_VERSION);
+      const comparison = compareAppVersions(latest, APP_VERSION);
       if (comparison > 0) {
         statusEl.textContent = `Latest public version is ${latest}. This browser is on ${APP_VERSION}; clear cache or press Ctrl+Shift+R to load the newest build.`;
       } else if (comparison < 0) {

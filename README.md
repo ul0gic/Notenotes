@@ -38,7 +38,7 @@ I built this app primarily to experiment with music myself, and to understand wa
 
 No install. Click a pad. You're making music.
 
-It's a Progressive Web App. In Chrome, use the three-dot menu, then Cast, save, and share, then Install page as app. In Edge, use Apps, then Install this site as an app. In Safari, use Share, then Add to Home Screen. The current app version is shown in Settings, and Settings can check GitHub for the newest public version if your browser is hanging onto an old cached build.
+It's a Progressive Web App. In Chrome, use the three-dot menu, then Cast, save, and share, then Install page as app. In Edge, use Apps, then Install this site as an app. In Safari, use Share, then Add to Home Screen. The current app version is shown in Settings, and Settings checks the app's public version file on GitHub so it can tell you when your browser is hanging onto an old cached build.
 
 ---
 

@@ -19,8 +19,9 @@ Before starting:
 
 1. Open Settings.
 2. Confirm the app version is visible.
-3. Turn on Debug logs if you are investigating a failure.
-4. Make one small project with at least one MIDI track, one drum track, and one audio track.
+3. Click `Check latest` and confirm GitHub comparison treats numeric patch versions correctly; for example, `0.1.105` must be newer than `0.1.99`, and `0.2.0` must be newer than any `0.1.x` build.
+4. Turn on Debug logs if you are investigating a failure.
+5. Make one small project with at least one MIDI track, one drum track, and one audio track.
 
 ## 1. Fresh Load And Audio Wake
 

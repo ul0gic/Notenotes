@@ -30,6 +30,23 @@ notation surfaces.
 - No new runtime dependency unless it preserves PWA/offline behavior, iOS audio
   unlock, exports, backups, and local-first storage.
 
+## App Versioning
+
+`src/version.js` is the canonical public app version. Settings shows
+`APP_VERSION` from that file and checks GitHub by fetching raw `src/version.js`
+from `main`, then parsing the exported constant with
+`latestVersionFromSourceText()` in `src/utils/AppVersion.js`.
+
+Do not point the version checker at `package.json`. Package metadata can lag or
+serve tooling needs, while `APP_VERSION` is what users see and what backups
+record. Keep `package.json`/`package-lock.json` aligned when doing version-fix
+slices so local build output is not misleading, but do not make the runtime
+checker depend on package metadata.
+
+Use `compareAppVersions()` for version ordering. It compares numeric semver
+parts, so `0.1.105` is newer than `0.1.99`, and `0.2.0` is newer than every
+`0.1.x` build.
+
 ## Current Module Map
 
 ```text
@@ -80,6 +97,10 @@ src/main.js
     SettingsPanel.js        settings, export, backup, milestones, diagnostics
     SnippetTray.js          snippet strip
     Toast.js                notifications
+  utils/
+    AppVersion.js          app-version parsing/comparison for Settings checker
+    BackupStatus.js        backup age/status text helpers
+    FolderBackup.js        File System Access folder backup helpers
   stage/
     StageEventStream.js     renderer-agnostic live/visual performance events
     StageModel.js           Stage lane limits, intensity tiers, track mapping

@@ -113,6 +113,10 @@ import {
   projectMetronomeVolume,
 } from '../src/engine/OutputVolume.js';
 import {
+  compareAppVersions,
+  latestVersionFromSourceText,
+} from '../src/utils/AppVersion.js';
+import {
   createDrumNoiseState,
   drumTransientEnvelope,
   shapedDrumNoiseSample,
@@ -155,6 +159,14 @@ test('output volume settings preserve zero and clamp invalid values', () => {
   assert.equal(projectMasterVolume({ settings: { masterVolume: 0.25 } }), 0.25);
   assert.equal(projectMetronomeVolume({ settings: { metronomeVolume: 0 } }), 0);
   assert.equal(projectMetronomeVolume({ settings: { metronomeVolume: 1.5 } }), 1);
+});
+
+test('app version helpers compare numeric semver parts and parse source version text', () => {
+  assert.ok(compareAppVersions('0.1.105', '0.1.99') > 0);
+  assert.ok(compareAppVersions('0.2.0', '0.1.105') > 0);
+  assert.ok(compareAppVersions('0.10.0', '0.2.9') > 0);
+  assert.equal(compareAppVersions('0.1.105', '0.1.105'), 0);
+  assert.equal(latestVersionFromSourceText("export const APP_VERSION = '0.1.105';"), '0.1.105');
 });
 
 test('drum noise shaping reduces raw white noise hash and keeps bounded output', () => {
