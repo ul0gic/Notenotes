@@ -1514,14 +1514,6 @@
   border-radius: var(--radius-md);
 }
 
-.ctrlmode__eyebrow {
-  color: var(--text-tertiary);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
 .ctrlmode__title {
   margin: 0;
   color: var(--text-primary);
@@ -1529,16 +1521,107 @@
   font-weight: var(--font-weight-semibold);
 }
 
-.ctrlmode__lede {
+/* Tabs are blank pills — no visible text. The active tab is filled
+   with the accent color, disabled tabs are outlined and dimmed.
+   The tab name lives in the aria-label/title attributes, not in the
+   visible button content. */
+.ctrlmode__tabs {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--space-sm);
+  padding: var(--space-xs) 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  touch-action: pan-x;
+}
+
+.ctrlmode__tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.ctrlmode__tab {
+  flex: 0 0 auto;
+  min-width: 36px;
+  min-height: 12px;
+  padding: 0;
+  background: transparent;
+  border: 1.5px solid var(--surface-4);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    opacity var(--duration-fast) var(--ease-out);
+}
+
+.ctrlmode__tab:hover:not([disabled]):not(.is-active) {
+  border-color: var(--accent);
+}
+
+.ctrlmode__tab.is-active {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.ctrlmode__tab.is-disabled,
+.ctrlmode__tab[disabled] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.ctrlmode__tab.is-disabled:hover,
+.ctrlmode__tab[disabled]:hover {
+  border-color: var(--surface-4);
+}
+
+.ctrlmode__panel {
+  display: grid;
+  gap: var(--space-md);
+  min-height: 0;
+}
+
+.ctrlmode__tab-content-desc {
   margin: 0;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--surface-1);
+  border: var(--border-subtle);
+  border-radius: var(--radius-md);
   color: var(--text-secondary);
   font-size: var(--font-size-sm);
   line-height: 1.45;
 }
 
-.ctrlmode__lede strong {
+.ctrlmode__tab-content-desc strong {
   color: var(--text-primary);
   font-weight: var(--font-weight-semibold);
+}
+
+.ctrlmode__placeholder {
+  display: grid;
+  gap: var(--space-sm);
+  padding: var(--space-xl) var(--space-md);
+  background: var(--surface-1);
+  border: 1px dashed var(--surface-4);
+  border-radius: var(--radius-md);
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.ctrlmode__placeholder-title {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.04em;
+}
+
+.ctrlmode__placeholder-desc {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  line-height: 1.45;
+  max-width: 56ch;
+  justify-self: center;
 }
 
 .ctrlmode__section {
@@ -1587,6 +1670,13 @@
   font-weight: var(--font-weight-semibold);
 }
 
+/* Green trigger text below the modifier grid.
+   text-align: center centers the inline text inside the <p>.
+   justify-self: center centers the <p> itself inside its grid cell,
+   which matters because max-width caps the element at 640px on
+   wide panels. Without justify-self: center, the 640px block is
+   left-aligned in the panel and only the text within the block is
+   centered, which reads as "off to the left" rather than "centered". */
 .ctrlmode__trigger-help {
   max-width: min(100%, 640px);
   min-height: 0;
@@ -1596,6 +1686,7 @@
   line-height: 1.45;
   opacity: 0;
   text-align: center;
+  justify-self: center;
   transition: opacity var(--duration-fast) var(--ease-out);
 }
 
@@ -1613,6 +1704,8 @@
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-bold);
   opacity: 0;
+  text-align: center;
+  justify-self: center;
   transition: opacity var(--duration-fast) var(--ease-out);
 }
 

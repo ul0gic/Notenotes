@@ -2087,3 +2087,123 @@ modifier grid.
 existing CreativeMode wiring (`controllerMode?.refreshBindings?.()`) does
 not need to change. Future work that wants to surface bindings inside Labs
 can give it real behavior again.
+
+## Labs Tab Structure 0.1.110
+
+The visible Labs panel is a small tabbed surface so it can host more
+than one lab without rendering every lab's UI at once. The tab
+definitions live in the `TABS` constant at the top of
+`src/instruments/ControllerMode.js`:
+
+- **Controller** — enabled. The four held modifier slot pickers
+  (`LB`, `LT`, `RB`, `RT`), the held-modifier help line, and the live
+  active-trigger status line. This is the only tab with rendered content
+  in this slice.
+- **Accessibility** — disabled stub. Reserved for Tremor filter, Dwell
+  play, and other input helpers. The runtime helpers
+  (`tremorAllows`, `dwellSettings`) already read from
+  `project.settings.accessibility`, so they function regardless of whether
+  this tab is active.
+- **Seed** — disabled stub. Reserved for AI Seed defaults
+  (provider, model, default snippet length). The interactive seed prompt
+  and generation surface stay in the AI Seed popover; this tab is the
+  config home.
+- **Custom** — disabled stub. Reserved for the future Custom Instrument
+  editor. Custom instruments are not yet shipped, so this tab is a
+  placeholder.
+
+### Visible layout
+
+The visible Labs layout is intentionally minimal:
+
+1. A single `Labs` title card at the top. No eyebrow, no active tab
+   name, no lede.
+2. A row of blank tab pills (no visible text). The active tab is filled
+   with the accent color; disabled tabs are outlined with `--surface-4`
+   at 40% opacity. The tab name lives in the `aria-label` and `title`
+   attributes only.
+3. A single panel that shows the active tab's body. For the Controller
+   tab, the panel leads with a `.ctrlmode__tab-content-desc` card
+   (the description moved from the old header lede), followed by the
+   modifier grid, then the green help and status lines.
+
+### Tab schema
+
+```js
+{
+  id,      // stable id; data-tab attribute, localStorage value
+  label,   // human-readable name; aria-label, title, placeholder tooltip
+  enabled, // true = interactive, false = disabled "Future" placeholder
+  body,    // HTML description shown at the top of an enabled tab's panel
+           //   (only Controller ships a body in this slice)
+}
+```
+
+The `TABS` constant carries this schema as a comment block at the top
+of `ControllerMode.js`. To add a new tab, append an entry with
+`enabled: false`, render its body in `_renderActiveTabBody()`, then flip
+`enabled: true` when the lab ships.
+
+### Placeholder for disabled tabs
+
+Disabled tabs render a generic `Future` card with a single description:
+"This lab slot is reserved for a future Notenotes feature." The
+per-tab identity (Accessibility, Seed, Custom) lives only in the
+`aria-label` and `title` attribute of the tab button, not in the visible
+placeholder. This keeps the three disabled slots visually identical and
+unambiguous: they are all "Future" labs, distinguished only by tooltip
+and order.
+
+### Runtime behavior across tab switches
+
+Each tab's runtime state continues to function when its tab is not
+active:
+
+- Modifier slot assignments, gamepad polling, and any future
+  accessibility/AI/Custom state all read from their own data sources
+  (`project.settings.*`, the gamepad input manager, etc.) independent
+  of the rendered DOM.
+- `_attachGamepadInput()` is idempotent and subscribes only when the
+  Controller tab is the active tab at render time, so background trigger
+  polling does not double-bind when the user navigates Create > Canvas
+  > Create > Labs.
+- When the user returns to the Controller tab via `_setActiveTab()`,
+  the modifier pickers' event handlers are re-bound to the freshly
+  rendered DOM nodes, and the live "Active: ..." status line is
+  refreshed so it picks up the current modifier state.
+
+### Persistence
+
+Active tab state persists in `localStorage` under
+`notenotes.labs.activeTab`. Only enabled tabs are restored, so flipping
+a stub to `enabled: true` later does not auto-promote a stale saved
+value until the user actually clicks that tab. Reads and writes are
+wrapped in `try/catch` so private mode and locked-down iframes do not
+break the constructor or the tab switcher.
+
+### Trigger text centering
+
+The green "Held modifiers" and "Active: ..." text below the modifier
+grid is centered both inside the `<p>` and inside the panel. Two CSS
+properties are needed for this to work on a max-width-constrained
+element inside a grid panel:
+
+- `text-align: center` centers the inline text content inside the
+  `<p>`.
+- `justify-self: center` centers the `<p>` element itself inside its
+  grid cell. Without this, the `max-width: min(100%, 640px)` constraint
+  on the help element left the 640px-wide block anchored to the left of
+  the panel, and only the text within the block was centered. The
+  result read as "off to the left" rather than "centered".
+
+Both rules have explanatory comments in `instruments.css`.
+
+### Removed CSS
+
+- `.ctrlmode__eyebrow` and `.ctrlmode__lede` were used only by the
+  removed header eyebrow and lede. The rules are kept (harmless) for
+  potential future surface headers, but no current code path renders
+  them inside Labs.
+- `.ctrlmode__placeholder-eyebrow` (the small "Coming soon" uppercase
+  label) is no longer used because the placeholder now leads with a
+  larger "Future" title.

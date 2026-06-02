@@ -1,5 +1,12 @@
 /**
- * ControllerMode - Labs home for global gamepad state and modifier slots.
+ * ControllerMode - Labs home for the tabbed Controller setup surface and the
+ * runtime gamepad state. The visible Labs panel uses a small tab strip so
+ * future labs (accessibility helpers, AI Seed settings, custom instrument
+ * editor) can share the same Labs space without rendering everything at once.
+ * Each tab's runtime state continues to function when its tab is not active:
+ * modifier slot assignments, gamepad polling, and accessibility helpers all
+ * read from their own data sources independent of the rendered DOM.
+ *
  * Face buttons / D-pad can be learned globally; shoulders and triggers are
  * held musical modifiers; sticks stay continuous pitch/mod controls.
  */
@@ -22,6 +29,52 @@ const MODIFIER_SLOTS = [
 ];
 
 const SLOT_BY_KEY = Object.fromEntries(MODIFIER_SLOTS.map(slot => [slot.key, slot]));
+
+const ACTIVE_TAB_STORAGE_KEY = 'notenotes.labs.activeTab';
+
+// Labs tab registry. Order matters: the first entry is the default active
+// tab, and the visible pill order in the tab strip follows this array.
+//
+// Schema:
+//   id      - stable identifier; used as the data-tab attribute, the local
+//             storage value, and the `ct-tab-<id>` element id.
+//   label   - human-readable tab name. Not rendered as visible text on the
+//             tab button (tabs are blank pills); used as the aria-label,
+//             title attribute, and the panel placeholder's "Future: <label>"
+//             tooltip on disabled tabs.
+//   enabled - true = interactive, false = disabled placeholder. Disabled
+//             tabs render a generic "Future" card and do not show their
+//             specific identity in the panel.
+//   body    - HTML for the description card shown at the top of an enabled
+//             tab's panel. Only the Controller tab ships a body in this
+//             slice; future enabled tabs should add their own.
+//
+// To add a new tab, append an entry here with enabled: false, then flip
+// to true when the lab is ready. _renderActiveTabBody() handles the
+// enabled-vs-disabled branch generically.
+const TABS = [
+  {
+    id: 'controller',
+    label: 'Controller',
+    enabled: true,
+    body: 'Assign held note modifiers to the four shoulder and trigger slots. Use the <strong>Controller</strong> button in the upper app toolbar to learn gamepad bindings and manage presets.',
+  },
+  {
+    id: 'accessibility',
+    label: 'Accessibility',
+    enabled: false,
+  },
+  {
+    id: 'seed',
+    label: 'Seed',
+    enabled: false,
+  },
+  {
+    id: 'custom',
+    label: 'Custom',
+    enabled: false,
+  },
+];
 
 export class ControllerMode {
   constructor(synth, project, modManager, gamepadInput = null) {
@@ -54,6 +107,8 @@ export class ControllerMode {
     this._inputUnsubscribers = [];
     this._pitchBend = 0;
     this._modulation = 0;
+
+    this._activeTab = this._loadActiveTab();
   }
 
   set project(p) {
@@ -61,8 +116,10 @@ export class ControllerMode {
     this.setProjectKey(p?.musicalContext);
     this._controllerModifierAssignments();
     this._syncModifierSelects();
-    this._updateModifierHelp();
-    this._updateModifierStatus();
+    if (this._activeTab === 'controller') {
+      this._updateModifierHelp();
+      this._updateModifierStatus();
+    }
   }
   get project() { return this._project; }
 
@@ -105,26 +162,161 @@ export class ControllerMode {
     this.el.className = 'controller-mode';
     this.el.id = 'controller-mode';
 
+    // The visible Labs layout is intentionally minimal:
+    //   1. A single "Labs" title card (no active tab name in the header).
+    //   2. A row of blank tab pills (no visible text on the pills).
+    //   3. A single panel that shows the active tab's body.
+    // Tab identity lives in the panel content and the pills' aria-label /
+    // title attributes, not in the visible header.
     this.el.innerHTML = `
       <header class="ctrlmode__header">
-        <span class="ctrlmode__eyebrow">Labs</span>
-        <h2 class="ctrlmode__title">Controller</h2>
-        <p class="ctrlmode__lede">Assign held note modifiers to the four shoulder and trigger slots. Use the <strong>Controller</strong> button in the upper app toolbar to learn gamepad bindings and manage presets.</p>
+        <h2 class="ctrlmode__title">Labs</h2>
       </header>
-      <section class="ctrlmode__section ctrlmode__modifiers-section" aria-label="Controller modifier assignments">
+      <nav class="ctrlmode__tabs" role="tablist" aria-label="Labs sections">
+        ${TABS.map(t => this._renderTabButton(t)).join('')}
+      </nav>
+      <section class="ctrlmode__panel" id="ct-tab-panel" role="tabpanel" aria-labelledby="ct-tab-${this._escapeHtml(this._activeTab)}">
+        ${this._renderActiveTabBody()}
+      </section>
+    `;
+
+    this._bindEvents();
+    // Only attach gamepad input when the Controller tab is the active tab
+    // at render time. _attachGamepadInput() is idempotent (it short-circuits
+    // when already subscribed), so background polling does not double-bind
+    // when the user returns to the Controller tab via _setActiveTab().
+    if (this._activeTab === 'controller') {
+      this._updateModifierHelp();
+      this._attachGamepadInput();
+    }
+
+    return this.el;
+  }
+
+  // Renders a tab button as a BLANK PILL — no visible text. The active tab
+  // is filled with the accent color, disabled tabs are outlined. The label
+  // and "Future: <name>" tooltip live in the aria-label and title
+  // attributes only, so the visible tab strip is a quiet row of markers
+  // and the user identifies the active tab by position and color.
+  _renderTabButton(tab) {
+    const isActive = tab.id === this._activeTab;
+    const classes = ['ctrlmode__tab'];
+    if (isActive) classes.push('is-active');
+    if (!tab.enabled) classes.push('is-disabled');
+
+    // Disabled tabs get a "Future:" prefix on the tooltip so the user
+    // understands the slot is a placeholder, not a broken button. The
+    // visible card in the panel reinforces this with a "Future" title.
+    const titleText = !tab.enabled ? `Future: ${tab.label}` : tab.label;
+    const attrs = [
+      `id="ct-tab-${tab.id}"`,
+      'type="button"',
+      'role="tab"',
+      `aria-selected="${isActive ? 'true' : 'false'}"`,
+      'aria-controls="ct-tab-panel"',
+      `aria-label="${this._escapeHtml(titleText)}"`,
+      `title="${this._escapeHtml(titleText)}"`,
+      `data-tab="${tab.id}"`,
+    ];
+    if (!tab.enabled) {
+      attrs.push('aria-disabled="true"');
+      attrs.push('disabled');
+    }
+
+    return `<button class="${classes.join(' ')}" ${attrs.join(' ')}></button>`;
+  }
+
+  // Renders the body of the currently active tab. The disabled-tab branch
+  // is generic: a single "Future" card with no per-tab identity in the
+  // visible panel. Per-tab identity for disabled slots lives only in the
+  // tab strip's aria-label and title attribute, which is why the
+  // placeholder text is identical for all three disabled tabs.
+  _renderActiveTabBody() {
+    const tab = this._activeTabDef();
+    if (!tab) return '';
+    if (!tab.enabled) {
+      return `
+        <div class="ctrlmode__placeholder">
+          <p class="ctrlmode__placeholder-title">Future</p>
+          <p class="ctrlmode__placeholder-desc">This lab slot is reserved for a future Notenotes feature.</p>
+        </div>
+      `;
+    }
+    if (tab.id === 'controller') {
+      return `
+        <p class="ctrlmode__tab-content-desc">${tab.body}</p>
         <div class="ctrlmode__modifier-grid">
           ${MODIFIER_SLOTS.map(slot => this._renderModifierSelect(slot)).join('')}
         </div>
         <p class="ctrlmode__trigger-help" id="ct-trigger-help" aria-live="polite"></p>
         <p class="ctrlmode__trigger-status" id="ct-trigger-status" aria-live="polite"></p>
-      </section>
-    `;
+      `;
+    }
+    return '';
+  }
 
-    this._bindEvents();
-    this._updateModifierHelp();
-    this._attachGamepadInput();
+  _activeTabDef() {
+    return TABS.find(t => t.id === this._activeTab) || TABS[0];
+  }
 
-    return this.el;
+  _setActiveTab(tabId) {
+    const tab = TABS.find(t => t.id === tabId);
+    if (!tab || !tab.enabled) return;
+    if (tabId === this._activeTab) return;
+    this._activeTab = tabId;
+    this._saveActiveTab();
+
+    // Update tab button states without rebuilding the strip. The header
+    // title is intentionally not touched because it always says "Labs";
+    // the active tab identity now lives in the filled pill and the
+    // panel content, not in the header.
+    this.el?.querySelectorAll('.ctrlmode__tab').forEach((btn) => {
+      const isActive = btn.dataset.tab === tabId;
+      btn.classList.toggle('is-active', isActive);
+      btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    });
+
+    const panel = this.el?.querySelector('.ctrlmode__panel');
+    if (panel) {
+      panel.setAttribute('aria-labelledby', `ct-tab-${tabId}`);
+      panel.innerHTML = this._renderActiveTabBody();
+    }
+
+    // When the user returns to the Controller tab, re-bind the modifier
+    // slot pickers (their DOM nodes are recreated when the panel is
+    // re-rendered) and refresh the help + status lines so the live
+    // "Active: ..." indicator picks up the current modifier state.
+    if (tabId === 'controller') {
+      this._bindModifierEvents();
+      this._updateModifierHelp();
+      this._updateModifierStatus();
+    }
+  }
+
+  _loadActiveTab() {
+    try {
+      const saved = typeof localStorage !== 'undefined' ? localStorage.getItem(ACTIVE_TAB_STORAGE_KEY) : null;
+      // Only restore enabled tabs. Flipping a stub to enabled: true later
+      // should not auto-promote a stale saved value until the user actually
+      // clicks that tab.
+      if (saved && TABS.find(t => t.id === saved && t.enabled)) return saved;
+    } catch (_) {
+      // localStorage may be unavailable (private mode, locked-down iframes).
+      // Falling through to the default keeps the constructor safe.
+    }
+    return 'controller';
+  }
+
+  _saveActiveTab() {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(ACTIVE_TAB_STORAGE_KEY, this._activeTab);
+      }
+    } catch (_) {
+      // localStorage may refuse writes (quota, private mode, locked-down
+      // iframes). The active tab is still correct in-memory for this
+      // session; persistence is best-effort.
+    }
   }
 
   _renderModifierSelect(slot) {
@@ -142,6 +334,16 @@ export class ControllerMode {
   }
 
   _bindEvents() {
+    this.el.querySelectorAll('.ctrlmode__tab:not([disabled])').forEach((btn) => {
+      btn.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        this._setActiveTab(btn.dataset.tab);
+      });
+    });
+    this._bindModifierEvents();
+  }
+
+  _bindModifierEvents() {
     MODIFIER_SLOTS.forEach(slot => {
       this.el.querySelector(`#ct-mod-${slot.key}`)?.addEventListener('pointerdown', (e) => {
         e.preventDefault();
