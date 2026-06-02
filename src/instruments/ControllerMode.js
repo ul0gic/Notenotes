@@ -4,9 +4,8 @@
  * held musical modifiers; sticks stay continuous pitch/mod controls.
  */
 
-import { getScaleNotes, midiToNoteName, normalizeMusicalContext, SCALES } from '../engine/MusicTheory.js';
+import { getScaleNotes, normalizeMusicalContext, SCALES } from '../engine/MusicTheory.js';
 import { normalizeSoundTraits } from './WebAudioSynth.js';
-import { gamepadButtonInfo } from '../engine/GamepadInputManager.js';
 import {
   CONTROLLER_NOTE_MODIFIERS,
   controllerModifierLabel,
@@ -107,49 +106,18 @@ export class ControllerMode {
     this.el.id = 'controller-mode';
 
     this.el.innerHTML = `
-      <div class="ctrlmode__lab-header">
-        <span>Labs</span>
-        <strong>Controller</strong>
-        <p>Global gamepad bindings, held note modifiers, sticks, and saved presets.</p>
-      </div>
-      <div class="ctrlmode__controls">
-        <div class="ctrlmode__control-group">
-          <label class="ctrlmode__label">Pad Mode</label>
-          <select class="ctrlmode__select" id="ct-p-mode" aria-label="Pad mode">
-            <option value="single" ${this.padMode === 'single' ? 'selected' : ''}>Single</option>
-            <option value="chords" ${this.padMode === 'chords' ? 'selected' : ''}>Chords</option>
-          </select>
+      <header class="ctrlmode__header">
+        <span class="ctrlmode__eyebrow">Labs</span>
+        <h2 class="ctrlmode__title">Controller</h2>
+        <p class="ctrlmode__lede">Assign held note modifiers to the four shoulder and trigger slots. Use the <strong>Controller</strong> button in the upper app toolbar to learn gamepad bindings and manage presets.</p>
+      </header>
+      <section class="ctrlmode__section ctrlmode__modifiers-section" aria-label="Controller modifier assignments">
+        <div class="ctrlmode__modifier-grid">
+          ${MODIFIER_SLOTS.map(slot => this._renderModifierSelect(slot)).join('')}
         </div>
-        <div class="ctrlmode__octave">
-          <button class="btn btn--ghost" id="ct-oct-down" style="min-width:28px;min-height:28px;" aria-label="Octave down">v</button>
-          <span class="ctrlmode__oct-label" id="ct-oct-label">Oct ${this.octave}</span>
-          <button class="btn btn--ghost" id="ct-oct-up" style="min-width:28px;min-height:28px;" aria-label="Octave up">^</button>
-        </div>
-        <span class="ctrlmode__status" id="ct-status">No controller detected</span>
-      </div>
-      <div class="ctrlmode__body">
-        <div class="ctrlmode__bindings" id="ct-bindings">
-          ${this._renderBindings()}
-        </div>
-        <div class="ctrlmode__controller" id="ct-controller">
-          <div class="ctrlmode__modifier-panel" aria-label="Controller modifier assignments">
-            <div class="ctrlmode__binding-head">
-              <span>Held modifiers</span>
-              <span>Shoulders / triggers</span>
-            </div>
-            <div class="ctrlmode__modifier-grid">
-              ${MODIFIER_SLOTS.map(slot => this._renderModifierSelect(slot)).join('')}
-            </div>
-          </div>
-          <div class="ctrlmode__guide" aria-label="Controller controls">
-            <span>Left stick: modulation</span>
-            <span>Right stick: pitch bend</span>
-            <span>LB / LT / RB / RT: held note modifiers</span>
-          </div>
-          <div class="ctrlmode__trigger-help" id="ct-trigger-help" aria-live="polite"></div>
-          <div class="ctrlmode__trigger-status" id="ct-trigger-status" aria-live="polite"></div>
-        </div>
-      </div>
+        <p class="ctrlmode__trigger-help" id="ct-trigger-help" aria-live="polite"></p>
+        <p class="ctrlmode__trigger-status" id="ct-trigger-status" aria-live="polite"></p>
+      </section>
     `;
 
     this._bindEvents();
@@ -157,43 +125,6 @@ export class ControllerMode {
     this._attachGamepadInput();
 
     return this.el;
-  }
-
-  _renderBindings() {
-    const bindings = this.project?.settings?.controllerBindings || {};
-    const entries = Object.entries(bindings)
-      .filter(([, binding]) => binding)
-      .sort(([a], [b]) => Number(a) - Number(b));
-
-    const fallback = this._notes.slice(0, 7).map((midi, i) => {
-      const info = midiToNoteName(midi);
-      return `<div class="ctrlmode__binding-row ctrlmode__binding-row--fallback">
-        <span class="ctrlmode__binding-button">${i + 1}</span>
-        <span class="ctrlmode__binding-target">${info.display}</span>
-      </div>`;
-    }).join('');
-
-    const bindingRows = entries.map(([index, binding]) => {
-      const info = gamepadButtonInfo(Number(index));
-      return `<div class="ctrlmode__binding-row">
-        <span class="ctrlmode__binding-button">${info.short}</span>
-        <span class="ctrlmode__binding-target">${this._escapeHtml(this._bindingLabel(binding))}</span>
-      </div>`;
-    }).join('');
-
-    return `
-      <div class="ctrlmode__binding-head">
-        <span>Custom bindings</span>
-        <span>${entries.length ? `${entries.length} set` : 'None set'}</span>
-      </div>
-      ${entries.length ? bindingRows : '<p class="ctrlmode__binding-empty">No custom bindings yet.</p>'}
-      <div class="ctrlmode__binding-head ctrlmode__binding-head--secondary">
-        <span>Fallback scale</span>
-        <span>Unbound buttons</span>
-      </div>
-      ${fallback}
-      <p class="ctrlmode__binding-note">Use the Controller button in the upper app toolbar to learn or clear custom bindings. LB, LT, RB, RT, and sticks are reserved for modifier and expression slots.</p>
-    `;
   }
 
   _renderModifierSelect(slot) {
@@ -211,17 +142,6 @@ export class ControllerMode {
   }
 
   _bindEvents() {
-    this.el.querySelector('#ct-p-mode')?.addEventListener('change', (e) => {
-      this.padMode = e.target.value;
-    });
-    this.el.querySelector('#ct-oct-down')?.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      this.shiftOctave(-1);
-    });
-    this.el.querySelector('#ct-oct-up')?.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      this.shiftOctave(1);
-    });
     MODIFIER_SLOTS.forEach(slot => {
       this.el.querySelector(`#ct-mod-${slot.key}`)?.addEventListener('pointerdown', (e) => {
         e.preventDefault();
@@ -249,8 +169,10 @@ export class ControllerMode {
     this.octave = next;
     this._releaseAllNotes();
     this._updateNotes();
-    const label = this.el?.querySelector('#ct-oct-label');
-    if (label) label.textContent = `Oct ${this.octave}`;
+    // The visible Labs panel no longer renders the octave label; this method
+    // exists for CreativeMode's keyboard octave-shift behavior when the user
+    // is on the Labs tab. Kept so fallback button routing tracks the latest
+    // octave the user asked for.
   }
 
   _releaseAllNotes() {
@@ -264,16 +186,13 @@ export class ControllerMode {
 
   _attachGamepadInput() {
     if (!this._gamepadInput || this._inputUnsubscribers.length) return;
+    // The Labs Controller panel only displays the four modifier slot pickers,
+    // so it does not render the gamepad status string. The Controller popover
+    // (ControllerMapperPopover) is the surface that shows connection state.
     this._inputUnsubscribers = [
-      this._gamepadInput.on('state', ({ label }) => {
-        const status = this.el?.querySelector('#ct-status');
-        if (status) status.textContent = label || 'No controller detected';
-      }),
       this._gamepadInput.on('triggers', ({ buttons, axes }) => this._mapModifierControls(buttons, axes)),
       this._gamepadInput.on('axes', ({ axes }) => this._mapAxes(axes)),
     ];
-    const status = this.el?.querySelector('#ct-status');
-    if (status) status.textContent = this._gamepadInput.state().label;
   }
 
   handleFallbackButtonDown(idx) {
@@ -289,8 +208,10 @@ export class ControllerMode {
   }
 
   refreshBindings() {
-    const panel = this.el?.querySelector('#ct-bindings');
-    if (panel) panel.innerHTML = this._renderBindings();
+    // No-op: the visible Labs panel no longer renders the bindings list.
+    // The Controller popover (ControllerMapperPopover) is the surface where
+    // bindings are created, edited, and cleared. The runtime gamepad routes
+    // still read project.settings.controllerBindings directly.
   }
 
   _controllerModifierAssignments() {
@@ -500,16 +421,6 @@ export class ControllerMode {
         this._modManager.setModulation(mod);
       }
     }
-  }
-
-  _bindingLabel(binding) {
-    if (binding?.type === 'drum') return binding.padId || 'Drum';
-    if (binding?.type === 'scalePad' && Number.isFinite(binding.padIndex)) {
-      const prefix = binding.padAction === 'chord' ? 'Chord' : binding.padAction === 'root' ? 'Root' : 'Pad';
-      return `${prefix} ${binding.padIndex + 1}`;
-    }
-    if (binding?.type === 'midi' && Number.isFinite(binding.midi)) return midiToNoteName(binding.midi).display;
-    return 'Unknown';
   }
 
   _escapeHtml(value = '') {

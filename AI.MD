@@ -742,13 +742,42 @@ label/normalization helpers. It receives explicit getters/setters from
 instrument construction. `CreativeMode` remains the adapter that schedules saves
 and refreshes `ControllerMode` after bindings change.
 
-The old top-level `Ctrl` tab is now labeled `Labs`. It still renders
-`ControllerMode` for connection status, fallback scale, four held modifier
-slots, and current binding readout. The old controller artwork was removed
-because Labs is setup/control space, not a performance stage. The Create toolbar
-`Controller` button remains the global Controller Mapper entry point for
-learning/clearing bindings. Do not bury the mapper inside Labs unless product
-direction changes.
+The old top-level `Ctrl` tab is now labeled `Labs`. Labs renders a focused
+`ControllerMode` panel that, in this slice, only shows the four held modifier
+slots (`LB`, `LT`, `RB`, `RT`) and the active modifier help/status lines. The
+old Pad Mode selector, Octave buttons, fallback scale list, custom bindings
+list, preset list, and controller artwork were removed because they duplicated
+surfaces the user can already reach through the `Controller` popover. The
+Create toolbar `Controller` button remains the global Controller Mapper entry
+point for learning/clearing bindings, loading/saving/deleting presets, and
+seeing the live gamepad connection status. Do not bury the mapper inside Labs
+unless product direction changes.
+
+### Controller button availability (Create mode)
+
+The Create toolbar `Controller` button (`ControllerMapperPopover`) is the
+single entry point for gamepad binding and preset management. It must be
+reachable from every Create surface except `Mic`:
+
+- **Pads, Piano, Labs** — exposed by the global `.patch-selector` toolbar,
+  guarded by `CreativeMode._syncPatchToolbarVisibility()` so it shows only on
+  those three instruments. Pads has an additional
+  `_syncControllerMapperButtonVisibility()` guard that hides the button while
+  `scaleBoard.padMode === 'voices'` because the Voice Sketch instrument does
+  not consume gamepad bindings.
+- **Kit** — exposed by the Kit-owned `.sk-kit-selector` toolbar
+  (`#sk-controller-map-button`) alongside kit picker, Create/Edit, Delete,
+  Tone, AI, and Stage. The Kit toolbar is always shown when Kit is active.
+- **Mic** — no Controller button. The Mic surface records user audio and does
+  not consume gamepad bindings, so the mapper is intentionally hidden here.
+  Mic also has no `.patch-selector` or `.sk-kit-selector` toolbar of its own.
+- **Canvas and Inspect** — outside the Create mode toolbar model. They do not
+  consume gamepad bindings; the global gamepad poll still fires so any
+  learned modifier slot still affects the next time Create is opened.
+
+If a future Create surface needs the mapper, add it to the relevant toolbar
+and extend `_syncPatchToolbarVisibility()` (or its surface-specific
+equivalent) instead of opening a new entry point.
 
 `src/ui/CreateLayoutPopover.js` owns the Create toolbar Layout popover for Pads
 and Piano. Pads now expose a `Pad template` selector backed by
@@ -1977,3 +2006,84 @@ Patch row plus the real Kit row. Keep the Kit-specific controls in
 `SketchKit.render()` and the synth patch controls in `CreativeMode`; do not
 merge the two toolbars unless the whole Create toolbar architecture is being
 intentionally redesigned.
+
+## Labs Controller Cleanup 0.1.108
+
+`ControllerMode` no longer renders a duplicate controller screen. The visible
+Labs `Controller` panel now contains only the four held modifier slot pickers
+(`LB`, `LT`, `RB`, `RT`) and the live modifier help/status lines. Everything
+else that used to live here moved to the `Controller` popover
+(`ControllerMapperPopover`), which is the single global surface for gamepad
+bindings, presets, and connection status.
+
+Removed from `ControllerMode.render()`:
+
+- Pad Mode selector (Single / Chords). Pad Mode already lives on ScaleBoard;
+  the controller surface is no longer a playable pad screen.
+- Octave up / down buttons. Octave belongs to the active surface (Pads or
+  Piano); it should not be duplicated in Labs. The runtime
+  `controllerMode.shiftOctave()` is kept because the active Create surface
+  still routes keyboard arrows through it when Labs is the active tab, and
+  the controller's internal `octave` still drives fallback-button routing.
+- Custom bindings list. The bindings list was redundant with the
+  `Controller` popover, which is where users actually create, learn, and
+  clear bindings.
+- Fallback scale / unbound-button list. The fallback behavior is automatic
+  and lives in `handleFallbackButtonDown`/`Up`; showing a static copy of the
+  scale here was misleading.
+- Preset list. Saved presets are visible and editable only from the
+  `Controller` popover. Labs has nothing to display here.
+- Controller artwork, hotspots, and stick overlays. These were the
+  pre-Labs controller diagram; the renamed Labs surface is setup space, not
+  a diagram of the physical controller.
+- Gamepad status line. The `Controller` popover already shows the live
+  connection label; reading it from the popover is the single source of
+  truth.
+
+Visible Labs panel now contains:
+
+- A header with the `Labs` eyebrow, a `Controller` title, and a lede that
+  points the user to the toolbar `Controller` button for bindings and
+  presets.
+- A single modifiers section with the four shoulder/trigger slot pickers,
+  the held-modifier help line, and the live active-trigger status line.
+
+The runtime gamepad layer is intentionally unchanged:
+
+- `controllerMode.modifiedMidisForRoot()` still transforms the active root
+  note for Pads bindings, fallback Pads buttons, fallback Piano buttons, and
+  learned MIDI bindings.
+- `controllerMode.handleFallbackButtonDown`/`Up` still route unbound face
+  buttons and d-pad into the ScaleBoard fallback pad action.
+- `controllerMode.shiftOctave()` still updates the controller's internal
+  octave (used by fallback routing) when the user changes the active
+  surface via keyboard arrows on the Labs tab.
+- `project.settings.controllerModifierAssignments`,
+  `controllerBindings`, and `controllerBindingPresets` are all unchanged
+  data shapes; old projects and old snippets keep loading.
+- The `Controller` popover is unchanged. It still owns learn flow, clear
+  flow, preset save/load/delete, and live gamepad status.
+
+Dead display code removed alongside the markup:
+
+- `ControllerMode._renderBindings`, `_customBindingsCountLabel`,
+  `_renderPresets`, `_presetsCountLabel`, `refreshPresets`,
+  `_bindingLabel`, and the `#ct-status` writes inside
+  `_attachGamepadInput`. The `_attachGamepadInput` subscription no longer
+  listens for the `state` event because the status line is gone.
+- The unused `gamepadButtonInfo` and `midiToNoteName` imports.
+- `CreativeMode._onControllerBindingsChanged` no longer calls
+  `controllerMode.refreshPresets()` (the method is gone).
+
+`instruments.css` drops the corresponding dead rules: the lab header card,
+control group, select, octave label, body, controller, modifier panel,
+binding head/row/button/target/note, fallback row, trigger assignments,
+trigger select, art, image, hotspot, stick, all the `#ct-*` position
+rules, the guide row, and the mobile media queries for those classes. The
+remaining controller-mode block is now a focused header plus a four-cell
+modifier grid.
+
+`refreshBindings()` is intentionally kept as a documented no-op so the
+existing CreativeMode wiring (`controllerMode?.refreshBindings?.()`) does
+not need to change. Future work that wants to surface bindings inside Labs
+can give it real behavior again.
