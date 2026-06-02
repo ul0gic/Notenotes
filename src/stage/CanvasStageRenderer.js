@@ -1,5 +1,6 @@
 import './stage.css';
 
+import { pocketEventPhase } from './StagePocketModel.js';
 import { STAGE_CANVAS_TRACK_LIMIT, STAGE_LIVE_LANE_LIMIT } from './StageModel.js';
 import { stageBlur, stageRenderQuality, stageTrailMs } from './StageRenderQuality.js';
 import { resolveStageView, stageViewNeighbor, stageViewOptionsForMode } from './StageViews.js';
@@ -323,6 +324,8 @@ export class CanvasStageRenderer {
       this._drawPulse(ctx, width, height);
     } else if (this.viewId === 'halo') {
       this._drawHalo(ctx, width, height);
+    } else if (this.viewId === 'pocket') {
+      this._drawPocket(ctx, width, height);
     } else {
       this._drawHighway(ctx, width, height);
       this._drawEvents(ctx, width, height);
@@ -919,6 +922,183 @@ export class CanvasStageRenderer {
       outer: Math.max(110, radius),
       labelRadius: Math.max(126, radius + 28),
     };
+  }
+
+  _pocketGeometry(width, height) {
+    const laneCount = clamp(Math.floor(Number(this.getLaneCount()) || 1), 1, this.maxLanes);
+    const radius = Math.min(width, height) * 0.34;
+    const outer = Math.max(106, radius);
+    const inner = Math.max(38, outer * 0.24);
+    const ringGap = laneCount <= 1 ? 0 : (outer - inner) / Math.max(1, laneCount - 1);
+    const laneRadius = (lane) => laneCount <= 1 ? (inner + outer) / 2 : outer - lane * ringGap;
+    return {
+      laneCount,
+      cx: width * 0.5,
+      cy: height * 0.52,
+      inner,
+      outer,
+      laneRadius,
+    };
+  }
+
+  _drawPocket(ctx, width, height) {
+    const geom = this._pocketGeometry(width, height);
+    const events = this._eventsForFrame();
+    const quality = this._qualityForEvents(events);
+    const now = performance.now();
+    const nowTick = Math.max(0, Math.floor(Number(this.getNowTick()) || 0));
+    const unitTicks = Math.max(1, Number(this.getUnitTicks()) || 480);
+    const decayMs = stageTrailMs(2800, quality);
+    const startOffset = -Math.PI / 2;
+    const laneEnergy = Array.from({ length: geom.laneCount }, (_, index) => ({
+      value: 0,
+      color: '#7bd88f',
+      label: this.getLaneLabel(index),
+      hits: 0,
+    }));
+
+    const pointAt = (phase, radius) => {
+      const angle = startOffset + phase * Math.PI * 2;
+      return {
+        angle,
+        x: geom.cx + Math.cos(angle) * radius,
+        y: geom.cy + Math.sin(angle) * radius,
+      };
+    };
+
+    ctx.save();
+    const field = this._cachedGradient(ctx, 'pocket-field', width, height, () => {
+      const gradient = ctx.createRadialGradient(geom.cx, geom.cy, geom.inner * 0.2, geom.cx, geom.cy, geom.outer * 1.36);
+      gradient.addColorStop(0, 'rgba(255,255,255,0.08)');
+      gradient.addColorStop(0.42, 'rgba(90, 255, 196, 0.09)');
+      gradient.addColorStop(1, 'rgba(0,0,0,0)');
+      return gradient;
+    });
+    ctx.fillStyle = field;
+    ctx.beginPath();
+    ctx.arc(geom.cx, geom.cy, geom.outer * 1.36, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    for (let lane = 0; lane < geom.laneCount; lane += 1) {
+      const r = geom.laneRadius(lane);
+      const strong = lane === 0 || lane === geom.laneCount - 1;
+      ctx.strokeStyle = `rgba(255,255,255,${strong ? 0.17 : 0.075})`;
+      ctx.lineWidth = strong ? 1.4 : 0.7;
+      ctx.beginPath();
+      ctx.arc(geom.cx, geom.cy, r, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    for (let tick = 0; tick < 16; tick += 1) {
+      const phase = tick / 16;
+      const start = pointAt(phase, geom.inner - 8);
+      const end = pointAt(phase, geom.outer + (tick % 4 === 0 ? 18 : 9));
+      const strong = tick % 4 === 0;
+      ctx.strokeStyle = `rgba(255,255,255,${strong ? 0.22 : 0.08})`;
+      ctx.lineWidth = strong ? 1.4 : 0.75;
+      ctx.beginPath();
+      ctx.moveTo(start.x, start.y);
+      ctx.lineTo(end.x, end.y);
+      ctx.stroke();
+    }
+
+    const nowLine = pointAt(0, geom.outer + 24);
+    ctx.strokeStyle = 'rgba(255,255,255,0.62)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(geom.cx, geom.cy - geom.inner + 4);
+    ctx.lineTo(nowLine.x, nowLine.y);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.82)';
+    ctx.font = '800 10px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('NOW', nowLine.x, nowLine.y - 12);
+
+    for (const event of events) {
+      const lane = clamp(event.lane, 0, geom.laneCount - 1);
+      const eventEnd = event._active ? now : (event._visualEndMs || event._visualStartMs || now);
+      const age = Math.max(0, now - eventEnd);
+      const recency = event._active ? 1 : Math.max(0, 1 - age / decayMs);
+      if (recency <= 0) continue;
+
+      const radius = geom.laneRadius(lane);
+      const phase = pocketEventPhase(event, { nowTick, unitTicks });
+      const endTick = event.endTick ?? event.startTick + (event.durationTick || unitTicks * 0.18);
+      const durationPhase = clamp(Math.abs(endTick - event.startTick) / unitTicks, 0.035, 0.92);
+      const color = event.accentColor || event.color || laneEnergy[lane].color;
+      const velocity = event.velocity || 0.8;
+      const glow = event.intensity?.glow ?? 0.35;
+      const alpha = event._active ? 0.92 : 0.28 + recency * 0.54;
+      const point = pointAt(phase, radius);
+      const lineWidth = event.type === 'hit' ? 3 + velocity * 5 : 2.2 + velocity * 3.4 + glow * 2.8;
+
+      laneEnergy[lane].value = Math.max(laneEnergy[lane].value, recency * (0.4 + velocity * 0.42 + glow * 0.25));
+      laneEnergy[lane].color = color;
+      laneEnergy[lane].label = event.label || this.getLaneLabel(lane);
+      laneEnergy[lane].hits += 1;
+
+      ctx.save();
+      ctx.shadowColor = rgba(color, 0.72);
+      ctx.shadowBlur = stageBlur(8 + glow * 24, quality);
+      ctx.strokeStyle = rgba(color, alpha);
+      ctx.lineWidth = lineWidth;
+      if (event.type !== 'hit' && durationPhase > 0.04) {
+        ctx.beginPath();
+        ctx.arc(geom.cx, geom.cy, radius, startOffset + (phase - durationPhase) * Math.PI * 2, startOffset + phase * Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.fillStyle = rgba(color, Math.min(1, alpha + 0.16));
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, event.type === 'hit' ? 5 + velocity * 8 : 4 + velocity * 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      if (event.label && event._active && width > 560 && quality.detail === 'full') {
+        ctx.save();
+        ctx.font = '750 10px system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillStyle = 'rgba(255,255,255,0.78)';
+        ctx.fillText(String(event.label).slice(0, 8), point.x, point.y - 10);
+        ctx.restore();
+      }
+    }
+
+    ctx.fillStyle = 'rgba(255,255,255,0.94)';
+    ctx.font = '850 14px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('POCKET', geom.cx, geom.cy - 8);
+    ctx.fillStyle = 'rgba(255,255,255,0.54)';
+    ctx.font = '750 10px system-ui, sans-serif';
+    const activeCount = laneEnergy.filter(lane => lane.value > 0.08).length;
+    ctx.fillText(`${activeCount} lanes`, geom.cx, geom.cy + 12);
+    ctx.restore();
+
+    if (width > 560 && quality.detail !== 'minimal') {
+      const hot = laneEnergy
+        .map((lane, index) => ({ ...lane, index }))
+        .filter(lane => lane.value > 0.08)
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 5);
+      ctx.save();
+      ctx.font = '800 11px system-ui, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      hot.forEach((lane, index) => {
+        const x = 22;
+        const y = 38 + index * 24;
+        ctx.fillStyle = rgba(lane.color, 0.16 + lane.value * 0.24);
+        this._roundedRect(ctx, x, y - 9, 150, 18, 9);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.82)';
+        ctx.fillText(String(lane.label || this.getLaneLabel(lane.index)).slice(0, 16), x + 10, y);
+      });
+      ctx.restore();
+    }
   }
 
   _drawHalo(ctx, width, height) {

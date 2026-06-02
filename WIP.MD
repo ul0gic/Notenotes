@@ -220,6 +220,10 @@ Shipped first slice:
 - **Halo** is the first tonal live Canvas2D view: it maps live notes onto a
   circle-of-fifths bloom so chords and pitch classes read as harmonic gravity
   instead of lane position.
+- **Pocket** is the first guide-style live Canvas2D view: one clock revolution
+  is the current Stage unit/pulse, lanes become concentric rings, quick hits
+  become timing pips, and held notes become arcs. It is meant to make groove
+  density and placement readable without quantizing or changing playback.
 - Live Stage view switching now has previous/next buttons and left/right swipe
   in addition to the selector.
 - Canvas Stage still uses the horizontal track map only. That view already shows
@@ -239,8 +243,6 @@ Still pending:
 
 Viable future views from Opus/Grok review:
 
-- **Pocket**: groove clock. Strongest guide view for timing, drums, swing, and
-  early/late feel.
 - **Ink/Bloom**: one organic expressive Canvas2D view merging the better parts
   of Sustain Nebula, Ripple Pond, Particle Garden, and Ink. Do not ship four
   separate "pretty particles" views.
@@ -250,11 +252,12 @@ Viable future views from Opus/Grok review:
 
 Open decisions:
 
-- Whether Pocket should be the next Canvas2D view, or whether the next slice
-  should pause new views and optimize shared render paths.
 - Whether WebGL is in scope soon or only architected-for.
 - Whether each future view must support Canvas mode; default should be no unless
   it can show dense track detail better than the existing map.
+- Whether Pocket should grow a stronger early/late reference layer later. The
+  first version only shows placement within the current unit; it does not judge
+  timing or snap anything.
 
 Expected scope:
 

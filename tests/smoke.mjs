@@ -91,6 +91,10 @@ import {
   stageTrailMs,
 } from '../src/stage/StageRenderQuality.js';
 import {
+  pocketEventPhase,
+  pocketLaneAngle,
+} from '../src/stage/StagePocketModel.js';
+import {
   clipTimeScaleBadgeItem,
   clipVisualDurationBars,
   normalizeClipTimeScale,
@@ -757,20 +761,33 @@ test('stage view registry exposes live views without leaking them into canvas st
   assert.equal(resolveStageView('thread').label, 'Thread');
   assert.equal(resolveStageView('pulse').label, 'Pulse');
   assert.equal(resolveStageView('halo').label, 'Halo');
+  assert.equal(resolveStageView('pocket').label, 'Pocket');
 
   const liveIds = stageViewOptionsForMode('live').map(view => view.id);
-  assert.deepEqual(liveIds, ['trace', 'thread', 'pulse', 'halo']);
+  assert.deepEqual(liveIds, ['trace', 'thread', 'pulse', 'halo', 'pocket']);
 
   const canvasIds = stageViewOptionsForMode('canvas').map(view => view.id);
   assert.deepEqual(canvasIds, ['trace']);
+});
+
+test('pocket stage model maps event timing and lanes to stable clock positions', () => {
+  assert.equal(pocketEventPhase({ startTick: 0 }, { nowTick: 0, unitTicks: 480 }), 0);
+  assert.equal(pocketEventPhase({ startTick: 240 }, { nowTick: 0, unitTicks: 480 }), 0.5);
+  assert.equal(pocketEventPhase({ startTick: -120 }, { nowTick: 0, unitTicks: 480 }), 0.75);
+  assert.equal(pocketEventPhase({ startTick: 720 }, { nowTick: 240, unitTicks: 480 }), 0);
+
+  assert.equal(pocketLaneAngle(0, 4), -Math.PI / 2);
+  assert.equal(pocketLaneAngle(1, 4), 0);
+  assert.equal(pocketLaneAngle(3, 4), Math.PI);
 });
 
 test('stage view navigation wraps within the current Stage mode', () => {
   assert.equal(stageViewNeighbor('trace', 'live', 1).id, 'thread');
   assert.equal(stageViewNeighbor('thread', 'live', 1).id, 'pulse');
   assert.equal(stageViewNeighbor('pulse', 'live', 1).id, 'halo');
-  assert.equal(stageViewNeighbor('halo', 'live', 1).id, 'trace');
-  assert.equal(stageViewNeighbor('trace', 'live', -1).id, 'halo');
+  assert.equal(stageViewNeighbor('halo', 'live', 1).id, 'pocket');
+  assert.equal(stageViewNeighbor('pocket', 'live', 1).id, 'trace');
+  assert.equal(stageViewNeighbor('trace', 'live', -1).id, 'pocket');
   assert.equal(stageViewNeighbor('pulse', 'canvas', 1).id, 'trace');
 });
 

@@ -83,6 +83,7 @@ src/main.js
   stage/
     StageEventStream.js     renderer-agnostic live/visual performance events
     StageModel.js           Stage lane limits, intensity tiers, track mapping
+    StagePocketModel.js     Pocket groove-clock timing helpers
     StageRenderQuality.js   Stage render budget for blur, trails, motion
     StageViews.js           Stage view registry and mode filtering
   data/
@@ -792,10 +793,12 @@ moving musical input or transport logic.
   the default `trace` view renders the Create performance highway, `thread`
   renders pitch-contour ribbons where sustain is literal line length and chords
   appear as parallel strands, `pulse` renders radial lane energy for recent
-  rhythm/velocity hits, and `halo` renders circle-of-fifths pitch-class energy
-  so chords bloom as connected tones. Live Stage keeps a longer recent-event tail than the
-  first Stage slice so Thread phrases can travel across the full field instead
-  of disappearing around mid-screen. The Stage view selector is a native
+  rhythm/velocity hits, `halo` renders circle-of-fifths pitch-class energy so
+  chords bloom as connected tones, and `pocket` renders a groove-clock view
+  where one revolution equals the current Stage timing unit. Live Stage keeps a
+  longer recent-event tail than the first Stage slice so Thread phrases can
+  travel across the full field instead of disappearing around mid-screen. The
+  Stage view selector is a native
   `<select>` for footprint/accessibility, but its closed control and option rows
   are explicitly dark-styled because platform defaults can otherwise render a
   white popup against the black Stage chrome. Live mode also has previous/next
@@ -809,6 +812,14 @@ moving musical input or transport logic.
   drum sounds, audio clips render as sustained blocks, and a vertical playhead
   anchors the motion. Keep this split unless a later Three.js renderer can show
   dense Canvas detail without turning into track-level visual noise.
+- `src/stage/StagePocketModel.js` owns Pocket's pure clock math.
+  `pocketEventPhase(event, { nowTick, unitTicks })` maps an event start into
+  the current Stage unit from `0..1`, wrapping safely for old/recent events.
+  `pocketLaneAngle()` exists for stable lane-angle math and smoke coverage. The
+  renderer uses these helpers so Pocket remains a visual guide only: it does
+  not quantize, score, or mutate notes. If a future slice adds early/late
+  judgment, keep that as a separate visual layer and never feed it back into
+  playback.
 - `src/stage/StageRenderQuality.js` is the pure render-budget helper for Stage.
   It never touches audio or transport. `stageRenderQuality()` takes event count,
   lane count, and `prefers-reduced-motion`, then returns a detail tier plus
