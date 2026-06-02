@@ -91,6 +91,7 @@ import {
   stageTrailMs,
 } from '../src/stage/StageRenderQuality.js';
 import {
+  pocketActiveSpan,
   pocketEventPhase,
   pocketLaneAngle,
 } from '../src/stage/StagePocketModel.js';
@@ -779,6 +780,9 @@ test('pocket stage model maps event timing and lanes to stable clock positions',
   assert.equal(pocketLaneAngle(0, 4), -Math.PI / 2);
   assert.equal(pocketLaneAngle(1, 4), 0);
   assert.equal(pocketLaneAngle(3, 4), Math.PI);
+  assert.equal(pocketActiveSpan({ startMs: 1000, currentMs: 1500 }, { unitMs: 1000 }), 0.5);
+  assert.equal(pocketActiveSpan({ startMs: 1000, currentMs: 3500 }, { unitMs: 1000 }), 1);
+  assert.equal(pocketActiveSpan({ startMs: 1000, endMs: 1250, currentMs: 3000 }, { unitMs: 1000 }), 0.25);
 });
 
 test('stage view navigation wraps within the current Stage mode', () => {

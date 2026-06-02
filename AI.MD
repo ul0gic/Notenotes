@@ -815,11 +815,15 @@ moving musical input or transport logic.
 - `src/stage/StagePocketModel.js` owns Pocket's pure clock math.
   `pocketEventPhase(event, { nowTick, unitTicks })` maps an event start into
   the current Stage unit from `0..1`, wrapping safely for old/recent events.
-  `pocketLaneAngle()` exists for stable lane-angle math and smoke coverage. The
-  renderer uses these helpers so Pocket remains a visual guide only: it does
-  not quantize, score, or mutate notes. If a future slice adds early/late
-  judgment, keep that as a separate visual layer and never feed it back into
-  playback.
+  `pocketActiveSpan(event, { currentMs, unitMs })` maps a held or recently
+  released note into an arc length, using the real Stage unit duration supplied
+  by `CreativeMode`/`CanvasMode` (`unitTicks * transport.secondsPerTick`).
+  Held notes must visibly grow around the clock while the user holds them;
+  fixed fallback slivers make Pocket read as broken. `pocketLaneAngle()` exists
+  for stable lane-angle math and smoke coverage. The renderer uses these helpers
+  so Pocket remains a visual guide only: it does not quantize, score, or mutate
+  notes. If a future slice adds early/late judgment, keep that as a separate
+  visual layer and never feed it back into playback.
 - `src/stage/StageRenderQuality.js` is the pure render-budget helper for Stage.
   It never touches audio or transport. `stageRenderQuality()` takes event count,
   lane count, and `prefers-reduced-motion`, then returns a detail tier plus

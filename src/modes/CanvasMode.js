@@ -1924,6 +1924,7 @@ export class CanvasMode {
       getLaneLabel: (index) => this._canvasStageTracks()[index]?.name || `Track ${index + 1}`,
       getNowTick: () => this.transport?.currentTick || 0,
       getUnitTicks: () => stageUnitTicksForMeter(this.transport),
+      getUnitSeconds: () => stageUnitTicksForMeter(this.transport) * (this.transport?.secondsPerTick || 0),
       getEvents: () => stageEventsForCanvasTracks(this.project?.tracks || [], {
         maxTracks: STAGE_CANVAS_TRACK_LIMIT,
         ticksPerBar: this.transport?.ticksPerBar || 1920,

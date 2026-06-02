@@ -295,7 +295,7 @@ Expected:
 - Kit does not show the generic Patch toolbar above its own Kit toolbar.
 - Kit Thread uses the full vertical field rather than bunching all hits at the bottom.
 - Kit Halo reacts to drum hits even though drum recording/export still stores drum hit types, not melodic notes.
-- Pocket shows hits as timing pips and held notes as arcs around the current pulse clock. Kit patterns should read as repeated clock placements, not as random lane flashes.
+- Pocket shows hits as timing pips and held notes as arcs around the current pulse clock. Holding a pad/key should visibly grow the arc instead of leaving a fixed sliver. Kit patterns should read as repeated clock placements, not as random lane flashes.
 - Canvas Stage uses a horizontal track map rather than the Create highway.
 - Canvas Stage respects muted/soloed tracks, caps to the audible lane set, keeps track colors, and shows audio clips as sustained blocks instead of omitting them.
 - Multiple notes or drum sounds inside the same Canvas track appear on separate internal sublanes. A chord should not collapse into one undifferentiated block.

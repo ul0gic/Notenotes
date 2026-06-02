@@ -1,6 +1,6 @@
 import './stage.css';
 
-import { pocketEventPhase } from './StagePocketModel.js';
+import { pocketActiveSpan, pocketEventPhase } from './StagePocketModel.js';
 import { STAGE_CANVAS_TRACK_LIMIT, STAGE_LIVE_LANE_LIMIT } from './StageModel.js';
 import { stageBlur, stageRenderQuality, stageTrailMs } from './StageRenderQuality.js';
 import { resolveStageView, stageViewNeighbor, stageViewOptionsForMode } from './StageViews.js';
@@ -53,6 +53,7 @@ export class CanvasStageRenderer {
     this.getLaneLabel = options.getLaneLabel || ((index) => `Lane ${index + 1}`);
     this.getNowTick = options.getNowTick || (() => 0);
     this.getUnitTicks = options.getUnitTicks || (() => 480);
+    this.getUnitSeconds = options.getUnitSeconds || (() => null);
     this.getInputItems = options.getInputItems || (() => []);
     this.getInputNotice = options.getInputNotice || (() => '');
     this.onInputDown = options.onInputDown || null;
@@ -948,6 +949,8 @@ export class CanvasStageRenderer {
     const now = performance.now();
     const nowTick = Math.max(0, Math.floor(Number(this.getNowTick()) || 0));
     const unitTicks = Math.max(1, Number(this.getUnitTicks()) || 480);
+    const unitSeconds = Number(this.getUnitSeconds?.());
+    const unitMs = Number.isFinite(unitSeconds) && unitSeconds > 0 ? unitSeconds * 1000 : 2000;
     const decayMs = stageTrailMs(2800, quality);
     const startOffset = -Math.PI / 2;
     const laneEnergy = Array.from({ length: geom.laneCount }, (_, index) => ({
@@ -1026,8 +1029,10 @@ export class CanvasStageRenderer {
 
       const radius = geom.laneRadius(lane);
       const phase = pocketEventPhase(event, { nowTick, unitTicks });
-      const endTick = event.endTick ?? event.startTick + (event.durationTick || unitTicks * 0.18);
-      const durationPhase = clamp(Math.abs(endTick - event.startTick) / unitTicks, 0.035, 0.92);
+      const spanPhase = pocketActiveSpan(event, { currentMs: now, unitMs });
+      const endTick = event.endTick ?? event.startTick + (event.durationTick || Math.max(1, Math.round(unitTicks * spanPhase)));
+      const tickPhase = Math.abs(endTick - event.startTick) / unitTicks;
+      const durationPhase = clamp(Math.max(spanPhase, tickPhase), event._active ? 0.08 : 0.035, 1);
       const color = event.accentColor || event.color || laneEnergy[lane].color;
       const velocity = event.velocity || 0.8;
       const glow = event.intensity?.glow ?? 0.35;
@@ -1047,7 +1052,13 @@ export class CanvasStageRenderer {
       ctx.lineWidth = lineWidth;
       if (event.type !== 'hit' && durationPhase > 0.04) {
         ctx.beginPath();
-        ctx.arc(geom.cx, geom.cy, radius, startOffset + (phase - durationPhase) * Math.PI * 2, startOffset + phase * Math.PI * 2);
+        ctx.arc(
+          geom.cx,
+          geom.cy,
+          radius,
+          startOffset + (phase - durationPhase) * Math.PI * 2,
+          startOffset + phase * Math.PI * 2
+        );
         ctx.stroke();
       }
       ctx.fillStyle = rgba(color, Math.min(1, alpha + 0.16));

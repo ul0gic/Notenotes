@@ -1391,6 +1391,7 @@ export class CreativeMode {
       maxLanes: STAGE_LIVE_LANE_LIMIT,
       getNowTick: () => this.transport?.currentTick || 0,
       getUnitTicks: () => stageUnitTicksForMeter(this.transport),
+      getUnitSeconds: () => stageUnitTicksForMeter(this.transport) * (this.transport?.secondsPerTick || 0),
       getInputItems: () => this._stageInputItems(),
       getInputNotice: () => this._stageInputNotice(),
       onInputDown: (index) => this._stageInputDown(index),

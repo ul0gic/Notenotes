@@ -222,8 +222,9 @@ Shipped first slice:
   instead of lane position.
 - **Pocket** is the first guide-style live Canvas2D view: one clock revolution
   is the current Stage unit/pulse, lanes become concentric rings, quick hits
-  become timing pips, and held notes become arcs. It is meant to make groove
-  density and placement readable without quantizing or changing playback.
+  become timing pips, and held notes grow into arcs using the real pulse
+  duration. It is meant to make groove density and placement readable without
+  quantizing or changing playback.
 - Live Stage view switching now has previous/next buttons and left/right swipe
   in addition to the selector.
 - Canvas Stage still uses the horizontal track map only. That view already shows

@@ -27,3 +27,13 @@ export function pocketLaneAngle(laneIndex = 0, laneCount = 1) {
   return -Math.PI / 2 + lane * ((Math.PI * 2) / count);
 }
 
+export function pocketActiveSpan(event = {}, options = {}) {
+  const unitMs = Math.max(120, finiteNumber(options.unitMs, 1000));
+  const rawCurrentMs = options.currentMs ?? event.currentMs;
+  const startMs = finiteNumber(event.startMs ?? event._visualStartMs, finiteNumber(rawCurrentMs, 0));
+  const endMs = finiteNumber(event.endMs ?? event._visualEndMs, finiteNumber(rawCurrentMs, startMs));
+  const currentMs = finiteNumber(rawCurrentMs, endMs);
+  const visualEndMs = event.endMs == null && event._visualEndMs == null ? currentMs : endMs;
+  const elapsedMs = Math.max(0, visualEndMs - startMs);
+  return Math.min(1, elapsedMs / unitMs);
+}
