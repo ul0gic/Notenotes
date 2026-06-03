@@ -8,7 +8,8 @@
     "build": "vite build",
     "test:smoke": "node tests/smoke.mjs",
     "test:audio": "node tests/audioVoiceStress.mjs",
-    "test": "node tests/smoke.mjs && node tests/audioVoiceStress.mjs",
+    "test:export": "node --import ./tests/_loaders/registerCss.mjs tests/exportVoices.mjs",
+    "test": "node tests/smoke.mjs && node tests/audioVoiceStress.mjs && node --import ./tests/_loaders/registerCss.mjs tests/exportVoices.mjs",
     "preview": "vite preview"
   },
   "devDependencies": {

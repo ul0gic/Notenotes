@@ -18,6 +18,8 @@ import { normalizeStereoWidth, panForVoice } from '../engine/StereoWidth.js';
 import { adsrEnvelopeValueAt, createEnvelopeParamCurve } from '../engine/EnvelopeCurves.js';
 import { pickZone, playableMidi } from './sampleZone.js';
 import { humanize } from '../engine/Humanize.js';
+import { periodicWaveCoefficients } from '../engine/AdditiveWave.js';
+import { renderKarplusStrong } from '../engine/KarplusStrong.js';
 
 /** Maximum simultaneous HELD voices (keys currently down). */
 const MAX_VOICES = 8;
@@ -323,6 +325,155 @@ export const PRESETS = {
     gain: 0.36,
     drive: 0.02,
   },
+
+  // --- FM (2-operator) ---
+  // `fm.ratio` = modulator:carrier frequency ratio (integer = harmonic/clean,
+  // non-integer = inharmonic/metallic). `fm.index` = modulation depth; it decays
+  // from `index` toward `index*indexSustain` over `fm.decay` seconds, which is
+  // what makes the attack bright and the body mellow.
+  fm_epiano: {
+    name: 'FM E-Piano',
+    family: 'fm',
+    type: 'fm',
+    oscillator: { type: 'sine', detune: 0 },
+    fm: { ratio: 1, index: 2.6, indexSustain: 0.12, decay: 0.22 },
+    envelope: { attack: 0.002, decay: 1.4, sustain: 0.28, release: 0.45 },
+    filter: { type: 'lowpass', frequency: 9000, Q: 0.5 },
+    keyTrack: 0.12,
+    velocityResponse: { filter: 0.3, drive: 0 },
+    gain: 0.5,
+    drive: 0.02,
+  },
+  fm_bell: {
+    name: 'FM Bell',
+    family: 'fm',
+    type: 'fm',
+    oscillator: { type: 'sine', detune: 0 },
+    fm: { ratio: 1.41, index: 4.2, indexSustain: 0.4, decay: 1.1 },
+    envelope: { attack: 0.001, decay: 2.4, sustain: 0.0, release: 1.4 },
+    filter: { type: 'lowpass', frequency: 11000, Q: 0.4 },
+    gain: 0.42,
+  },
+  fm_glass_bass: {
+    name: 'FM Glass Bass',
+    family: 'fm',
+    type: 'fm',
+    oscillator: { type: 'sine', detune: 0 },
+    fm: { ratio: 0.5, index: 1.6, indexSustain: 0.18, decay: 0.16 },
+    envelope: { attack: 0.004, decay: 0.3, sustain: 0.55, release: 0.18 },
+    filter: { type: 'lowpass', frequency: 2600, Q: 1.4 },
+    keyTrack: 0.2,
+    velocityResponse: { filter: 0.34, drive: 0.04 },
+    gain: 0.5,
+    drive: 0.06,
+  },
+  fm_mallet: {
+    name: 'FM Mallet',
+    family: 'fm',
+    type: 'fm',
+    oscillator: { type: 'sine', detune: 0 },
+    fm: { ratio: 3.5, index: 3.2, indexSustain: 0.0, decay: 0.07 },
+    envelope: { attack: 0.001, decay: 0.5, sustain: 0.0, release: 0.22 },
+    filter: { type: 'lowpass', frequency: 10000, Q: 0.5 },
+    gain: 0.46,
+  },
+
+  // --- Karplus–Strong pluck ---
+  // `pluck.decay` = seconds to ~-60 dB; `pluck.damping` 0 = bright/long,
+  // 1 = dark/short. Amp envelope stays high (sustain 1) so the string's own
+  // decay dominates; release just rounds off note-off.
+  pluck_nylon: {
+    name: 'Nylon Guitar',
+    family: 'pluck',
+    type: 'pluck',
+    oscillator: { type: 'sine', detune: 0 },
+    pluck: { decay: 1.6, damping: 0.5 },
+    envelope: { attack: 0.001, decay: 0.02, sustain: 1, release: 0.12 },
+    filter: { type: 'lowpass', frequency: 6000, Q: 0.6 },
+    gain: 0.6,
+  },
+  pluck_harp: {
+    name: 'Concert Harp (pluck)',
+    family: 'pluck',
+    type: 'pluck',
+    oscillator: { type: 'sine', detune: 0 },
+    pluck: { decay: 2.8, damping: 0.32 },
+    envelope: { attack: 0.001, decay: 0.02, sustain: 1, release: 0.18 },
+    filter: { type: 'lowpass', frequency: 8200, Q: 0.5 },
+    gain: 0.56,
+  },
+  pluck_koto: {
+    name: 'Koto',
+    family: 'pluck',
+    type: 'pluck',
+    oscillator: { type: 'sine', detune: 0 },
+    pluck: { decay: 1.9, damping: 0.42 },
+    envelope: { attack: 0.001, decay: 0.02, sustain: 1, release: 0.14 },
+    filter: { type: 'lowpass', frequency: 7000, Q: 0.7 },
+    gain: 0.58,
+  },
+  pluck_kalimba: {
+    name: 'Kalimba (pluck)',
+    family: 'pluck',
+    type: 'pluck',
+    oscillator: { type: 'sine', detune: 0 },
+    pluck: { decay: 1.1, damping: 0.62 },
+    envelope: { attack: 0.001, decay: 0.02, sustain: 1, release: 0.1 },
+    filter: { type: 'lowpass', frequency: 5200, Q: 0.8 },
+    gain: 0.6,
+  },
+
+  // --- Additive (custom PeriodicWave from harmonic recipes) ---
+  // `oscillator.type: 'custom'` + `oscillator.partials` = harmonic amplitudes,
+  // fundamental first. Shared with the exporter via AdditiveWave so live and
+  // export match exactly.
+  add_organ: {
+    name: 'Additive Organ',
+    family: 'additive',
+    oscillator: { type: 'custom', detune: 0, partials: [1, 0.6, 0.8, 0.4, 0, 0.3, 0, 0.2] },
+    envelope: { attack: 0.006, decay: 0.06, sustain: 0.9, release: 0.09 },
+    filter: { type: 'lowpass', frequency: 9000, Q: 0.4 },
+    unison: { voices: 2, spread: 4 },
+    stereoWidth: 0.18,
+    gain: 0.4,
+  },
+  add_rhodes: {
+    name: 'Additive Rhodes',
+    family: 'additive',
+    oscillator: { type: 'custom', detune: 0, partials: [1, 0, 0, 0.45, 0, 0.2] },
+    envelope: { attack: 0.003, decay: 1.3, sustain: 0.18, release: 0.5 },
+    filter: { type: 'lowpass', frequency: 7000, Q: 0.6 },
+    keyTrack: 0.18,
+    velocityResponse: { filter: 0.34, drive: 0 },
+    gain: 0.46,
+  },
+  add_clarinet: {
+    name: 'Additive Clarinet',
+    family: 'additive',
+    oscillator: { type: 'custom', detune: 0, partials: [1, 0, 0.5, 0, 0.33, 0, 0.25] },
+    envelope: { attack: 0.04, decay: 0.2, sustain: 0.88, release: 0.18 },
+    filter: { type: 'lowpass', frequency: 6000, Q: 0.5 },
+    vibrato: { rate: 5, depth: 4, delay: 0.3 },
+    gain: 0.4,
+  },
+  add_reed: {
+    name: 'Additive Reed',
+    family: 'additive',
+    oscillator: { type: 'custom', detune: 0, partials: [1, 0.5, 0.7, 0.3, 0.4, 0.2, 0.15] },
+    envelope: { attack: 0.02, decay: 0.24, sustain: 0.8, release: 0.2 },
+    filter: { type: 'lowpass', frequency: 6500, Q: 0.6 },
+    unison: { voices: 2, spread: 6 },
+    stereoWidth: 0.2,
+    gain: 0.38,
+  },
+  add_glass: {
+    name: 'Additive Glass',
+    family: 'additive',
+    oscillator: { type: 'custom', detune: 0, partials: [1, 0, 0, 0, 0.5, 0, 0, 0, 0.3] },
+    envelope: { attack: 0.005, decay: 1.6, sustain: 0.1, release: 0.9 },
+    filter: { type: 'lowpass', frequency: 12000, Q: 0.4 },
+    gain: 0.4,
+  },
 };
 
 export class WebAudioSynth {
@@ -375,6 +526,9 @@ export class WebAudioSynth {
       playbackMode: patch.playbackMode || 'gated',
       oscillator: { ...DEFAULT_PATCH.oscillator, ...patch.oscillator },
       oscillator2: patch.oscillator2 ? { ...patch.oscillator2 } : null,
+      // Voice-specific param blocks for the FM and Karplus–Strong pluck voices.
+      fm: patch.fm ? { ...patch.fm } : null,
+      pluck: patch.pluck ? { ...patch.pluck } : null,
       envelope: { ...DEFAULT_PATCH.envelope, ...patch.envelope },
       filter: { ...DEFAULT_PATCH.filter, ...patch.filter },
       gain: patch.gain ?? DEFAULT_PATCH.gain,
@@ -474,7 +628,15 @@ export class WebAudioSynth {
       const gain = ctx.createGain();
       const panner = stereoWidth > 0 && ctx.createStereoPanner ? ctx.createStereoPanner() : null;
       const spreadOffset = voices === 1 ? 0 : ((i / (voices - 1)) - 0.5) * spread;
-      osc.type = oscPatch.type || this.patch.oscillator.type;
+      const oscType = oscPatch.type || this.patch.oscillator.type;
+      if (oscType === 'custom') {
+        // Additive voice: synthesize from a harmonic recipe. setPeriodicWave
+        // replaces the named waveform; the same coefficients are evaluated by
+        // the WAV exporter so live and export match.
+        osc.setPeriodicWave(this._getPeriodicWave(oscPatch.partials || this.patch.oscillator.partials));
+      } else {
+        osc.type = oscType;
+      }
       osc.frequency.setValueAtTime(midiToFreq(midi), now);
       osc.detune.setValueAtTime((oscPatch.detune || 0) + spreadOffset + extraDetune, now);
       gain.gain.setValueAtTime((gainAmount ?? 1) / voices, now);
@@ -487,6 +649,25 @@ export class WebAudioSynth {
       oscillatorOutputs.push(panner || gain);
     }
     return { oscillators, oscillatorGains: oscillatorOutputs };
+  }
+
+  /**
+   * Build (and cache) a PeriodicWave for an additive harmonic recipe. One wave
+   * per distinct recipe is reused across notes. Normalization is disabled so the
+   * browser uses our coefficients verbatim — matching the offline exporter.
+   * @param {number[]} partials harmonic amplitudes, fundamental first
+   */
+  _getPeriodicWave(partials) {
+    const list = (Array.isArray(partials) && partials.length) ? partials : [1];
+    const key = list.join(',');
+    if (!this._waveCache) this._waveCache = new Map();
+    let wave = this._waveCache.get(key);
+    if (!wave) {
+      const { real, imag } = periodicWaveCoefficients(list);
+      wave = this.engine.ctx.createPeriodicWave(real, imag, { disableNormalization: true });
+      this._waveCache.set(key, wave);
+    }
+    return wave;
   }
 
   _createVibrato(oscillators, now) {
@@ -571,6 +752,111 @@ export class WebAudioSynth {
         try { source.stop(stopAt); } catch (_) {}
       }
       // Keep the number of still-ringing voices bounded (rapid-retrigger guard).
+      this._enforceSoundingCap(now);
+      return;
+    }
+
+    if (p.type === 'fm') {
+      // 2-operator FM: a modulator oscillator drives the carrier's frequency. A
+      // fast decay on the modulation index gives the classic clangy-attack →
+      // mellow-body motion. The WAV exporter mirrors the same instantaneous-
+      // frequency math so exports match.
+      const fm = p.fm || {};
+      const ratio = Math.max(0.01, Number(fm.ratio ?? 2));
+      const index = Math.max(0, Number(fm.index ?? 3));
+      const indexSustain = Math.max(0, Math.min(1, Number(fm.indexSustain ?? 0)));
+      const modDecay = Math.max(0.005, Number(fm.decay ?? 0.4));
+      const hf = humanize(0.7);
+      const carrierFreq = midiToFreq(midi);
+      const modFreq = carrierFreq * ratio;
+
+      const carrier = ctx.createOscillator();
+      carrier.type = p.oscillator.type === 'custom' ? 'sine' : (p.oscillator.type || 'sine');
+      carrier.frequency.setValueAtTime(carrierFreq, now);
+      carrier.detune.setValueAtTime((p.oscillator.detune || 0) + hf.detuneCents, now);
+
+      const mod = ctx.createOscillator();
+      mod.type = 'sine';
+      mod.frequency.setValueAtTime(modFreq, now);
+      const modGain = ctx.createGain();
+      const peakDev = index * modFreq; // peak carrier-frequency deviation (Hz)
+      modGain.gain.setValueAtTime(peakDev, now);
+      modGain.gain.setTargetAtTime(peakDev * indexSustain, now, modDecay);
+      mod.connect(modGain);
+      modGain.connect(carrier.frequency);
+
+      const filter = ctx.createBiquadFilter();
+      filter.type = p.filter.type;
+      const baseFilterFreq = this._filterBaseFrequency(midi, velocity);
+      filter.frequency.setValueAtTime(baseFilterFreq, now);
+      this._scheduleFilterEnvelope(filter, baseFilterFreq, now);
+      filter.Q.setValueAtTime(p.filter.Q, now);
+
+      const driveAmount = velocityAdjustedDrive(p.drive, velocity, p.velocityResponse);
+      const drive = driveAmount > 0 ? ctx.createWaveShaper() : null;
+      if (drive) { drive.curve = this._makeDriveCurve(driveAmount); drive.oversample = '2x'; }
+
+      const env = ctx.createGain();
+      this._scheduleAmpEnvelope(env.gain, p.envelope, velocity * hf.gainMul, now);
+
+      const toneInput = drive || filter;
+      carrier.connect(toneInput);
+      if (drive) drive.connect(filter);
+      filter.connect(env);
+      env.connect(this._toneInput || this._output);
+
+      const vibrato = this._createVibrato([carrier], now);
+      carrier.start(now);
+      mod.start(now);
+
+      const voice = { oscillators: [carrier], fmMod: mod, fmModGain: modGain, vibrato, filter, env, midi, startTime: now, velocity };
+      this._registerVoice(voice, midi, carrier);
+      this._enforceSoundingCap(now);
+      return;
+    }
+
+    if (p.type === 'pluck') {
+      // Karplus–Strong plucked string, synthesized into a buffer (works at every
+      // pitch — unlike a live feedback DelayNode loop, which Web Audio mutes for
+      // sub-render-quantum delays) and played back. The same renderer feeds the
+      // WAV exporter, so live and export are identical.
+      const pl = p.pluck || {};
+      const decaySec = Math.max(0.15, Number(pl.decay ?? 1.8));
+      const damping = Math.max(0, Math.min(1, Number(pl.damping ?? 0.5)));
+      const lifetime = decaySec + 0.2;
+
+      const samples = renderKarplusStrong({
+        freq: midiToFreq(midi),
+        sampleRate: ctx.sampleRate,
+        durationSec: lifetime,
+        decaySec,
+        damping,
+        // Velocity is applied once, at the amp envelope (like every other voice),
+        // so the offline exporter can match without double-scaling.
+        velocity: 1,
+      });
+      const buf = ctx.createBuffer(1, samples.length, ctx.sampleRate);
+      buf.getChannelData(0).set(samples);
+      const source = ctx.createBufferSource();
+      source.buffer = buf;
+
+      const filter = ctx.createBiquadFilter();
+      filter.type = p.filter.type;
+      const baseFilterFreq = this._filterBaseFrequency(midi, velocity);
+      filter.frequency.setValueAtTime(baseFilterFreq, now);
+      this._scheduleFilterEnvelope(filter, baseFilterFreq, now);
+      filter.Q.setValueAtTime(p.filter.Q, now);
+
+      const env = ctx.createGain();
+      this._scheduleAmpEnvelope(env.gain, p.envelope, velocity, now);
+
+      source.connect(filter);
+      filter.connect(env);
+      env.connect(this._toneInput || this._output);
+      source.start(now);
+
+      const voice = { source, filter, env, midi, startTime: now, velocity, pluck: true };
+      this._registerVoice(voice, midi, source);
       this._enforceSoundingCap(now);
       return;
     }
@@ -672,6 +958,7 @@ export class WebAudioSynth {
     drop(voice.source); drop(voice.filter); drop(voice.env);
     for (const o of voice.oscillators || []) drop(o);
     for (const o of voice.oscillators2 || []) drop(o);
+    if (voice.fmMod) { drop(voice.fmMod); drop(voice.fmModGain); }
     if (voice.noise) { drop(voice.noise.source); drop(voice.noise.gain); }
     if (voice.vibrato) { drop(voice.vibrato.lfo); drop(voice.vibrato.gain); }
   }
@@ -752,6 +1039,7 @@ export class WebAudioSynth {
     stop(voice.osc); stop(voice.osc2);
     for (const o of voice.oscillators || []) stop(o);
     for (const o of voice.oscillators2 || []) stop(o);
+    if (voice.fmMod) stop(voice.fmMod);
     if (voice.vibrato && voice.vibrato.lfo) stop(voice.vibrato.lfo);
     if (voice.noise) stop(voice.noise.source);
   }

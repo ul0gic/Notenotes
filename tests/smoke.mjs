@@ -336,6 +336,29 @@ test('modern synth presets keep a richer produced-voice floor', () => {
   }
 });
 
+test('Section A voice presets are well-formed (FM, pluck, additive)', () => {
+  const fm = Object.entries(PRESETS).filter(([, p]) => p.family === 'fm');
+  assert.ok(fm.length >= 4, 'at least 4 FM presets');
+  for (const [id, p] of fm) {
+    assert.equal(p.type, 'fm', `${id} declares type fm`);
+    assert.ok(p.fm && Number.isFinite(p.fm.ratio) && Number.isFinite(p.fm.index), `${id} has fm ratio+index`);
+  }
+
+  const pluck = Object.entries(PRESETS).filter(([, p]) => p.family === 'pluck');
+  assert.ok(pluck.length >= 4, 'at least 4 pluck presets');
+  for (const [id, p] of pluck) {
+    assert.equal(p.type, 'pluck', `${id} declares type pluck`);
+    assert.ok(p.pluck && Number.isFinite(p.pluck.decay), `${id} has pluck decay`);
+  }
+
+  const additive = Object.entries(PRESETS).filter(([, p]) => p.family === 'additive');
+  assert.ok(additive.length >= 3, 'at least 3 additive presets');
+  for (const [id, p] of additive) {
+    assert.equal(p.oscillator.type, 'custom', `${id} uses a custom oscillator`);
+    assert.ok(Array.isArray(p.oscillator.partials) && p.oscillator.partials.length >= 2, `${id} has a harmonic recipe`);
+  }
+});
+
 test('velocity response changes timbre without changing legacy patches', () => {
   assert.equal(velocityAdjustedFilterFrequency(2000, 1, null), 2000);
   assert.equal(velocityAdjustedDrive(0.1, 1, null), 0.1);

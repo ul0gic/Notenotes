@@ -289,6 +289,11 @@ const r4 = runStress('gated sample · fast melodic tapping', { patch: makeSample
 const { PRESETS } = await import('../src/instruments/WebAudioSynth.js');
 const r5 = runStress('SYNTH (modern_keys) · fast melodic tapping', { patch: PRESETS.modern_keys, taps: 600 });
 
+// 6-8) The new Section A voice types must also stay bounded + leak-free.
+const r6 = runStress('FM (fm_epiano) · fast melodic tapping', { patch: PRESETS.fm_epiano, taps: 600 });
+const r7 = runStress('PLUCK (pluck_nylon) · fast melodic tapping', { patch: PRESETS.pluck_nylon, taps: 600 });
+const r8 = runStress('ADDITIVE (add_organ) · fast melodic tapping', { patch: PRESETS.add_organ, taps: 600 });
+
 console.log('\n===== assertions =====');
 
 // MAX_SOUNDING_VOICES in WebAudioSynth is 16; allow a tiny slack for the
@@ -297,7 +302,7 @@ console.log('\n===== assertions =====');
 const SOUNDING_CAP = 16;
 const SOUNDING_SLACK = 4;
 
-const all = { r1, r2, r3, r4, r5 };
+const all = { r1, r2, r3, r4, r5, r6, r7, r8 };
 const sampleRuns = { r1, r2, r3, r4 };
 
 for (const [k, r] of Object.entries(all)) {
