@@ -1,0 +1,55 @@
+{
+  "id": "tubular-bells",
+  "name": "Tubular Bells",
+  "icon": "🔔",
+  "category": "Bells",
+  "type": "sample",
+  "source": "VCSL (CC0)",
+  "playbackMode": "oneShot",
+  "gain": 0.5,
+  "brightness": 0.9,
+  "envelope": {
+    "attack": 0.002,
+    "decay": 1.5,
+    "sustain": 0.85,
+    "release": 0.8
+  },
+  "zones": [
+    {
+      "midi": 60,
+      "file": "60.m4a"
+    },
+    {
+      "midi": 62,
+      "file": "62.m4a"
+    },
+    {
+      "midi": 64,
+      "file": "64.m4a"
+    },
+    {
+      "midi": 66,
+      "file": "66.m4a"
+    },
+    {
+      "midi": 68,
+      "file": "68.m4a"
+    },
+    {
+      "midi": 70,
+      "file": "70.m4a"
+    },
+    {
+      "midi": 72,
+      "file": "72.m4a"
+    },
+    {
+      "midi": 74,
+      "file": "74.m4a"
+    },
+    {
+      "midi": 76,
+      "file": "76.m4a"
+    }
+  ]
+}

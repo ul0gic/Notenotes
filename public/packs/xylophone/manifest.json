@@ -1,0 +1,51 @@
+{
+  "id": "xylophone",
+  "name": "Xylophone",
+  "icon": "🎵",
+  "category": "Mallets",
+  "type": "sample",
+  "source": "VCSL (CC0)",
+  "playbackMode": "oneShot",
+  "gain": 0.5,
+  "brightness": 0.95,
+  "envelope": {
+    "attack": 0.001,
+    "decay": 0.5,
+    "sustain": 0.4,
+    "release": 0.3
+  },
+  "zones": [
+    {
+      "midi": 67,
+      "file": "67.m4a"
+    },
+    {
+      "midi": 72,
+      "file": "72.m4a"
+    },
+    {
+      "midi": 79,
+      "file": "79.m4a"
+    },
+    {
+      "midi": 84,
+      "file": "84.m4a"
+    },
+    {
+      "midi": 91,
+      "file": "91.m4a"
+    },
+    {
+      "midi": 96,
+      "file": "96.m4a"
+    },
+    {
+      "midi": 103,
+      "file": "103.m4a"
+    },
+    {
+      "midi": 108,
+      "file": "108.m4a"
+    }
+  ]
+}

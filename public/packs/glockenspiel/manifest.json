@@ -1,0 +1,43 @@
+{
+  "id": "glockenspiel",
+  "name": "Glockenspiel",
+  "icon": "✨",
+  "category": "Mallets",
+  "type": "sample",
+  "source": "VCSL (CC0)",
+  "playbackMode": "oneShot",
+  "gain": 0.5,
+  "brightness": 0.95,
+  "envelope": {
+    "attack": 0.001,
+    "decay": 0.8,
+    "sustain": 0.7,
+    "release": 0.5
+  },
+  "zones": [
+    {
+      "midi": 79,
+      "file": "79.m4a"
+    },
+    {
+      "midi": 84,
+      "file": "84.m4a"
+    },
+    {
+      "midi": 91,
+      "file": "91.m4a"
+    },
+    {
+      "midi": 96,
+      "file": "96.m4a"
+    },
+    {
+      "midi": 103,
+      "file": "103.m4a"
+    },
+    {
+      "midi": 108,
+      "file": "108.m4a"
+    }
+  ]
+}

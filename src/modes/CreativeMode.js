@@ -6,6 +6,7 @@
 
 import '../modes/creative.css';
 import { WebAudioSynth, PRESETS, SOUND_TRAITS, normalizeSoundTraits } from '../instruments/WebAudioSynth.js';
+import { loadSampleIndex, loadSampleInstrument } from '../instruments/SamplePack.js';
 import {
   degreeForMidi,
   midiToNoteName,
@@ -233,6 +234,8 @@ export class CreativeMode {
     this._recordArmed = false;
     this.onRecordArmChanged = null;
     this._activePatchId = 'chip_lead';
+    this._sampleIndex = null;
+    loadSampleIndex().then((idx) => { this._sampleIndex = idx; }).catch(() => {});
     this._currentToneTraits = this._currentToneTraits || null;
     this._stageOverlay = null;
     this._stageHeldNotes = new Map();
@@ -613,6 +616,10 @@ export class CreativeMode {
       const instrument = this._customInstruments().find(item => item.id === id.slice(7));
       return instrument?.name || 'Custom instrument';
     }
+    if (id?.startsWith?.('builtin:')) {
+      const inst = (this._sampleIndex || []).find(item => item.id === id.slice(8));
+      return inst?.name || 'Sample instrument';
+    }
     return PRESETS[id]?.name || PRESETS.chip_lead.name;
   }
 
@@ -631,6 +638,20 @@ export class CreativeMode {
       { id: 'chip', label: 'Chip presets', items: chipPresets.map(presetItem) },
       { id: 'modern', label: 'Modern presets', items: modernPresets.map(presetItem) },
     ];
+    const builtinSamples = this._sampleIndex || [];
+    if (builtinSamples.length) {
+      groups.push({
+        id: 'builtin-sample',
+        label: 'Sample instruments',
+        items: builtinSamples.map(inst => ({
+          value: `builtin:${inst.id}`,
+          label: inst.name,
+          kicker: inst.category ? `${inst.category} - CC0 sample` : 'CC0 sample',
+          description: 'Multi-sampled real instrument (loads on first use)',
+          tags: ['sample', inst.category, inst.name].filter(Boolean),
+        })),
+      });
+    }
     if (custom.length) {
       groups.push({
         id: 'custom',
@@ -657,8 +678,9 @@ export class CreativeMode {
     return bits.join(' - ') || 'Simple synth patch';
   }
 
-  _openPatchPicker(anchor) {
+  async _openPatchPicker(anchor) {
     if (this.activeInstrument === INSTRUMENTS.KIT) return;
+    if (!this._sampleIndex) { try { this._sampleIndex = await loadSampleIndex(); } catch (_) {} }
     this._patchPicker?.close();
     this._patchPicker = new ChoicePicker({
       title: 'Choose Instrument',
@@ -769,6 +791,8 @@ export class CreativeMode {
         return;
       }
       await this._loadSamplePatch(instrument);
+    } else if (id.startsWith('builtin:')) {
+      await this._loadBuiltinSamplePatch(id.slice(8));
     } else {
       const patch = PRESETS[id];
       if (patch) this.synth.loadPatch(patch);
@@ -809,6 +833,18 @@ export class CreativeMode {
     } catch (err) {
       console.warn('[CreativeMode] Custom instrument load failed:', err);
       showToast(err?.message || 'Custom instrument failed to load');
+    }
+  }
+
+  async _loadBuiltinSamplePatch(id) {
+    try {
+      if (!this.engine?.ctx) this.engine?.initSync?.();
+      const patch = await loadSampleInstrument(id);
+      this.synth.loadPatch(patch);
+      showToast(`Instrument loaded: ${patch.name}`);
+    } catch (err) {
+      console.warn('[CreativeMode] Built-in sample load failed:', err);
+      showToast('Sample instrument failed to load');
     }
   }
 

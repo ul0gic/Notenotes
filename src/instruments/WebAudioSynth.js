@@ -16,6 +16,7 @@ import {
 } from '../engine/VelocityResponse.js';
 import { normalizeStereoWidth, panForVoice } from '../engine/StereoWidth.js';
 import { adsrEnvelopeValueAt, createEnvelopeParamCurve } from '../engine/EnvelopeCurves.js';
+import { pickZone } from './sampleZone.js';
 
 /** Maximum simultaneous voices */
 const MAX_VOICES = 8;
@@ -348,6 +349,7 @@ export class WebAudioSynth {
       schemaVersion: patch.schemaVersion || DEFAULT_PATCH.schemaVersion,
       type: patch.type || 'synth',
       sampleBuffer: patch.sampleBuffer || null,
+      sampleMap: patch.sampleMap || null,
       rootMidi: patch.rootMidi ?? 60,
       playbackMode: patch.playbackMode || 'gated',
       oscillator: { ...DEFAULT_PATCH.oscillator, ...patch.oscillator },
@@ -509,10 +511,14 @@ export class WebAudioSynth {
     const now = atTime !== undefined ? atTime : ctx.currentTime;
     const p = this.patch;
 
-    if (p.type === 'sample' && p.sampleBuffer) {
+    if (p.type === 'sample' && (p.sampleBuffer || (p.sampleMap && p.sampleMap.length))) {
+      const zone = (p.sampleMap && p.sampleMap.length) ? pickZone(p.sampleMap, midi) : null;
+      const sampleBuffer = zone ? zone.buffer : p.sampleBuffer;
+      const sampleRoot = zone ? zone.rootMidi : (p.rootMidi ?? 60);
+      if (!sampleBuffer) return;
       const source = ctx.createBufferSource();
-      source.buffer = p.sampleBuffer;
-      source.playbackRate.setValueAtTime(Math.pow(2, (midi - (p.rootMidi ?? 60)) / 12), now);
+      source.buffer = sampleBuffer;
+      source.playbackRate.setValueAtTime(Math.pow(2, (midi - sampleRoot) / 12), now);
 
       const filter = ctx.createBiquadFilter();
       filter.type = p.filter.type;
@@ -534,7 +540,7 @@ export class WebAudioSynth {
       this._voiceQueue.push(midi);
 
       if (p.playbackMode === 'oneShot') {
-        const stopAt = now + (p.sampleBuffer.duration / source.playbackRate.value) + 0.05;
+        const stopAt = now + (sampleBuffer.duration / source.playbackRate.value) + 0.05;
         source.stop(stopAt);
         source.addEventListener('ended', () => {
           this._voices.delete(midi);
