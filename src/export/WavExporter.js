@@ -12,7 +12,7 @@ import {
 } from '../engine/VelocityResponse.js';
 import { normalizeStereoWidth, normalizeTrackPan, panForVoice, stereoGainsForPan } from '../engine/StereoWidth.js';
 import { normalizeWavChannelMode } from './WavChannelMode.js';
-import { pickZone } from '../instruments/sampleZone.js';
+import { pickZone, playableMidi } from '../instruments/sampleZone.js';
 
 const SAMPLE_PACKS_BASE = `${(import.meta.env && import.meta.env.BASE_URL) || '/'}packs`;
 
@@ -629,10 +629,11 @@ async function decodeBuiltinInstrument(id) {
 /** Render a MIDI snippet through a multi-zone built-in pack (nearest-zone per note). */
 function renderMidiWithBuiltinSample(target, snippet, pack, startSec, bpm, gain = 1, options = {}) {
   for (const note of snippet.notes || []) {
-    const zone = pickZone(pack.zones, note.pitch || 60);
+    const playPitch = playableMidi(pack.zones, note.pitch || 60);
+    const zone = pickZone(pack.zones, playPitch);
     if (!zone) continue;
     const inst = { ...pack.meta, rootMidi: zone.rootMidi };
-    renderSampleNote(target, zone.decoded, inst, note, startSec, bpm, gain, options);
+    renderSampleNote(target, zone.decoded, inst, { ...note, pitch: playPitch }, startSec, bpm, gain, options);
   }
 }
 

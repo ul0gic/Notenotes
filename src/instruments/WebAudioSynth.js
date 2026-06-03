@@ -16,7 +16,7 @@ import {
 } from '../engine/VelocityResponse.js';
 import { normalizeStereoWidth, panForVoice } from '../engine/StereoWidth.js';
 import { adsrEnvelopeValueAt, createEnvelopeParamCurve } from '../engine/EnvelopeCurves.js';
-import { pickZone } from './sampleZone.js';
+import { pickZone, playableMidi } from './sampleZone.js';
 
 /** Maximum simultaneous voices */
 const MAX_VOICES = 8;
@@ -512,13 +512,17 @@ export class WebAudioSynth {
     const p = this.patch;
 
     if (p.type === 'sample' && (p.sampleBuffer || (p.sampleMap && p.sampleMap.length))) {
-      const zone = (p.sampleMap && p.sampleMap.length) ? pickZone(p.sampleMap, midi) : null;
+      const hasMap = !!(p.sampleMap && p.sampleMap.length);
+      // Fold notes far outside the sampled range back in by octaves, so every note
+      // stays audible (and in key) rather than pitched into near-silence.
+      const playMidi = hasMap ? playableMidi(p.sampleMap, midi) : midi;
+      const zone = hasMap ? pickZone(p.sampleMap, playMidi) : null;
       const sampleBuffer = zone ? zone.buffer : p.sampleBuffer;
       const sampleRoot = zone ? zone.rootMidi : (p.rootMidi ?? 60);
       if (!sampleBuffer) return;
       const source = ctx.createBufferSource();
       source.buffer = sampleBuffer;
-      source.playbackRate.setValueAtTime(Math.pow(2, (midi - sampleRoot) / 12), now);
+      source.playbackRate.setValueAtTime(Math.pow(2, (playMidi - sampleRoot) / 12), now);
 
       const filter = ctx.createBiquadFilter();
       filter.type = p.filter.type;

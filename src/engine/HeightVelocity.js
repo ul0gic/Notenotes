@@ -18,8 +18,9 @@ function clamp01(v) { return Math.max(0, Math.min(1, v)); }
 
 /** Map a vertical fraction (0 = top of element) to a snapped velocity. Bottom is loudest. */
 export function velocityForFraction(fractionFromTop) {
-  const fromBottom = 1 - clamp01(fractionFromTop);
-  const idx = Math.min(HEIGHT_VELOCITY_ZONES - 1, Math.floor(fromBottom * HEIGHT_VELOCITY_ZONES));
+  // fractionFromTop is 0 at the top of the pad/key, 1 at the bottom. Striking lower
+  // (bottom) should be louder, so velocity rises with fractionFromTop.
+  const idx = Math.min(HEIGHT_VELOCITY_ZONES - 1, Math.floor(clamp01(fractionFromTop) * HEIGHT_VELOCITY_ZONES));
   return HEIGHT_VELOCITY_LEVELS[idx];
 }
 
