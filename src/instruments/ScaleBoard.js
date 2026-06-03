@@ -32,6 +32,8 @@ import {
 import { scaleChordRecipes } from '../engine/ScaleChords.js';
 import { activeProgressionResolution, normalizeProgressionGlow } from '../engine/Progressions.js';
 import { normalizePadLayout, normalizePadMode, recommendedPadColumns } from '../engine/PadLayout.js';
+import { velocityFromPointer, HEIGHT_VELOCITY_ZONES } from '../engine/HeightVelocity.js';
+import './heightVelocity.css';
 import { showToast } from '../ui/Toast.js';
 import { syllabify, extractPlayableSyllables, sanitizePhraseInput } from './voice/syllabify.js';
 import { dwellSettings, tremorAllows } from '../ui/AccessibilityProfiles.js';
@@ -261,7 +263,7 @@ export class ScaleBoard {
         ? this._renderCompass()
         : this.padMode === 'step'
           ? this._renderStepPlay()
-        : `<div class="scaleboard__pads${this._padGridMetrics().compact ? ' scaleboard__pads--compact' : ''}" id="sb-pads" style="${this._padGridStyle()}">
+        : `<div class="scaleboard__pads${this._padGridMetrics().compact ? ' scaleboard__pads--compact' : ''}${this._heightVelocityActive() ? ' scaleboard__pads--velocity' : ''}" id="sb-pads" style="${this._padGridStyle()}">
             ${this._renderPads()}
           </div>`}
     `;
@@ -392,6 +394,7 @@ export class ScaleBoard {
 
   _renderPads() {
     const layout = normalizePadLayout(this.project?.settings?.padLayout, this._notes.length);
+    const velGrid = this._heightVelocityActive() ? this._velocityGridlinesMarkup() : '';
     return this._notes.map((midi, i) => {
       const noteInfo = midiToNoteName(midi);
       const curatedChord = this._curatedChordRecipe(i);
@@ -428,7 +431,7 @@ export class ScaleBoard {
       return `
         <button class="scaleboard__pad${voiceClass}${degreeClass}${progressionClass}"${padStyle} data-size="${this._escapeAttr(padSize)}" data-index="${i}" data-midi="${midi}"
                 aria-label="${isRootMode ? `${noteInfo.display} plus nearest ${this.rootNote}, ${rootInfo.display}` : curatedChord ? `${curatedChord.label} chord, ${curatedChord.name}` : `Scale degree ${degree}, ${noteInfo.display}`}${theoryLabel}${voiceLabel ? ', sings ' + voiceLabel : ''}">
-          <span class="scaleboard__pad-degree">${isRootMode ? noteInfo.name : (curatedChord?.label || degree)}</span>
+          ${velGrid}<span class="scaleboard__pad-degree">${isRootMode ? noteInfo.name : (curatedChord?.label || degree)}</span>
           <span class="scaleboard__pad-note">${noteInfo.display}</span>
           ${degreeLabel ? `<span class="scaleboard__pad-degree-name">${this._escapeHtml(degreeLabel)}</span>` : ''}
           ${(isRootMode || curatedChord) ? `<span class="scaleboard__pad-type">${this._escapeHtml(typeLabel)}</span>` : ''}
@@ -1202,7 +1205,8 @@ export class ScaleBoard {
         if (!tremorAllows(this.project, `scale:${this.padMode}:${i}`)) return;
 
         pad.setPointerCapture(e.pointerId);
-        this.pressPad(i);
+        const velocity = this._heightVelocityActive() ? (velocityFromPointer(e, pad) ?? 0.8) : 0.8;
+        this.pressPad(i, velocity);
       });
 
       pad.addEventListener('pointerenter', () => {
@@ -1282,7 +1286,7 @@ export class ScaleBoard {
     this._activeCompassChords.delete(id);
   }
 
-  pressPad(index) {
+  pressPad(index, velocity = 0.8) {
     if (this.padMode === 'step') {
       this.triggerStepPlay();
       return;
@@ -1304,7 +1308,7 @@ export class ScaleBoard {
       const rootMidi = this._rootMidiNear(midi);
       const midis = rootMidi === midi ? [midi] : [midi, rootMidi];
       this._activeRootDyads.set(index, midis);
-      midis.forEach(m => this._noteOn(m));
+      midis.forEach(m => this._noteOn(m, velocity));
       return;
     }
 
@@ -1312,9 +1316,9 @@ export class ScaleBoard {
     if (isChord) {
       const chordMidis = this._getChordMidis(index);
       this._activeChords.set(index, chordMidis);
-      chordMidis.forEach(m => this._noteOn(m));
+      chordMidis.forEach(m => this._noteOn(m, velocity));
     } else {
-      this._noteOn(midi);
+      this._noteOn(midi, velocity);
     }
   }
 
@@ -1565,11 +1569,22 @@ export class ScaleBoard {
     if (this.el) this._refreshPads();
   }
 
-  _noteOn(midi) {
+  _noteOn(midi, velocity = 0.8) {
     if (this._onBeforeNoteOn) this._onBeforeNoteOn();
-    this.synth.noteOn(midi);
+    this.synth.noteOn(midi, velocity);
     this._activePads.add(midi);
-    if (this._onNoteOn) this._onNoteOn(midi, 0.8);
+    if (this._onNoteOn) this._onNoteOn(midi, velocity);
+  }
+
+  _heightVelocityActive() {
+    const s = this.project?.settings || {};
+    return s.padLayout?.template === 'velocity' || !!(s.labs && s.labs.heightVelocity);
+  }
+
+  _velocityGridlinesMarkup() {
+    let html = '<span class="scaleboard__pad-velgrid" aria-hidden="true">';
+    for (let z = 0; z < HEIGHT_VELOCITY_ZONES; z++) html += '<span class="scaleboard__pad-velzone"></span>';
+    return `${html}</span>`;
   }
 
   _noteOff(midi) {

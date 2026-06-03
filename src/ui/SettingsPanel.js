@@ -189,6 +189,16 @@ export class SettingsPanel {
         </div>
 
         <div class="settings-group">
+          <h3 class="settings-group__title">Labs</h3>
+          <p class="settings-desc">Experimental, off by default. Labs features never change how existing instruments already behave.</p>
+          <div class="settings-row" style="justify-content: flex-start; gap: 10px;">
+            <input type="checkbox" id="setting-height-velocity" ${this.project?.settings?.labs?.heightVelocity ? 'checked' : ''} />
+            <label class="settings-label" for="setting-height-velocity">Height Velocity</label>
+          </div>
+          <p class="settings-desc">Split each pad and piano key into four height zones — strike lower to play louder (20/40/70/99%). Also available as the "Velocity" pad layout.</p>
+        </div>
+
+        <div class="settings-group">
           <h3 class="settings-group__title">Install App</h3>
           <p class="settings-desc">Install Notenotes from your browser for an app-window experience. In Chrome, open the three-dot menu, then Cast, save, and share, then Install page as app. Edge uses Apps, then Install this site as an app. Safari uses Share, then Add to Home Screen.</p>
           <div class="settings-row">
@@ -627,6 +637,17 @@ export class SettingsPanel {
         console.info('[Notenotes Debug] Debug logs disabled');
         showToast('Debug logs disabled');
       }
+    });
+
+    body.querySelector('#setting-height-velocity')?.addEventListener('change', (e) => {
+      if (!this.project) return;
+      this.project.settings ||= {};
+      this.project.settings.labs = { ...(this.project.settings.labs || {}), heightVelocity: e.target.checked };
+      this.store?.scheduleAutoSave(this.project);
+      // Refresh pad + piano surfaces so the zones/gridlines apply immediately.
+      window.dispatchEvent(new CustomEvent('settings-pads-changed'));
+      window.dispatchEvent(new CustomEvent('settings-piano-changed'));
+      showToast(e.target.checked ? 'Height Velocity on' : 'Height Velocity off');
     });
 
     // Metronome volume

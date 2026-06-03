@@ -6,6 +6,7 @@
 import { correctMidiToScale, degreeForMidi, normalizeDegreeHighlighting, normalizeMusicalContext } from '../engine/MusicTheory.js';
 import { activeProgressionResolution, normalizeProgressionGlow } from '../engine/Progressions.js';
 import { dwellSettings, tremorAllows } from '../ui/AccessibilityProfiles.js';
+import { velocityFromPointer } from '../engine/HeightVelocity.js';
 
 export class MicroPiano {
   constructor(synth, project) {
@@ -240,7 +241,7 @@ export class MicroPiano {
         if (this._onControllerLearnTarget?.(this._controllerLearnTargetForMidi(midi))) return;
         if (!tremorAllows(this.project, `piano:${midi}`)) return;
         key.setPointerCapture(e.pointerId);
-        this.pressMidi(midi);
+        this.pressMidi(midi, this._heightVelocityActive() ? (velocityFromPointer(e, key) ?? 0.8) : 0.8);
       });
 
       key.addEventListener('pointerenter', () => {
@@ -331,8 +332,12 @@ export class MicroPiano {
     this._refreshAll();
   }
 
-  pressMidi(midi) {
-    return this._pressResolvedMidi(midi, 0.8, { source: 'piano', correct: true, requireVisibleInput: true });
+  pressMidi(midi, velocity = 0.8) {
+    return this._pressResolvedMidi(midi, velocity, { source: 'piano', correct: true, requireVisibleInput: true });
+  }
+
+  _heightVelocityActive() {
+    return !!this.project?.settings?.labs?.heightVelocity;
   }
 
   pressControllerMidi(midi, velocity = 0.8, options = {}) {
@@ -358,7 +363,7 @@ export class MicroPiano {
     const count = this._activeKeyCounts.get(midi) || 0;
     const key = this.el?.querySelector(`.micropiano__key[data-midi="${midi}"]`);
     if (count === 0) {
-      this.synth.noteOn(midi);
+      this.synth.noteOn(midi, velocity);
       if (key) key.classList.add('is-active');
       this._activeKeys.add(midi);
       if (this._onNoteOn) this._onNoteOn(midi, velocity);
