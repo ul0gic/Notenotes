@@ -628,10 +628,21 @@ export class CreativeMode {
     const custom = this._customInstruments().filter(instrument => instrument.type === 'patch');
     const chipPresets = Object.entries(PRESETS).filter(([, p]) => (p.family || 'chip') === 'chip');
     const modernPresets = Object.entries(PRESETS).filter(([, p]) => p.family === 'modern');
+    const characterFamilies = new Set(['fm', 'pluck', 'additive']);
+    const characterPresets = Object.entries(PRESETS).filter(([, p]) => characterFamilies.has(p.family));
+    const familyKicker = (p) => {
+      switch (p.family) {
+        case 'fm': return 'FM synth';
+        case 'pluck': return 'Plucked string';
+        case 'additive': return 'Additive synth';
+        case 'modern': return 'Modern synth';
+        default: return 'Chip synth';
+      }
+    };
     const presetItem = ([key, patch]) => ({
       value: key,
       label: patch.name,
-      kicker: (patch.family || 'chip') === 'modern' ? 'Modern synth' : 'Chip synth',
+      kicker: familyKicker(patch),
       description: this._patchDescription(patch),
       tags: [patch.oscillator?.type, patch.filter?.type, patch.family].filter(Boolean),
     });
@@ -639,6 +650,9 @@ export class CreativeMode {
       { id: 'chip', label: 'Chip presets', items: chipPresets.map(presetItem) },
       { id: 'modern', label: 'Modern presets', items: modernPresets.map(presetItem) },
     ];
+    if (characterPresets.length) {
+      groups.push({ id: 'character', label: 'Character synths (FM · Pluck · Additive)', items: characterPresets.map(presetItem) });
+    }
     const builtinSamples = this._sampleIndex || [];
     if (builtinSamples.length) {
       groups.push({
@@ -673,7 +687,10 @@ export class CreativeMode {
 
   _patchDescription(patch = {}) {
     const bits = [];
-    if (patch.oscillator?.type) bits.push(patch.oscillator.type);
+    if (patch.type === 'fm') bits.push('2-op FM');
+    else if (patch.type === 'pluck') bits.push('plucked string');
+    else if (patch.oscillator?.type === 'custom') bits.push('additive');
+    else if (patch.oscillator?.type) bits.push(patch.oscillator.type);
     if (patch.unison?.voices) bits.push(`${patch.unison.voices}-voice unison`);
     if (patch.filterEnv) bits.push('filter motion');
     if (patch.vibrato) bits.push('vibrato');
