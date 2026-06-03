@@ -103,6 +103,14 @@ export class AudioEngine {
     if (this.ctx.state === 'suspended') {
       this.ctx.resume().catch(() => {});
     }
+    // The silent "nudge" only needs to fire occasionally to keep iOS/WebKit
+    // audio routed. Creating a fresh oscillator on EVERY note press (e.g. rapid
+    // tapping) is needless audio-thread churn, so throttle it to ~4x/second.
+    const nowMs = (typeof performance !== 'undefined' && performance.now)
+      ? performance.now()
+      : Date.now();
+    if (this._lastUnlockNudgeMs !== undefined && (nowMs - this._lastUnlockNudgeMs) < 250) return;
+    this._lastUnlockNudgeMs = nowMs;
     try {
       const source = this.ctx.createOscillator();
       const gain = this.ctx.createGain();

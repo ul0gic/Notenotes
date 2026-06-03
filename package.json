@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "test:smoke": "node tests/smoke.mjs",
+    "test:audio": "node tests/audioVoiceStress.mjs",
+    "test": "node tests/smoke.mjs && node tests/audioVoiceStress.mjs",
     "preview": "vite preview"
   },
   "devDependencies": {

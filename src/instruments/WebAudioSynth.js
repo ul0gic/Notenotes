@@ -19,8 +19,24 @@ import { adsrEnvelopeValueAt, createEnvelopeParamCurve } from '../engine/Envelop
 import { pickZone, playableMidi } from './sampleZone.js';
 import { humanize } from '../engine/Humanize.js';
 
-/** Maximum simultaneous voices */
+/** Maximum simultaneous HELD voices (keys currently down). */
 const MAX_VOICES = 8;
+
+/**
+ * Hard cap on concurrently-SOUNDING voices (held + still releasing). A noteOff
+ * removes a voice from `_voices` immediately, but its source keeps playing until
+ * its scheduled stop (release tail). Without a cap on the still-ringing voices,
+ * rapid tapping piles up dozens of full-volume sources that the audio render
+ * thread must keep mixing — which can overload the thread and crash the tab on
+ * Windows Chrome (STATUS_BREAKPOINT). 16 is far above any musical need but well
+ * under the danger zone, so normal playing is never affected.
+ */
+const MAX_SOUNDING_VOICES = 16;
+
+/** Fast release (seconds) for stolen / over-cap voices — quick but click-free. */
+const FAST_STEAL_RELEASE = 0.05;
+/** Release (seconds) applied to the previous copy when the same note retriggers. */
+const FAST_RETRIGGER_RELEASE = 0.06;
 
 export const SOUND_TRAITS = {
   crush: { id: 'crush', name: 'Crush', hint: 'Blocky bitcrush edge', defaultAmount: 0.35 },
@@ -314,10 +330,14 @@ export class WebAudioSynth {
     this.engine = AudioEngine.getInstance();
     /** @type {GainNode|null} */
     this._output = null;
-    /** Active voice map: midi note → voice object */
+    /** Active HELD voice map: midi note → voice object */
     this._voices = new Map();
-    /** Voice queue for stealing */
+    /** Voice queue for stealing (oldest-held first) */
     this._voiceQueue = [];
+    /** Voices that were released/stolen but whose sources are still ringing out. */
+    this._releasing = new Set();
+    /** One-time guard so the rapid-retrigger throttle warning logs only once. */
+    this._floodWarned = false;
     /** Current patch */
     this.patch = { ...DEFAULT_PATCH };
     this.soundTraits = defaultSoundTraits();
@@ -495,22 +515,22 @@ export class WebAudioSynth {
     this.engine.unlockGesture?.();
     if (!this._output) return;
 
-    // If this note is already playing, stop it first
-    if (this._voices.has(midi)) {
-      this.noteOff(midi);
-    }
-
-    // Voice stealing if at max polyphony
-    if (this._voices.size >= MAX_VOICES) {
-      const oldest = this._voiceQueue.shift();
-      if (oldest !== undefined) {
-        this.noteOff(oldest);
-      }
-    }
-
     const ctx = this.engine.ctx;
     const now = atTime !== undefined ? atTime : ctx.currentTime;
     const p = this.patch;
+
+    // If this note is already playing, release the old copy quickly so a fast
+    // retrigger doesn't leave a full-length duplicate ringing out.
+    if (this._voices.has(midi)) {
+      this._releaseVoice(this._voices.get(midi), now, FAST_RETRIGGER_RELEASE);
+    }
+
+    // Voice stealing at max HELD polyphony — a stolen voice yields fast.
+    if (this._voices.size >= MAX_VOICES) {
+      const oldest = this._voiceQueue.shift();
+      const stolen = oldest !== undefined ? this._voices.get(oldest) : null;
+      if (stolen) this._releaseVoice(stolen, now, FAST_STEAL_RELEASE);
+    }
 
     if (p.type === 'sample' && (p.sampleBuffer || (p.sampleMap && p.sampleMap.length))) {
       const hasMap = !!(p.sampleMap && p.sampleMap.length);
@@ -541,27 +561,17 @@ export class WebAudioSynth {
       source.start(now);
 
       const voice = { source, filter, env, midi, startTime: now, velocity, sample: true };
-      this._voices.set(midi, voice);
-      this._voiceQueue.push(midi);
-
-      // Always clean up when the sample finishes OR is stopped (gated + oneShot).
-      // Without this, fast retriggering piles up BufferSource/filter/gain nodes
-      // faster than GC frees them, which can crash the tab (STATUS_BREAKPOINT/OOM).
-      // The identity guard stops a finishing old voice from evicting a newer one
-      // that reused the same midi key.
-      source.addEventListener('ended', () => {
-        if (this._voices.get(midi) === voice) {
-          this._voices.delete(midi);
-          const queueIdx = this._voiceQueue.indexOf(midi);
-          if (queueIdx !== -1) this._voiceQueue.splice(queueIdx, 1);
-        }
-        this._disposeVoiceNodes(voice);
-      }, { once: true });
+      // Register + wire identity-guarded teardown on the source's 'ended' event.
+      // Without prompt teardown, fast retriggering piles up BufferSource/filter/
+      // gain nodes faster than GC frees them (STATUS_BREAKPOINT/OOM).
+      this._registerVoice(voice, midi, source);
 
       if (p.playbackMode === 'oneShot') {
         const stopAt = now + (sampleBuffer.duration / source.playbackRate.value) + 0.05;
         try { source.stop(stopAt); } catch (_) {}
       }
+      // Keep the number of still-ringing voices bounded (rapid-retrigger guard).
+      this._enforceSoundingCap(now);
       return;
     }
 
@@ -607,24 +617,12 @@ export class WebAudioSynth {
     for (const osc of oscillators.concat(oscillators2)) osc.start(now);
     if (noise) noise.source.start(now);
 
-    // Store voice
+    // Store voice. Dispose nodes once the voice's first oscillator stops (via
+    // noteOff / stealing / panic), mirroring the sample path so rapid
+    // retriggering can't pile up nodes.
     const voice = { oscillators, oscillators2, vibrato, noise, filter, env, midi, startTime: now, velocity };
-    this._voices.set(midi, voice);
-    this._voiceQueue.push(midi);
-
-    // Dispose nodes once the voice's oscillators stop (via noteOff / stealing /
-    // panic), mirroring the sample path so rapid retriggering can't pile up nodes.
-    const endOsc = oscillators[0];
-    if (endOsc) {
-      endOsc.addEventListener('ended', () => {
-        if (this._voices.get(midi) === voice) {
-          this._voices.delete(midi);
-          const qi = this._voiceQueue.indexOf(midi);
-          if (qi !== -1) this._voiceQueue.splice(qi, 1);
-        }
-        this._disposeVoiceNodes(voice);
-      }, { once: true });
-    }
+    this._registerVoice(voice, midi, oscillators[0]);
+    this._enforceSoundingCap(now);
   }
 
   /**
@@ -635,32 +633,8 @@ export class WebAudioSynth {
   noteOff(midi, atTime) {
     const voice = this._voices.get(midi);
     if (!voice) return;
-
-    const ctx = this.engine.ctx;
-    const now = atTime !== undefined ? atTime : ctx.currentTime;
-    const p = this.patch;
-
-    // Release envelope
-    const releaseLevel = this._envelopeLevelAt(p.envelope, now - (voice.startTime ?? now), voice.velocity ?? 1);
-    voice.env.gain.cancelScheduledValues(now);
-    voice.env.gain.setValueAtTime(Math.max(0.0001, releaseLevel), now);
-    // We use setTargetAtTime for a smoother release instead of linearRamp to avoid clicks if the value isn't exact
-    voice.env.gain.setTargetAtTime(0, now, p.envelope.release / 3);
-
-    // Schedule oscillator stop after release
-    const stopAt = now + p.envelope.release + 0.1;
-    if (voice.source) { try { voice.source.stop(stopAt); } catch (_) {} }
-    if (voice.osc) { try { voice.osc.stop(stopAt); } catch (_) {} }
-    if (voice.osc2) { try { voice.osc2.stop(stopAt); } catch (_) {} }
-    for (const osc of voice.oscillators || []) { try { osc.stop(stopAt); } catch (_) {} }
-    for (const osc of voice.oscillators2 || []) { try { osc.stop(stopAt); } catch (_) {} }
-    if (voice.vibrato?.lfo) { try { voice.vibrato.lfo.stop(stopAt); } catch (_) {} }
-    if (voice.noise) { try { voice.noise.source.stop(stopAt); } catch (_) {} }
-
-    // Remove from map
-    this._voices.delete(midi);
-    const queueIdx = this._voiceQueue.indexOf(midi);
-    if (queueIdx !== -1) this._voiceQueue.splice(queueIdx, 1);
+    const now = atTime !== undefined ? atTime : this.engine.ctx.currentTime;
+    this._releaseVoice(voice, now, this.patch.envelope.release);
   }
 
   /**
@@ -675,16 +649,16 @@ export class WebAudioSynth {
   panic() {
     const now = this.engine.currentTime;
     for (const voice of this._voices.values()) {
-      if (voice.source) { try { voice.source.stop(now); } catch (_) {} }
-      if (voice.osc) { try { voice.osc.stop(now); } catch (_) {} }
-      if (voice.osc2) { try { voice.osc2.stop(now); } catch (_) {} }
-      for (const osc of voice.oscillators || []) { try { osc.stop(now); } catch (_) {} }
-      for (const osc of voice.oscillators2 || []) { try { osc.stop(now); } catch (_) {} }
-      if (voice.vibrato?.lfo) { try { voice.vibrato.lfo.stop(now); } catch (_) {} }
-      if (voice.noise) { try { voice.noise.source.stop(now); } catch (_) {} }
+      this._stopVoiceSources(voice, now);
+      this._disposeVoiceNodes(voice);
+    }
+    for (const voice of this._releasing) {
+      this._stopVoiceSources(voice, now);
+      this._disposeVoiceNodes(voice);
     }
     this._voices.clear();
     this._voiceQueue = [];
+    this._releasing.clear();
     if (this._toneInput && this._output) this._rebuildEffects();
   }
 
@@ -700,6 +674,145 @@ export class WebAudioSynth {
     for (const o of voice.oscillators2 || []) drop(o);
     if (voice.noise) { drop(voice.noise.source); drop(voice.noise.gain); }
     if (voice.vibrato) { drop(voice.vibrato.lfo); drop(voice.vibrato.gain); }
+  }
+
+  /**
+   * Register a freshly built voice: track it as held, queue it for stealing, and
+   * wire a one-time 'ended' cleanup on its terminal node (sample source or first
+   * oscillator) so its graph is torn down the instant playback ends or is stopped.
+   */
+  _registerVoice(voice, midi, endNode) {
+    voice.midi = midi;
+    voice._releasing = false;
+    this._voices.set(midi, voice);
+    this._voiceQueue.push(midi);
+    if (endNode && typeof endNode.addEventListener === 'function') {
+      endNode.addEventListener('ended', () => this._onVoiceEnded(voice), { once: true });
+    }
+  }
+
+  /** Terminal node finished — forget the voice and free its graph. */
+  _onVoiceEnded(voice) {
+    this._forgetVoice(voice);
+    this._disposeVoiceNodes(voice);
+  }
+
+  /** Drop a voice from every bookkeeping structure (identity-guarded). */
+  _forgetVoice(voice) {
+    if (!voice) return;
+    if (this._voices.get(voice.midi) === voice) {
+      this._voices.delete(voice.midi);
+      const qi = this._voiceQueue.indexOf(voice.midi);
+      if (qi !== -1) this._voiceQueue.splice(qi, 1);
+    }
+    this._releasing.delete(voice);
+  }
+
+  /**
+   * Move a sounding voice into its release phase: fade the amp envelope to zero
+   * and schedule its sources to stop. The voice stays tracked in `_releasing`
+   * (so it still counts toward the sounding cap) until its 'ended' fires.
+   * Safe to call once per voice; subsequent calls are ignored.
+   */
+  _releaseVoice(voice, now, releaseSec) {
+    if (!voice || voice._releasing) return;
+    voice._releasing = true;
+    // No longer a held voice (so it can't be re-stolen or double-released).
+    if (this._voices.get(voice.midi) === voice) {
+      this._voices.delete(voice.midi);
+      const qi = this._voiceQueue.indexOf(voice.midi);
+      if (qi !== -1) this._voiceQueue.splice(qi, 1);
+    }
+    this._releasing.add(voice);
+
+    const rel = Math.max(0.005, Number(releaseSec) || 0.005);
+    try {
+      const g = voice.env && voice.env.gain;
+      if (g) {
+        const level = this._envelopeLevelAt(this.patch.envelope, now - (voice.startTime ?? now), voice.velocity ?? 1);
+        // cancelAndHoldAtTime cleanly truncates an in-flight envelope curve at
+        // `now`; falling back to cancelScheduledValues for older engines. This
+        // avoids scheduling a value INSIDE an active setValueCurve window (which
+        // Chrome treats as an error).
+        if (typeof g.cancelAndHoldAtTime === 'function') g.cancelAndHoldAtTime(now);
+        else g.cancelScheduledValues(now);
+        g.setValueAtTime(Math.max(0.0001, level), now);
+        g.setTargetAtTime(0, now, rel / 3);
+      }
+    } catch (_) { /* scheduling is best-effort; never let it bubble into input handlers */ }
+
+    this._stopVoiceSources(voice, now + rel + 0.1);
+  }
+
+  /** Stop every source / oscillator a voice owns. Idempotent; never throws. */
+  _stopVoiceSources(voice, when) {
+    if (!voice) return;
+    const stop = (node) => { if (node) { try { node.stop(when); } catch (_) {} } };
+    stop(voice.source);
+    stop(voice.osc); stop(voice.osc2);
+    for (const o of voice.oscillators || []) stop(o);
+    for (const o of voice.oscillators2 || []) stop(o);
+    if (voice.vibrato && voice.vibrato.lfo) stop(voice.vibrato.lfo);
+    if (voice.noise) stop(voice.noise.source);
+  }
+
+  /**
+   * Hard cap on concurrently-sounding voices (held + releasing). Rapid tapping
+   * otherwise piles up released-but-still-ringing voices — their stop is
+   * scheduled ahead in time, so the audio render thread keeps mixing all of
+   * them. Past a few dozen full-volume sample voices that overloads the render
+   * thread and crashes the tab on Windows Chrome (STATUS_BREAKPOINT). We retire
+   * the oldest still-ringing voices first with a tiny fade so the cull is
+   * click-free, and warn once so the throttle is observable in the console.
+   */
+  _enforceSoundingCap(now) {
+    let culled = false;
+    let guard = 0;
+    while (this._voices.size + this._releasing.size > MAX_SOUNDING_VOICES && this._releasing.size > 0 && guard++ < 512) {
+      const oldest = this._releasing.values().next().value; // Set preserves insertion (age) order
+      if (!oldest) break;
+      this._retireVoiceNow(oldest, now);
+      culled = true;
+    }
+    if (culled && !this._floodWarned) {
+      this._floodWarned = true;
+      try {
+        console.warn('[WebAudioSynth] sounding-voice cap engaged — rapid retrigger is being throttled to protect the audio thread.');
+      } catch (_) {}
+    }
+  }
+
+  /**
+   * Retire a voice almost immediately (a few-ms fade to avoid a click), then let
+   * its 'ended' handler free the nodes. Used by the sounding-voice cap.
+   */
+  _retireVoiceNow(voice, now) {
+    if (!voice) return;
+    this._releasing.delete(voice);
+    if (this._voices.get(voice.midi) === voice) {
+      this._voices.delete(voice.midi);
+      const qi = this._voiceQueue.indexOf(voice.midi);
+      if (qi !== -1) this._voiceQueue.splice(qi, 1);
+    }
+    try {
+      const g = voice.env && voice.env.gain;
+      if (g) {
+        if (typeof g.cancelAndHoldAtTime === 'function') g.cancelAndHoldAtTime(now);
+        else g.cancelScheduledValues(now);
+        g.setTargetAtTime(0, now, 0.004);
+      }
+    } catch (_) {}
+    this._stopVoiceSources(voice, now + 0.02);
+  }
+
+  /** Live voice counts — handy for debugging rapid-retrigger behaviour. */
+  voiceStats() {
+    return {
+      held: this._voices.size,
+      releasing: this._releasing.size,
+      sounding: this._voices.size + this._releasing.size,
+      maxSounding: MAX_SOUNDING_VOICES,
+    };
   }
 
   /**
