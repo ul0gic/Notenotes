@@ -1,0 +1,75 @@
+{
+  "id": "strumstick",
+  "name": "Strumstick",
+  "icon": "🪕",
+  "category": "Plucked",
+  "type": "sample",
+  "source": "VCSL (CC0)",
+  "playbackMode": "oneShot",
+  "gain": 0.6,
+  "brightness": 0.78,
+  "envelope": {
+    "attack": 0.002,
+    "decay": 0.7,
+    "sustain": 0.7,
+    "release": 0.5
+  },
+  "zones": [
+    {
+      "midi": 50,
+      "file": "50.mp3"
+    },
+    {
+      "midi": 52,
+      "file": "52.mp3"
+    },
+    {
+      "midi": 54,
+      "file": "54.mp3"
+    },
+    {
+      "midi": 57,
+      "file": "57.mp3"
+    },
+    {
+      "midi": 59,
+      "file": "59.mp3"
+    },
+    {
+      "midi": 61,
+      "file": "61.mp3"
+    },
+    {
+      "midi": 64,
+      "file": "64.mp3"
+    },
+    {
+      "midi": 66,
+      "file": "66.mp3"
+    },
+    {
+      "midi": 69,
+      "file": "69.mp3"
+    },
+    {
+      "midi": 71,
+      "file": "71.mp3"
+    },
+    {
+      "midi": 73,
+      "file": "73.mp3"
+    },
+    {
+      "midi": 76,
+      "file": "76.mp3"
+    },
+    {
+      "midi": 78,
+      "file": "78.mp3"
+    },
+    {
+      "midi": 81,
+      "file": "81.mp3"
+    }
+  ]
+}

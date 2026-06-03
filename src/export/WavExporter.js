@@ -12,6 +12,9 @@ import {
 } from '../engine/VelocityResponse.js';
 import { normalizeStereoWidth, normalizeTrackPan, panForVoice, stereoGainsForPan } from '../engine/StereoWidth.js';
 import { normalizeWavChannelMode } from './WavChannelMode.js';
+import { pickZone, playableMidi } from '../instruments/sampleZone.js';
+
+const SAMPLE_PACKS_BASE = `${(import.meta.env && import.meta.env.BASE_URL) || '/'}packs`;
 
 const TICKS_PER_BEAT = 480;
 const SAMPLE_RATE = 44100;
@@ -587,6 +590,53 @@ function customInstrumentForTrack(project, track) {
     .find(instrument => instrument.id === id.slice(7) && instrument.type === 'patch') || null;
 }
 
+function builtinInstrumentId(track) {
+  const id = track?.instrumentId || '';
+  return id.startsWith('builtin:') ? id.slice(8) : null;
+}
+
+/** Fetch + decode a bundled CC0 sample pack's zones for offline export. */
+async function decodeBuiltinInstrument(id) {
+  try {
+    const Ctx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    const ctx = new Ctx(1, 1, SAMPLE_RATE);
+    const manifest = await (await fetch(`${SAMPLE_PACKS_BASE}/${id}/manifest.json`)).json();
+    const zones = [];
+    for (const z of manifest.zones || []) {
+      const res = await fetch(`${SAMPLE_PACKS_BASE}/${id}/${z.file}`);
+      const decoded = await ctx.decodeAudioData(await res.arrayBuffer());
+      zones.push({ rootMidi: z.midi, decoded });
+    }
+    zones.sort((a, b) => a.rootMidi - b.rootMidi);
+    if (!zones.length) return null;
+    const brightness = manifest.brightness ?? 0.8;
+    const meta = {
+      name: manifest.name,
+      playbackMode: manifest.playbackMode || 'oneShot',
+      gain: manifest.gain ?? 0.5,
+      brightness,
+      attack: manifest.envelope?.attack ?? 0.002,
+      release: manifest.envelope?.release ?? 0.3,
+      filter: { type: 'lowpass', frequency: 1200 + brightness * 12000, Q: 0.7 },
+    };
+    return { meta, zones };
+  } catch (err) {
+    console.warn('[WavExporter] Built-in instrument decode failed:', id, err);
+    return null;
+  }
+}
+
+/** Render a MIDI snippet through a multi-zone built-in pack (nearest-zone per note). */
+function renderMidiWithBuiltinSample(target, snippet, pack, startSec, bpm, gain = 1, options = {}) {
+  for (const note of snippet.notes || []) {
+    const playPitch = playableMidi(pack.zones, note.pitch || 60);
+    const zone = pickZone(pack.zones, playPitch);
+    if (!zone) continue;
+    const inst = { ...pack.meta, rootMidi: zone.rootMidi };
+    renderSampleNote(target, zone.decoded, inst, { ...note, pitch: playPitch }, startSec, bpm, gain, options);
+  }
+}
+
 function sampleAt(decoded, sourceIndex) {
   if (!decoded) return 0;
   const channels = decoded.numberOfChannels || 1;
@@ -796,9 +846,10 @@ export async function projectToWavBlob(project, options = {}) {
       const durationSec = (snippet.durationTicks || barTicks) * secPerTick * timeScale;
       const traits = clip.soundTraits || snippet.soundTraits || project?.settings?.soundTraits || {};
       const customInstrument = trackType === 'midi' ? customInstrumentForTrack(project, track) : null;
-      const patch = trackType === 'midi' && !customInstrument ? (PRESETS[track.instrumentId] || PRESETS.chip_lead) : null;
+      const builtinId = trackType === 'midi' && !customInstrument ? builtinInstrumentId(track) : null;
+      const patch = trackType === 'midi' && !customInstrument && !builtinId ? (PRESETS[track.instrumentId] || PRESETS.chip_lead) : null;
       const pan = normalizeTrackPan(track.pan);
-      const job = { trackType, snippet, startSec, durationSec, gain, traits, customInstrument, patch, kitId, timeScale, pan };
+      const job = { trackType, snippet, startSec, durationSec, gain, traits, customInstrument, builtinId, patch, kitId, timeScale, pan };
 
       if (snippet.type === 'audio') {
         job.decoded = await decodeAudioSnippet(snippet, options);
@@ -809,6 +860,13 @@ export async function projectToWavBlob(project, options = {}) {
         job.customDecoded = await decodeCustomInstrument(customInstrument, options);
         if (job.customDecoded) {
           job.durationSec = Math.max(job.durationSec, durationSec + Math.min(8, job.customDecoded.duration * 2));
+        }
+      }
+      if (builtinId) {
+        job.builtinPack = await decodeBuiltinInstrument(builtinId);
+        if (job.builtinPack) {
+          const longest = Math.max(...job.builtinPack.zones.map(z => z.decoded.duration || 0), 0.5);
+          job.durationSec = Math.max(job.durationSec, durationSec + Math.min(8, longest * 2));
         }
       }
 
@@ -826,7 +884,15 @@ export async function projectToWavBlob(project, options = {}) {
     if (snippet.type === 'audio') {
       mixAudioBuffer(samples, job.decoded, startSec, gain, job.timeScale, pan);
     } else if (trackType === 'midi' && snippet.type === 'midi') {
-      if (job.customInstrument && job.customDecoded) {
+      if (job.builtinPack) {
+        if (hasToneTraits(traits)) {
+          const toneLayer = ensureLength(null, sampleLength(samples) / SAMPLE_RATE, isStereoBuffer(samples));
+          renderMidiWithBuiltinSample(toneLayer, snippet, job.builtinPack, startSec, bpm, gain, { useSnippetBpm: false, meterSource: project, timeScale: job.timeScale, pan });
+          mixBuffer(samples, applyToneTraits(toneLayer, traits));
+        } else {
+          renderMidiWithBuiltinSample(samples, snippet, job.builtinPack, startSec, bpm, gain, { useSnippetBpm: false, meterSource: project, timeScale: job.timeScale, pan });
+        }
+      } else if (job.customInstrument && job.customDecoded) {
         if (hasToneTraits(traits)) {
           const toneLayer = ensureLength(null, sampleLength(samples) / SAMPLE_RATE, isStereoBuffer(samples));
           renderMidiWithCustomInstrument(toneLayer, snippet, job.customDecoded, job.customInstrument, startSec, bpm, gain, { useSnippetBpm: false, meterSource: project, timeScale: job.timeScale, pan });

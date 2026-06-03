@@ -1,0 +1,63 @@
+{
+  "id": "kalimba",
+  "name": "Kalimba",
+  "icon": "🎼",
+  "category": "Plucked",
+  "type": "sample",
+  "source": "VCSL (CC0)",
+  "playbackMode": "oneShot",
+  "gain": 0.62,
+  "brightness": 0.85,
+  "envelope": {
+    "attack": 0.001,
+    "decay": 0.6,
+    "sustain": 0.6,
+    "release": 0.5
+  },
+  "zones": [
+    {
+      "midi": 59,
+      "file": "59.mp3"
+    },
+    {
+      "midi": 61,
+      "file": "61.mp3"
+    },
+    {
+      "midi": 63,
+      "file": "63.mp3"
+    },
+    {
+      "midi": 66,
+      "file": "66.mp3"
+    },
+    {
+      "midi": 68,
+      "file": "68.mp3"
+    },
+    {
+      "midi": 71,
+      "file": "71.mp3"
+    },
+    {
+      "midi": 73,
+      "file": "73.mp3"
+    },
+    {
+      "midi": 75,
+      "file": "75.mp3"
+    },
+    {
+      "midi": 78,
+      "file": "78.mp3"
+    },
+    {
+      "midi": 81,
+      "file": "81.mp3"
+    },
+    {
+      "midi": 83,
+      "file": "83.mp3"
+    }
+  ]
+}

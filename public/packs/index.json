@@ -1,0 +1,72 @@
+[
+  {
+    "id": "grand-piano",
+    "name": "Grand Piano",
+    "icon": "🎹",
+    "category": "Keys",
+    "path": "grand-piano/manifest.json"
+  },
+  {
+    "id": "upright-piano",
+    "name": "Upright Piano",
+    "icon": "🎹",
+    "category": "Keys",
+    "path": "upright-piano/manifest.json"
+  },
+  {
+    "id": "marimba",
+    "name": "Marimba",
+    "icon": "🎶",
+    "category": "Mallets",
+    "path": "marimba/manifest.json"
+  },
+  {
+    "id": "vibraphone",
+    "name": "Vibraphone",
+    "icon": "🎶",
+    "category": "Mallets",
+    "path": "vibraphone/manifest.json"
+  },
+  {
+    "id": "glockenspiel",
+    "name": "Glockenspiel",
+    "icon": "✨",
+    "category": "Mallets",
+    "path": "glockenspiel/manifest.json"
+  },
+  {
+    "id": "xylophone",
+    "name": "Xylophone",
+    "icon": "🎵",
+    "category": "Mallets",
+    "path": "xylophone/manifest.json"
+  },
+  {
+    "id": "kalimba",
+    "name": "Kalimba",
+    "icon": "🎼",
+    "category": "Plucked",
+    "path": "kalimba/manifest.json"
+  },
+  {
+    "id": "concert-harp",
+    "name": "Concert Harp",
+    "icon": "🎵",
+    "category": "Plucked",
+    "path": "concert-harp/manifest.json"
+  },
+  {
+    "id": "strumstick",
+    "name": "Strumstick",
+    "icon": "🪕",
+    "category": "Plucked",
+    "path": "strumstick/manifest.json"
+  },
+  {
+    "id": "tubular-bells",
+    "name": "Tubular Bells",
+    "icon": "🔔",
+    "category": "Bells",
+    "path": "tubular-bells/manifest.json"
+  }
+]

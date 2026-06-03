@@ -1,0 +1,75 @@
+{
+  "id": "concert-harp",
+  "name": "Concert Harp",
+  "icon": "🎵",
+  "category": "Plucked",
+  "type": "sample",
+  "source": "VCSL (CC0)",
+  "playbackMode": "oneShot",
+  "gain": 0.6,
+  "brightness": 0.8,
+  "envelope": {
+    "attack": 0.001,
+    "decay": 0.8,
+    "sustain": 0.8,
+    "release": 0.6
+  },
+  "zones": [
+    {
+      "midi": 28,
+      "file": "28.mp3"
+    },
+    {
+      "midi": 35,
+      "file": "35.mp3"
+    },
+    {
+      "midi": 41,
+      "file": "41.mp3"
+    },
+    {
+      "midi": 45,
+      "file": "45.mp3"
+    },
+    {
+      "midi": 52,
+      "file": "52.mp3"
+    },
+    {
+      "midi": 59,
+      "file": "59.mp3"
+    },
+    {
+      "midi": 65,
+      "file": "65.mp3"
+    },
+    {
+      "midi": 69,
+      "file": "69.mp3"
+    },
+    {
+      "midi": 76,
+      "file": "76.mp3"
+    },
+    {
+      "midi": 83,
+      "file": "83.mp3"
+    },
+    {
+      "midi": 89,
+      "file": "89.mp3"
+    },
+    {
+      "midi": 93,
+      "file": "93.mp3"
+    },
+    {
+      "midi": 98,
+      "file": "98.mp3"
+    },
+    {
+      "midi": 101,
+      "file": "101.mp3"
+    }
+  ]
+}

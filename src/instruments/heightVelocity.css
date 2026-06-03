@@ -1,0 +1,33 @@
+/* Height Velocity (Labs) — tall pads + four strike-zone gridlines.
+   Imported by ScaleBoard; only active when the pads carry the --velocity class. */
+.scaleboard__pads--velocity {
+  grid-auto-rows: minmax(140px, 38vh);
+}
+.scaleboard__pads--velocity .scaleboard__pad {
+  position: relative;
+  overflow: hidden;
+}
+.scaleboard__pad-velgrid {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  pointer-events: none;
+  z-index: 0;
+}
+.scaleboard__pad-velgrid .scaleboard__pad-velzone {
+  flex: 1 1 0;
+  border-top: 1px dashed rgba(127, 127, 127, 0.35);
+}
+.scaleboard__pad-velgrid .scaleboard__pad-velzone:first-child {
+  border-top: none;
+}
+/* Louder toward the TOP — a faint cue that striking high hits harder. */
+.scaleboard__pad-velgrid .scaleboard__pad-velzone:nth-child(1) { background: rgba(127, 127, 127, 0.20); }
+.scaleboard__pad-velgrid .scaleboard__pad-velzone:nth-child(2) { background: rgba(127, 127, 127, 0.12); }
+.scaleboard__pad-velgrid .scaleboard__pad-velzone:nth-child(3) { background: rgba(127, 127, 127, 0.06); }
+/* Keep pad text/labels above the gridline overlay. */
+.scaleboard__pads--velocity .scaleboard__pad > span:not(.scaleboard__pad-velgrid) {
+  position: relative;
+  z-index: 1;
+}

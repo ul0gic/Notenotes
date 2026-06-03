@@ -27,6 +27,11 @@ export const PAD_LAYOUT_TEMPLATES = {
     label: 'Thumb-friendly',
     description: 'A hand-shaped layout that still collapses cleanly on phones.',
   },
+  velocity: {
+    id: 'velocity',
+    label: 'Velocity',
+    description: 'Tall, narrow pads where striking lower plays louder. Still locked to the scale.',
+  },
 };
 
 export const PAD_SIZE_SPANS = {
@@ -101,6 +106,7 @@ export function recommendedPadColumns(padCount = 0, width = 360, options = {}) {
 }
 
 function targetRowsForTemplate(template, count) {
+  if (template === 'velocity') return 1; // single row of tall, narrow pads
   if (template === 'compact') return count > 10 ? 2 : 1;
   if (template === 'rows') return count > 8 ? 3 : 2;
   return count > 8 ? 2 : 2;

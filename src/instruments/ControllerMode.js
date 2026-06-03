@@ -60,6 +60,12 @@ const TABS = [
     body: 'Assign held note modifiers to the four shoulder and trigger slots. Use the <strong>Controller</strong> button in the upper app toolbar to learn gamepad bindings and manage presets.',
   },
   {
+    id: 'dynamics',
+    label: 'Dynamics',
+    enabled: true,
+    body: 'Height Velocity (experimental). Split each pad and piano key into four height zones so where you strike sets how loud it plays. Off by default — existing instruments are unchanged until you turn it on.',
+  },
+  {
     id: 'accessibility',
     label: 'Accessibility',
     enabled: false,
@@ -90,6 +96,7 @@ export class ControllerMode {
     this._onBeforeNoteOn = null;
     this.onToneAssignmentChanged = null; // kept for CreativeMode save wiring
     this.onToneOverrideChanged = null;   // kept for active modifier indicator wiring
+    this.onLabsChanged = null;           // Labs (Height Velocity) toggle -> autosave
 
     this.scaleName = 'major';
     this.rootNote = 'C';
@@ -252,6 +259,17 @@ export class ControllerMode {
         <p class="ctrlmode__trigger-status" id="ct-trigger-status" aria-live="polite"></p>
       `;
     }
+    if (tab.id === 'dynamics') {
+      const on = !!this._project?.settings?.labs?.heightVelocity;
+      return `
+        <p class="ctrlmode__tab-content-desc">${tab.body}</p>
+        <label class="ctrlmode__toggle-row" style="display:flex;align-items:center;gap:10px;margin:10px 0;">
+          <input type="checkbox" id="ct-height-velocity" ${on ? 'checked' : ''} />
+          <span>Height Velocity</span>
+        </label>
+        <p class="ctrlmode__trigger-help">Strike higher on a pad or key for louder, lower for softer (four levels). Also available as the &ldquo;Velocity&rdquo; pad layout.</p>
+      `;
+    }
     return '';
   }
 
@@ -290,6 +308,9 @@ export class ControllerMode {
       this._bindModifierEvents();
       this._updateModifierHelp();
       this._updateModifierStatus();
+    }
+    if (tabId === 'dynamics') {
+      this._bindDynamicsEvents();
     }
   }
 
@@ -341,6 +362,21 @@ export class ControllerMode {
       });
     });
     this._bindModifierEvents();
+    this._bindDynamicsEvents();
+  }
+
+  _bindDynamicsEvents() {
+    const cb = this.el?.querySelector('#ct-height-velocity');
+    if (!cb) return;
+    cb.addEventListener('change', (e) => {
+      if (!this._project) return;
+      this._project.settings ||= {};
+      this._project.settings.labs = { ...(this._project.settings.labs || {}), heightVelocity: e.target.checked };
+      this.onLabsChanged?.();
+      // Refresh pad + piano surfaces so the zones/gridlines apply immediately.
+      window.dispatchEvent(new CustomEvent('settings-pads-changed'));
+      window.dispatchEvent(new CustomEvent('settings-piano-changed'));
+    });
   }
 
   _bindModifierEvents() {

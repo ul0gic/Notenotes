@@ -16,6 +16,7 @@ import {
 } from '../engine/VelocityResponse.js';
 import { normalizeStereoWidth, panForVoice } from '../engine/StereoWidth.js';
 import { adsrEnvelopeValueAt, createEnvelopeParamCurve } from '../engine/EnvelopeCurves.js';
+import { pickZone, playableMidi } from './sampleZone.js';
 
 /** Maximum simultaneous voices */
 const MAX_VOICES = 8;
@@ -348,6 +349,7 @@ export class WebAudioSynth {
       schemaVersion: patch.schemaVersion || DEFAULT_PATCH.schemaVersion,
       type: patch.type || 'synth',
       sampleBuffer: patch.sampleBuffer || null,
+      sampleMap: patch.sampleMap || null,
       rootMidi: patch.rootMidi ?? 60,
       playbackMode: patch.playbackMode || 'gated',
       oscillator: { ...DEFAULT_PATCH.oscillator, ...patch.oscillator },
@@ -509,10 +511,18 @@ export class WebAudioSynth {
     const now = atTime !== undefined ? atTime : ctx.currentTime;
     const p = this.patch;
 
-    if (p.type === 'sample' && p.sampleBuffer) {
+    if (p.type === 'sample' && (p.sampleBuffer || (p.sampleMap && p.sampleMap.length))) {
+      const hasMap = !!(p.sampleMap && p.sampleMap.length);
+      // Fold notes far outside the sampled range back in by octaves, so every note
+      // stays audible (and in key) rather than pitched into near-silence.
+      const playMidi = hasMap ? playableMidi(p.sampleMap, midi) : midi;
+      const zone = hasMap ? pickZone(p.sampleMap, playMidi) : null;
+      const sampleBuffer = zone ? zone.buffer : p.sampleBuffer;
+      const sampleRoot = zone ? zone.rootMidi : (p.rootMidi ?? 60);
+      if (!sampleBuffer) return;
       const source = ctx.createBufferSource();
-      source.buffer = p.sampleBuffer;
-      source.playbackRate.setValueAtTime(Math.pow(2, (midi - (p.rootMidi ?? 60)) / 12), now);
+      source.buffer = sampleBuffer;
+      source.playbackRate.setValueAtTime(Math.pow(2, (playMidi - sampleRoot) / 12), now);
 
       const filter = ctx.createBiquadFilter();
       filter.type = p.filter.type;
@@ -533,14 +543,23 @@ export class WebAudioSynth {
       this._voices.set(midi, voice);
       this._voiceQueue.push(midi);
 
-      if (p.playbackMode === 'oneShot') {
-        const stopAt = now + (p.sampleBuffer.duration / source.playbackRate.value) + 0.05;
-        source.stop(stopAt);
-        source.addEventListener('ended', () => {
+      // Always clean up when the sample finishes OR is stopped (gated + oneShot).
+      // Without this, fast retriggering piles up BufferSource/filter/gain nodes
+      // faster than GC frees them, which can crash the tab (STATUS_BREAKPOINT/OOM).
+      // The identity guard stops a finishing old voice from evicting a newer one
+      // that reused the same midi key.
+      source.addEventListener('ended', () => {
+        if (this._voices.get(midi) === voice) {
           this._voices.delete(midi);
           const queueIdx = this._voiceQueue.indexOf(midi);
           if (queueIdx !== -1) this._voiceQueue.splice(queueIdx, 1);
-        }, { once: true });
+        }
+        this._disposeVoiceNodes(voice);
+      }, { once: true });
+
+      if (p.playbackMode === 'oneShot') {
+        const stopAt = now + (sampleBuffer.duration / source.playbackRate.value) + 0.05;
+        try { source.stop(stopAt); } catch (_) {}
       }
       return;
     }
@@ -590,6 +609,20 @@ export class WebAudioSynth {
     const voice = { oscillators, oscillators2, vibrato, noise, filter, env, midi, startTime: now, velocity };
     this._voices.set(midi, voice);
     this._voiceQueue.push(midi);
+
+    // Dispose nodes once the voice's oscillators stop (via noteOff / stealing /
+    // panic), mirroring the sample path so rapid retriggering can't pile up nodes.
+    const endOsc = oscillators[0];
+    if (endOsc) {
+      endOsc.addEventListener('ended', () => {
+        if (this._voices.get(midi) === voice) {
+          this._voices.delete(midi);
+          const qi = this._voiceQueue.indexOf(midi);
+          if (qi !== -1) this._voiceQueue.splice(qi, 1);
+        }
+        this._disposeVoiceNodes(voice);
+      }, { once: true });
+    }
   }
 
   /**
@@ -651,6 +684,20 @@ export class WebAudioSynth {
     this._voices.clear();
     this._voiceQueue = [];
     if (this._toneInput && this._output) this._rebuildEffects();
+  }
+
+  /**
+   * Disconnect a voice's nodes so the audio renderer frees them promptly instead
+   * of waiting on GC. Safe to call more than once; never throws.
+   */
+  _disposeVoiceNodes(voice) {
+    if (!voice) return;
+    const drop = (node) => { try { node && node.disconnect(); } catch (_) {} };
+    drop(voice.source); drop(voice.filter); drop(voice.env);
+    for (const o of voice.oscillators || []) drop(o);
+    for (const o of voice.oscillators2 || []) drop(o);
+    if (voice.noise) { drop(voice.noise.source); drop(voice.noise.gain); }
+    if (voice.vibrato) { drop(voice.vibrato.lfo); drop(voice.vibrato.gain); }
   }
 
   /**

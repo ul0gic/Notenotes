@@ -1,0 +1,59 @@
+{
+  "id": "marimba",
+  "name": "Marimba",
+  "icon": "🎶",
+  "category": "Mallets",
+  "type": "sample",
+  "source": "VCSL (CC0)",
+  "playbackMode": "oneShot",
+  "gain": 0.62,
+  "brightness": 0.8,
+  "envelope": {
+    "attack": 0.001,
+    "decay": 0.6,
+    "sustain": 0.7,
+    "release": 0.4
+  },
+  "zones": [
+    {
+      "midi": 41,
+      "file": "41.mp3"
+    },
+    {
+      "midi": 48,
+      "file": "48.mp3"
+    },
+    {
+      "midi": 55,
+      "file": "55.mp3"
+    },
+    {
+      "midi": 59,
+      "file": "59.mp3"
+    },
+    {
+      "midi": 65,
+      "file": "65.mp3"
+    },
+    {
+      "midi": 72,
+      "file": "72.mp3"
+    },
+    {
+      "midi": 79,
+      "file": "79.mp3"
+    },
+    {
+      "midi": 83,
+      "file": "83.mp3"
+    },
+    {
+      "midi": 89,
+      "file": "89.mp3"
+    },
+    {
+      "midi": 96,
+      "file": "96.mp3"
+    }
+  ]
+}

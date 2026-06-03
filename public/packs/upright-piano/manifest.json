@@ -1,0 +1,71 @@
+{
+  "id": "upright-piano",
+  "name": "Upright Piano",
+  "icon": "🎹",
+  "category": "Keys",
+  "type": "sample",
+  "source": "VCSL (CC0)",
+  "playbackMode": "gated",
+  "gain": 0.52,
+  "brightness": 0.8,
+  "envelope": {
+    "attack": 0.001,
+    "decay": 0.4,
+    "sustain": 1,
+    "release": 0.3
+  },
+  "zones": [
+    {
+      "midi": 24,
+      "file": "24.mp3"
+    },
+    {
+      "midi": 31,
+      "file": "31.mp3"
+    },
+    {
+      "midi": 36,
+      "file": "36.mp3"
+    },
+    {
+      "midi": 43,
+      "file": "43.mp3"
+    },
+    {
+      "midi": 48,
+      "file": "48.mp3"
+    },
+    {
+      "midi": 55,
+      "file": "55.mp3"
+    },
+    {
+      "midi": 60,
+      "file": "60.mp3"
+    },
+    {
+      "midi": 67,
+      "file": "67.mp3"
+    },
+    {
+      "midi": 72,
+      "file": "72.mp3"
+    },
+    {
+      "midi": 79,
+      "file": "79.mp3"
+    },
+    {
+      "midi": 84,
+      "file": "84.mp3"
+    },
+    {
+      "midi": 91,
+      "file": "91.mp3"
+    },
+    {
+      "midi": 96,
+      "file": "96.mp3"
+    }
+  ]
+}

@@ -1,0 +1,95 @@
+{
+  "id": "grand-piano",
+  "name": "Grand Piano",
+  "icon": "🎹",
+  "category": "Keys",
+  "type": "sample",
+  "source": "VCSL (CC0)",
+  "playbackMode": "gated",
+  "gain": 0.5,
+  "brightness": 0.85,
+  "envelope": {
+    "attack": 0.001,
+    "decay": 0.4,
+    "sustain": 1,
+    "release": 0.35
+  },
+  "zones": [
+    {
+      "midi": 22,
+      "file": "22.mp3"
+    },
+    {
+      "midi": 27,
+      "file": "27.mp3"
+    },
+    {
+      "midi": 33,
+      "file": "33.mp3"
+    },
+    {
+      "midi": 39,
+      "file": "39.mp3"
+    },
+    {
+      "midi": 45,
+      "file": "45.mp3"
+    },
+    {
+      "midi": 50,
+      "file": "50.mp3"
+    },
+    {
+      "midi": 54,
+      "file": "54.mp3"
+    },
+    {
+      "midi": 58,
+      "file": "58.mp3"
+    },
+    {
+      "midi": 62,
+      "file": "62.mp3"
+    },
+    {
+      "midi": 66,
+      "file": "66.mp3"
+    },
+    {
+      "midi": 70,
+      "file": "70.mp3"
+    },
+    {
+      "midi": 74,
+      "file": "74.mp3"
+    },
+    {
+      "midi": 78,
+      "file": "78.mp3"
+    },
+    {
+      "midi": 82,
+      "file": "82.mp3"
+    },
+    {
+      "midi": 87,
+      "file": "87.mp3"
+    },
+    {
+      "midi": 93,
+      "file": "93.mp3"
+    },
+    {
+      "midi": 99,
+      "file": "99.mp3"
+    },
+    {
+      "midi": 103,
+      "file": "103.mp3"
+    },
+    {
+      "midi": 108,
+      "file": "108.mp3"
+    }
+  ]
+}

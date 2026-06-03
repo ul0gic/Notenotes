@@ -1,0 +1,47 @@
+{
+  "id": "vibraphone",
+  "name": "Vibraphone",
+  "icon": "🎶",
+  "category": "Mallets",
+  "type": "sample",
+  "source": "VCSL (CC0)",
+  "playbackMode": "oneShot",
+  "gain": 0.6,
+  "brightness": 0.85,
+  "envelope": {
+    "attack": 0.001,
+    "decay": 1,
+    "sustain": 0.8,
+    "release": 0.6
+  },
+  "zones": [
+    {
+      "midi": 53,
+      "file": "53.mp3"
+    },
+    {
+      "midi": 57,
+      "file": "57.mp3"
+    },
+    {
+      "midi": 64,
+      "file": "64.mp3"
+    },
+    {
+      "midi": 71,
+      "file": "71.mp3"
+    },
+    {
+      "midi": 77,
+      "file": "77.mp3"
+    },
+    {
+      "midi": 81,
+      "file": "81.mp3"
+    },
+    {
+      "midi": 88,
+      "file": "88.mp3"
+    }
+  ]
+}
