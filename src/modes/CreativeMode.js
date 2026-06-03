@@ -115,6 +115,7 @@ export class CreativeMode {
     this.micRecorder = new MicRecorder();
     this.controllerMode = new ControllerMode(this.synth, this.project, modManager, this.gamepadInput);
     this.controllerMode.onToneAssignmentChanged = () => this.store?.scheduleAutoSave(this.project);
+    this.controllerMode.onLabsChanged = () => this.store?.scheduleAutoSave(this.project);
     this.controllerMode.onToneOverrideChanged = (traits, labels = []) => {
       this._setLiveSoundTraits(traits);
       this._updateToneTriggerIndicator(labels);

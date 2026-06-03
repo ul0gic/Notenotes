@@ -19,19 +19,24 @@ const _instrumentCache = new Map(); // id -> Promise<patch>
 
 /** Fetch through Cache Storage so packs are available offline after first use. */
 async function cachedFetch(url) {
-  try {
-    const cache = await caches.open(CACHE_NAME);
+  // Cache lookups are best-effort: if CacheStorage is unavailable (private mode,
+  // locked-down iframe) we just skip it. A genuine network failure from fetch()
+  // (e.g. the dev server isn't running -> ERR_CONNECTION_REFUSED) is left to
+  // propagate so the caller can report it clearly, instead of being retried.
+  let cache = null;
+  try { cache = await caches.open(CACHE_NAME); } catch (_) { cache = null; }
+  if (cache) {
     const hit = await cache.match(url);
     if (hit) return hit;
-    const res = await fetch(url);
-    // Never cache an SPA-fallback HTML page (happens when a file is missing) —
-    // otherwise a stale 200 page would masquerade as audio on later loads.
-    const type = res.headers.get('content-type') || '';
-    if (res && res.ok && !type.includes('text/html')) cache.put(url, res.clone());
-    return res;
-  } catch (_) {
-    return fetch(url); // private mode / CacheStorage unavailable
   }
+  const res = await fetch(url);
+  // Never cache an SPA-fallback HTML page (happens when a file is missing) —
+  // otherwise a stale 200 page would masquerade as audio on later loads.
+  const type = res.headers.get('content-type') || '';
+  if (cache && res && res.ok && !type.includes('text/html')) {
+    try { cache.put(url, res.clone()); } catch (_) {}
+  }
+  return res;
 }
 
 /** List of built-in sample instruments: [{ id, name, icon, category }]. */
