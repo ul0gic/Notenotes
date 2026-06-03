@@ -648,8 +648,10 @@ export class CreativeMode {
           value: `builtin:${inst.id}`,
           label: inst.name,
           kicker: inst.category ? `${inst.category} - CC0 sample` : 'CC0 sample',
-          description: 'Multi-sampled real instrument (loads on first use)',
-          tags: ['sample', inst.category, inst.name].filter(Boolean),
+          description: inst.range
+            ? `Sampled ${inst.range} - notes outside this range fold in by octave`
+            : 'Multi-sampled real instrument (loads on first use)',
+          tags: ['sample', inst.category, inst.range, inst.name].filter(Boolean),
         })),
       });
     }
