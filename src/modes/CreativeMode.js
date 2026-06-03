@@ -841,6 +841,7 @@ export class CreativeMode {
     try {
       if (!this.engine?.ctx) this.engine?.initSync?.();
       const patch = await loadSampleInstrument(id);
+      if (this._activePatchId !== `builtin:${id}`) return; // a newer selection superseded this load
       this.synth.loadPatch(patch);
       showToast(`Instrument loaded: ${patch.name}`);
     } catch (err) {

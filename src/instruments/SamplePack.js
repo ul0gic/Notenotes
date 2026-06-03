@@ -19,24 +19,49 @@ const _instrumentCache = new Map(); // id -> Promise<patch>
 
 /** Fetch through Cache Storage so packs are available offline after first use. */
 async function cachedFetch(url) {
-  // Cache lookups are best-effort: if CacheStorage is unavailable (private mode,
-  // locked-down iframe) we just skip it. A genuine network failure from fetch()
-  // (e.g. the dev server isn't running -> ERR_CONNECTION_REFUSED) is left to
-  // propagate so the caller can report it clearly, instead of being retried.
+  // Cache lookups are best-effort: skip if CacheStorage is unavailable.
   let cache = null;
   try { cache = await caches.open(CACHE_NAME); } catch (_) { cache = null; }
   if (cache) {
     const hit = await cache.match(url);
     if (hit) return hit;
   }
-  const res = await fetch(url);
-  // Never cache an SPA-fallback HTML page (happens when a file is missing) —
-  // otherwise a stale 200 page would masquerade as audio on later loads.
+  // Retry transient network failures (e.g. a connection momentarily refused while
+  // many zone files load at once / during fast instrument switching). This self-
+  // heals instead of failing the whole instrument on the first blip.
+  let res = null;
+  let lastErr = null;
+  for (let attempt = 0; attempt < 3 && !res; attempt++) {
+    try {
+      res = await fetch(url);
+    } catch (err) {
+      lastErr = err;
+      await new Promise((r) => setTimeout(r, 140 * (attempt + 1)));
+    }
+  }
+  if (!res) throw lastErr || new Error(`Failed to fetch ${url}`);
+  // Never cache an SPA-fallback HTML page (a missing file) as if it were audio.
   const type = res.headers.get('content-type') || '';
-  if (cache && res && res.ok && !type.includes('text/html')) {
+  if (cache && res.ok && !type.includes('text/html')) {
     try { cache.put(url, res.clone()); } catch (_) {}
   }
   return res;
+}
+
+// Run async tasks with a concurrency cap so loading a many-zone instrument (or
+// switching fast) doesn't open a storm of simultaneous connections.
+async function mapLimit(items, limit, fn) {
+  const results = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const idx = next++;
+      results[idx] = await fn(items[idx], idx);
+    }
+  }
+  const workers = Math.max(1, Math.min(limit, items.length));
+  await Promise.all(Array.from({ length: workers }, worker));
+  return results;
 }
 
 /** List of built-in sample instruments: [{ id, name, icon, category }]. */
@@ -60,8 +85,15 @@ export async function loadSampleInstrument(id) {
     if (!engine.ctx) engine.initSync();
     const ctx = engine.ctx;
     const base = `${PACKS_BASE}/${id}`;
-    const manifest = await (await cachedFetch(`${base}/manifest.json`)).json();
-    const zones = await Promise.all((manifest.zones || []).map(async (z) => {
+    const manifestRes = await cachedFetch(`${base}/manifest.json`);
+    const manifestType = manifestRes.headers.get('content-type') || '';
+    if (!manifestRes.ok || manifestType.includes('text/html')) {
+      throw new Error(`Missing manifest for "${id}" — run "node scripts/build-sample-packs.mjs" or drop the public/packs/ folder in.`);
+    }
+    const manifest = await manifestRes.json();
+    // Cap concurrency so a 19-zone instrument (and fast switching) doesn't fire a
+    // burst of simultaneous requests that the dev server may refuse under load.
+    const zones = await mapLimit(manifest.zones || [], 4, async (z) => {
       const res = await cachedFetch(`${base}/${z.file}`);
       const type = res.headers.get('content-type') || '';
       if (!res.ok || type.includes('text/html')) {
@@ -69,7 +101,7 @@ export async function loadSampleInstrument(id) {
       }
       const buffer = await ctx.decodeAudioData(await res.arrayBuffer());
       return { rootMidi: z.midi, buffer };
-    }));
+    });
     zones.sort((a, b) => a.rootMidi - b.rootMidi);
     if (!zones.length) throw new Error(`Sample pack "${id}" has no zones`);
     return manifestToPatch(manifest, zones);
