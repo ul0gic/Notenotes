@@ -17,6 +17,7 @@ import {
 import { normalizeStereoWidth, panForVoice } from '../engine/StereoWidth.js';
 import { adsrEnvelopeValueAt, createEnvelopeParamCurve } from '../engine/EnvelopeCurves.js';
 import { pickZone, playableMidi } from './sampleZone.js';
+import { humanize } from '../engine/Humanize.js';
 
 /** Maximum simultaneous voices */
 const MAX_VOICES = 8;
@@ -440,7 +441,7 @@ export class WebAudioSynth {
     gainParam.setValueCurveAtTime(createEnvelopeParamCurve(velocity, velocity * sustain, 'decay'), now + attack, decay);
   }
 
-  _createOscillatorStack(midi, oscPatch, gainAmount, now, layerOffset = 0) {
+  _createOscillatorStack(midi, oscPatch, gainAmount, now, layerOffset = 0, extraDetune = 0) {
     const ctx = this.engine.ctx;
     const unison = this.patch.unison || {};
     const voices = Math.max(1, Math.min(5, Math.round(unison.voices || 1)));
@@ -455,7 +456,7 @@ export class WebAudioSynth {
       const spreadOffset = voices === 1 ? 0 : ((i / (voices - 1)) - 0.5) * spread;
       osc.type = oscPatch.type || this.patch.oscillator.type;
       osc.frequency.setValueAtTime(midiToFreq(midi), now);
-      osc.detune.setValueAtTime((oscPatch.detune || 0) + spreadOffset, now);
+      osc.detune.setValueAtTime((oscPatch.detune || 0) + spreadOffset + extraDetune, now);
       gain.gain.setValueAtTime((gainAmount ?? 1) / voices, now);
       osc.connect(gain);
       if (panner) {
@@ -572,6 +573,7 @@ export class WebAudioSynth {
     this._scheduleFilterEnvelope(filter, baseFilterFreq, now);
     filter.Q.setValueAtTime(p.filter.Q, now);
 
+    const h = humanize(0.7); // subtle per-note pitch drift + level variation
     const driveAmount = velocityAdjustedDrive(p.drive, velocity, p.velocityResponse);
     const drive = driveAmount > 0 ? ctx.createWaveShaper() : null;
     if (drive) {
@@ -581,15 +583,15 @@ export class WebAudioSynth {
 
     // Envelope (gain)
     const env = ctx.createGain();
-    this._scheduleAmpEnvelope(env.gain, p.envelope, velocity, now);
+    this._scheduleAmpEnvelope(env.gain, p.envelope, velocity * h.gainMul, now);
 
     // Connect: osc → filter → env → output
-    const { oscillators, oscillatorGains } = this._createOscillatorStack(midi, p.oscillator, 1, now);
+    const { oscillators, oscillatorGains } = this._createOscillatorStack(midi, p.oscillator, 1, now, 0, h.detuneCents);
     const { oscillators: oscillators2, oscillatorGains: oscillator2Gains } = p.oscillator2
       ? this._createOscillatorStack(midi, {
         type: p.oscillator2.type || p.oscillator.type,
         detune: p.oscillator2.detune || 0,
-      }, p.oscillator2.gain ?? 0.35, now, -1)
+      }, p.oscillator2.gain ?? 0.35, now, -1, h.detuneCents)
       : { oscillators: [], oscillatorGains: [] };
 
     const toneInput = drive || filter;
