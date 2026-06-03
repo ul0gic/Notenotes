@@ -271,6 +271,56 @@ function runStress(label, { patch, taps, sameNote = false, withRelease = true, a
   return { created, peakActive, peakVoices, peakSounding, leakedActive, leakedVoices, thrown, firstError, overlaps: ctx._overlaps.length };
 }
 
+// Chord stress: fire several notes AT THE SAME instant (a chord strum), the way
+// ScaleBoard's chord pads do (chordMidis.forEach(m => noteOn(m))). With the
+// Extensions toggle a single pad can be a 7-note chord, so chordSize goes up to 7.
+function runChordStress(label, { patch, strums = 200, chordSize = 4, hold = false, advanceBy = 0.012 }) {
+  const synth = new WebAudioSynth();
+  synth.init();
+  synth.loadPatch(patch);
+  const ctx = synth.engine.ctx;
+  ctx._overlaps = [];
+  const baseTotal = ctx._totalCreated;
+  const roots = [48, 50, 52, 53, 55, 57, 59, 60, 62, 64];
+  // A chordSize-note stack (root, 3rd, 5th, 7th, 9th, 11th, 13th).
+  const offsets = [0, 4, 7, 11, 14, 17, 21].slice(0, chordSize);
+  let peakActive = 0;
+  let peakSounding = 0;
+  let thrown = 0;
+  let firstError = null;
+  const held = [];
+  for (let n = 0; n < strums; n++) {
+    const root = roots[n % roots.length];
+    const chord = offsets.map(o => root + o);
+    try {
+      for (const m of chord) synth.noteOn(m, 0.8); // simultaneous — same `now`
+      if (hold) {
+        held.push(chord);
+        // Sustain pedal-ish: only release chords once we are holding several.
+        if (held.length > 3) { for (const m of held.shift()) synth.noteOff(m); }
+      } else {
+        for (const m of chord) synth.noteOff(m);
+      }
+    } catch (err) { thrown++; if (!firstError) firstError = err; }
+    ctx.advance(advanceBy);
+    peakActive = Math.max(peakActive, ctx._activeSources.size);
+    peakSounding = Math.max(peakSounding, synth.voiceStats().sounding);
+  }
+  ctx.advance(12);
+  const created = ctx._totalCreated - baseTotal;
+  console.log(`\n[${label}]`);
+  console.log(`  strums=${strums} chordSize=${chordSize} hold=${hold}  (=${strums * chordSize} noteOn)`);
+  console.log(`  nodes created: ${created}`);
+  console.log(`  peak active sources: ${peakActive}   peak SOUNDING voices: ${peakSounding}`);
+  console.log(`  AFTER flush -> active sources: ${ctx._activeSources.size}   _voices: ${synth._voices.size}   releasing: ${synth._releasing.size}`);
+  console.log(`  scheduling exceptions: ${thrown}${firstError ? '  firstError=' + firstError.message : ''}`);
+  console.log(`  automation overlap warnings: ${ctx._overlaps.length}`);
+  return {
+    created, peakActive, peakSounding, thrown, firstError,
+    leakedActive: ctx._activeSources.size, leakedVoices: synth._voices.size, overlaps: ctx._overlaps.length,
+  };
+}
+
 console.log('===== WebAudioSynth rapid-retrigger stress (mock AudioContext) =====');
 
 // 1) The reported scenario: oneShot sample, fast tapping across notes (each tap = noteOn+noteOff).
@@ -294,6 +344,12 @@ const r6 = runStress('FM (fm_epiano) · fast melodic tapping', { patch: PRESETS.
 const r7 = runStress('PLUCK (pluck_nylon) · fast melodic tapping', { patch: PRESETS.pluck_nylon, taps: 600 });
 const r8 = runStress('ADDITIVE (add_organ) · fast melodic tapping', { patch: PRESETS.add_organ, taps: 600 });
 
+// 9-11) CHORDS on a sampled instrument — the user's repro. Strum 4- and 7-note
+// chords fast (with release), plus sustained/held chord spam (no release).
+const c1 = runChordStress('oneShot sample · fast 4-note chord strumming', { patch: makeSamplePatch('oneShot'), strums: 300, chordSize: 4 });
+const c2 = runChordStress('oneShot sample · fast 7-note chord (Extensions) strumming', { patch: makeSamplePatch('oneShot'), strums: 300, chordSize: 7 });
+const c3 = runChordStress('oneShot sample · held 7-note chord spam (no release)', { patch: makeSamplePatch('oneShot'), strums: 300, chordSize: 7, hold: true });
+
 console.log('\n===== assertions =====');
 
 // MAX_SOUNDING_VOICES in WebAudioSynth is 16; allow a tiny slack for the
@@ -302,8 +358,9 @@ console.log('\n===== assertions =====');
 const SOUNDING_CAP = 16;
 const SOUNDING_SLACK = 4;
 
-const all = { r1, r2, r3, r4, r5, r6, r7, r8 };
+const all = { r1, r2, r3, r4, r5, r6, r7, r8, c1, c2, c3 };
 const sampleRuns = { r1, r2, r3, r4 };
+const chordRuns = { c1, c2, c3 };
 
 for (const [k, r] of Object.entries(all)) {
   assert.equal(r.thrown, 0, `${k}: scheduling threw ${r.thrown} time(s) (${r.firstError && r.firstError.message})`);
@@ -325,7 +382,17 @@ for (const [k, r] of Object.entries(sampleRuns)) {
   );
 }
 
+// Chords fire bursts of simultaneous noteOn; concurrent sample sources must
+// still stay bounded (a 7-note chord adds a small transient over the cap).
+for (const [k, r] of Object.entries(chordRuns)) {
+  assert.ok(
+    r.peakActive <= 40,
+    `${k}: ${r.peakActive} concurrent sample sources under chord bursts — chord polyphony not bounded`
+  );
+}
+
 console.log('PASS rapid retrigger keeps sounding voices bounded (no STATUS_BREAKPOINT pile-up)');
+console.log('PASS chords / simultaneous notes stay bounded under the sounding-voice cap');
 console.log('PASS no AudioParam scheduling exceptions or overlap hazards');
 console.log('PASS no node / voice leaks after playback finishes');
 console.log('\nALL AUDIO STRESS CHECKS PASSED');
