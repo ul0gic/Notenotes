@@ -5,12 +5,13 @@
 
 import { TransportState } from '../engine/Transport.js';
 import { ARP_MODES } from '../engine/ArpeggioManager.js';
-import { NOTE_CORRECTION_MODES, NOTE_NAMES, SCALES, normalizeMusicalContext, normalizeNoteCorrectionMode, scaleDescription, scaleFamilyLabel } from '../engine/MusicTheory.js';
+import { NOTE_NAMES, SCALES, normalizeMusicalContext, scaleDescription, scaleFamilyLabel } from '../engine/MusicTheory.js';
 import { ALLOWED_GROUPINGS, METER_PICKER_IDS, METER_PRESETS, meterLabel, normalizeMeter, pulseCountForMeter } from '../engine/Meter.js';
-import { normalizeProgressionContext, parseDegreeToken, progressionChoiceGroups, progressionLabel, progressionPreset } from '../engine/Progressions.js';
+import { normalizeProgressionContext, parseDegreeToken } from '../engine/Progressions.js';
 import { suggestNextChords } from '../engine/ChordSuggestions.js';
 import { TapTempo } from '../engine/TapTempo.js';
 import { ChoicePicker } from './ChoicePicker.js';
+import { progressionButtonLabel } from './progressionPicker.js';
 
 export class TransportBar {
   /**
@@ -31,9 +32,7 @@ export class TransportBar {
     this.onArmRecordClick = null;
     this.onProjectKeyChange = null;
     this.onProjectMeterChange = null;
-    this.onProjectProgressionChange = null;
     this.onPreviewChord = null;
-    this.onDroneToggle = null;
     this.onBpmChange = null;
     this.onMoreOpen = null;
     this._lastMoreToggle = 0;
@@ -43,19 +42,8 @@ export class TransportBar {
     this._projectMeter = normalizeMeter('4/4');
     this._projectProgression = normalizeProgressionContext();
     this._scalePicker = null;
-    this._progressionPicker = null;
     this._suggestPopover = null;
     this._tapTempo = new TapTempo();
-    this._droneActive = false;
-  }
-
-  setDroneActive(active) {
-    this._droneActive = !!active;
-    const button = this.el?.querySelector('#project-drone-toggle');
-    if (button) {
-      button.classList.toggle('is-active', this._droneActive);
-      button.setAttribute('aria-pressed', this._droneActive ? 'true' : 'false');
-    }
   }
 
   /**
@@ -103,16 +91,7 @@ export class TransportBar {
           <span class="choice-picker-button__label" id="project-scale-label">${this._scaleLabel(this._projectKey.scale)}</span>
           <span class="choice-picker-button__chevron" aria-hidden="true">▼</span>
         </button>
-        <button class="choice-picker-button transport-bar__progression-picker" id="project-progression-picker" type="button" aria-label="Progression changes" aria-haspopup="dialog">
-          <span class="choice-picker-button__label" id="project-progression-label">${this._progressionButtonLabel(this._projectProgression)}</span>
-          <span class="choice-picker-button__chevron" aria-hidden="true">▼</span>
-        </button>
         <button class="transport-bar__suggest" id="chord-suggest-button" type="button" aria-label="Suggest next chord" aria-haspopup="dialog" title="Gentle next-chord suggestions for this key">Suggest</button>
-        <button class="transport-bar__drone" id="project-drone-toggle" type="button" aria-pressed="false" aria-label="Drone — sustain the root of the key" title="Sustain the root of the key as a tonal anchor">Drone</button>
-        <span class="transport-bar__project-key-label">Correction</span>
-        <select id="project-correction-select" aria-label="Piano and MIDI scale correction">
-          ${Object.values(NOTE_CORRECTION_MODES).map(mode => `<option value="${mode.id}" ${mode.id === this._projectKey.correction ? 'selected' : ''}>${mode.label}</option>`).join('')}
-        </select>
         <span class="transport-bar__project-key-label">Meter</span>
         <select id="project-meter-select" aria-label="Project meter">
           ${METER_PICKER_IDS.map(id => {
@@ -230,21 +209,10 @@ export class TransportBar {
       event.preventDefault();
       this._openScalePicker(event.currentTarget);
     });
-    this.el.querySelector('#project-progression-picker')?.addEventListener('pointerdown', (event) => {
-      event.preventDefault();
-      this._openProgressionPicker(event.currentTarget);
-    });
     this.el.querySelector('#chord-suggest-button')?.addEventListener('pointerdown', (event) => {
       event.preventDefault();
       this._openSuggestPopover(event.currentTarget);
     });
-    this.el.querySelector('#project-drone-toggle')?.addEventListener('pointerdown', (event) => {
-      event.preventDefault();
-      const next = !this._droneActive;
-      const active = this.onDroneToggle ? this.onDroneToggle(next) : next;
-      this.setDroneActive(active);
-    });
-    this.el.querySelector('#project-correction-select')?.addEventListener('change', () => this._emitProjectKeyChange());
     this.el.querySelector('#project-meter-select')?.addEventListener('change', () => this._emitProjectMeterChange());
     this.el.querySelector('#project-meter-grouping-select')?.addEventListener('change', () => this._emitProjectMeterChange());
 
@@ -328,10 +296,6 @@ export class TransportBar {
     return SCALES[scaleName]?.name || SCALES.major.name;
   }
 
-  _progressionButtonLabel(value = {}) {
-    return `Changes: ${progressionLabel(value)}`;
-  }
-
   _scaleGroups() {
     const groups = new Map();
     Object.entries(SCALES)
@@ -369,24 +333,6 @@ export class TransportBar {
     this._scalePicker.open(anchor);
   }
 
-  _openProgressionPicker(anchor) {
-    this._progressionPicker?.close();
-    this._progressionPicker = new ChoicePicker({
-      title: 'Choose Changes',
-      groups: progressionChoiceGroups(this._projectKey),
-      selectedValue: this._projectProgression.enabled ? this._projectProgression.id : 'off',
-      searchPlaceholder: 'Search changes...',
-      onSelect: (value) => {
-        const next = value === 'off'
-          ? normalizeProgressionContext()
-          : normalizeProgressionContext(progressionPreset(value));
-        this.setProjectProgression(next);
-        if (this.onProjectProgressionChange) this.onProjectProgressionChange({ ...this._projectProgression });
-      },
-    });
-    this._progressionPicker.open(anchor);
-  }
-
   _currentProgressionDegreeIndex() {
     const prog = this._projectProgression;
     if (!prog?.enabled || !prog.steps?.length) return null;
@@ -405,7 +351,7 @@ export class TransportBar {
     const overlay = document.createElement('div');
     overlay.className = 'suggest-popover-backdrop';
     const intro = this._projectProgression?.enabled
-      ? `Where your changes could go from <strong>${this._progressionButtonLabel(this._projectProgression).replace('Changes: ', '')}</strong>`
+      ? `Where your changes could go from <strong>${progressionButtonLabel(this._projectProgression).replace('Changes: ', '')}</strong>`
       : `Some chords that sit well in <strong>${this._projectKey.root} ${this._scaleLabel(this._projectKey.scale)}</strong>`;
     overlay.innerHTML = `
       <div class="suggest-popover" role="dialog" aria-modal="true" aria-label="Next chord suggestions">
@@ -518,11 +464,9 @@ export class TransportBar {
   setProjectKey(context = {}) {
     this._projectKey = normalizeMusicalContext(context);
     const root = this.el?.querySelector('#project-root-select');
-    const correction = this.el?.querySelector('#project-correction-select');
     const scaleLabel = this.el?.querySelector('#project-scale-label');
     const scaleButton = this.el?.querySelector('#project-scale-picker');
     if (root) root.value = this._projectKey.root;
-    if (correction) correction.value = normalizeNoteCorrectionMode(this._projectKey.correction);
     if (scaleLabel) scaleLabel.textContent = this._scaleLabel(this._projectKey.scale);
     if (scaleButton) {
       scaleButton.title = scaleDescription(this._projectKey.scale);
@@ -532,18 +476,6 @@ export class TransportBar {
 
   setProjectProgression(value = {}) {
     this._projectProgression = normalizeProgressionContext(value);
-    const label = this.el?.querySelector('#project-progression-label');
-    const button = this.el?.querySelector('#project-progression-picker');
-    const text = progressionLabel(this._projectProgression);
-    if (label) label.textContent = this._progressionButtonLabel(this._projectProgression);
-    if (button) {
-      const title = this._projectProgression.enabled
-        ? `Changes: ${text}. Future chord-tone glow will follow this progression.`
-        : 'Changes: Off';
-      button.title = title;
-      button.setAttribute('aria-label', title);
-      button.classList.toggle('is-active', this._projectProgression.enabled);
-    }
   }
 
   setProjectMeter(meter = '4/4') {

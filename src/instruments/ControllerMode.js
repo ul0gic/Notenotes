@@ -11,7 +11,7 @@
  * held musical modifiers; sticks stay continuous pitch/mod controls.
  */
 
-import { getScaleNotes, normalizeMusicalContext, SCALES } from '../engine/MusicTheory.js';
+import { getScaleNotes, NOTE_CORRECTION_MODES, normalizeMusicalContext, normalizeNoteCorrectionMode, SCALES } from '../engine/MusicTheory.js';
 import { normalizeSoundTraits } from './WebAudioSynth.js';
 import {
   CONTROLLER_NOTE_MODIFIERS,
@@ -20,6 +20,7 @@ import {
   normalizeControllerModifier,
 } from '../engine/ControllerModifiers.js';
 import { ChoicePicker } from '../ui/ChoicePicker.js';
+import { openProgressionPicker, progressionButtonLabel } from '../ui/progressionPicker.js';
 
 const MODIFIER_SLOTS = [
   { key: 'leftBumper', short: 'LB', label: 'Left bumper', buttonIndex: 4, defaultValue: 'octaveDown' },
@@ -60,30 +61,25 @@ const TABS = [
     body: 'Assign held note modifiers to the four shoulder and trigger slots. Use the <strong>Controller</strong> button in the upper app toolbar to learn gamepad bindings and manage presets.',
   },
   {
-    id: 'dynamics',
-    label: 'Dynamics',
+    id: 'sound',
+    label: 'Sound',
     enabled: true,
-    body: 'Height Velocity (experimental). Split each pad and piano key into four height zones so where you strike sets how loud it plays. Off by default — existing instruments are unchanged until you turn it on.',
+    body: 'Project-wide tonal and harmonic settings — a sustained <strong>Drone</strong> anchor, <strong>Changes</strong> for follow-the-progression chord-tone glow, <strong>Correction</strong> that snaps out-of-scale piano/MIDI notes back into the current key, and <strong>Height Velocity</strong> which splits each pad and piano key into four height zones so where you strike sets how loud it plays.',
   },
   {
-    id: 'accessibility',
-    label: 'Accessibility',
+    id: 'mrt2',
+    label: 'MRT2',
     enabled: false,
   },
   {
-    id: 'seed',
-    label: 'Seed',
-    enabled: false,
-  },
-  {
-    id: 'custom',
-    label: 'Custom',
+    id: 'experiment',
+    label: 'Experiment',
     enabled: false,
   },
 ];
 
 export class ControllerMode {
-  constructor(synth, project, modManager, gamepadInput = null) {
+  constructor(synth, project, modManager, gamepadInput = null, soundOptions = {}) {
     this.synth = synth;
     this._project = project;
     this._modManager = modManager;
@@ -97,6 +93,19 @@ export class ControllerMode {
     this.onToneAssignmentChanged = null; // kept for CreativeMode save wiring
     this.onToneOverrideChanged = null;   // kept for active modifier indicator wiring
     this.onLabsChanged = null;           // Labs (Height Velocity) toggle -> autosave
+
+    // Sound-tab bindings. Each is a small dependency that the parent
+    // (typically main.js) wires in once. Defaults are no-ops so legacy
+    // callers that don't pass these still get a renderable Sound tab.
+    this._sound = {
+      getDroneEnabled: soundOptions.getDroneEnabled || (() => false),
+      onDroneToggle: soundOptions.onDroneToggle || (() => {}),
+      getProjectProgression: soundOptions.getProjectProgression || (() => ({ enabled: false })),
+      setProjectProgression: soundOptions.setProjectProgression || (() => {}),
+      getProjectKey: soundOptions.getProjectKey || (() => this._project?.musicalContext || normalizeMusicalContext()),
+      onProjectKeyChange: soundOptions.onProjectKeyChange || (() => {}),
+    };
+    this._progressionPicker = null;
 
     this.scaleName = 'major';
     this.rootNote = 'C';
@@ -170,11 +179,10 @@ export class ControllerMode {
     this.el.id = 'controller-mode';
 
     // The visible Labs layout is intentionally minimal:
-    //   1. A single "Labs" title card (no active tab name in the header).
-    //   2. A row of blank tab pills (no visible text on the pills).
+    //   1. A single "Labs" title card.
+    //   2. A segmented tab strip with the four sections.
     //   3. A single panel that shows the active tab's body.
-    // Tab identity lives in the panel content and the pills' aria-label /
-    // title attributes, not in the visible header.
+    // Tab identity lives in the visible tab labels and the panel content.
     this.el.innerHTML = `
       <header class="ctrlmode__header">
         <h2 class="ctrlmode__title">Labs</h2>
@@ -195,25 +203,25 @@ export class ControllerMode {
     if (this._activeTab === 'controller') {
       this._updateModifierHelp();
       this._attachGamepadInput();
+    } else if (this._activeTab === 'sound') {
+      this._refreshSoundTab();
     }
 
     return this.el;
   }
 
-  // Renders a tab button as a BLANK PILL — no visible text. The active tab
-  // is filled with the accent color, disabled tabs are outlined. The label
-  // and "Future: <name>" tooltip live in the aria-label and title
-  // attributes only, so the visible tab strip is a quiet row of markers
-  // and the user identifies the active tab by position and color.
+  // Renders a tab button with its label visible inside. The strip is styled
+  // as a segmented control: a single container with internal dividers; the
+  // active tab is the filled-accent segment, inactive tabs are transparent,
+  // disabled tabs are dimmed and non-clickable. The label is also kept in
+  // aria-label / title for assistive tech, with a "Future:" prefix on
+  // disabled tabs to mirror the placeholder card.
   _renderTabButton(tab) {
     const isActive = tab.id === this._activeTab;
     const classes = ['ctrlmode__tab'];
     if (isActive) classes.push('is-active');
     if (!tab.enabled) classes.push('is-disabled');
 
-    // Disabled tabs get a "Future:" prefix on the tooltip so the user
-    // understands the slot is a placeholder, not a broken button. The
-    // visible card in the panel reinforces this with a "Future" title.
     const titleText = !tab.enabled ? `Future: ${tab.label}` : tab.label;
     const attrs = [
       `id="ct-tab-${tab.id}"`,
@@ -230,7 +238,7 @@ export class ControllerMode {
       attrs.push('disabled');
     }
 
-    return `<button class="${classes.join(' ')}" ${attrs.join(' ')}></button>`;
+    return `<button class="${classes.join(' ')}" ${attrs.join(' ')}><span class="ctrlmode__tab-label">${this._escapeHtml(tab.label)}</span></button>`;
   }
 
   // Renders the body of the currently active tab. The disabled-tab branch
@@ -259,16 +267,8 @@ export class ControllerMode {
         <p class="ctrlmode__trigger-status" id="ct-trigger-status" aria-live="polite"></p>
       `;
     }
-    if (tab.id === 'dynamics') {
-      const on = !!this._project?.settings?.labs?.heightVelocity;
-      return `
-        <p class="ctrlmode__tab-content-desc">${tab.body}</p>
-        <label class="ctrlmode__toggle-row" style="display:flex;align-items:center;gap:10px;margin:10px 0;">
-          <input type="checkbox" id="ct-height-velocity" ${on ? 'checked' : ''} />
-          <span>Height Velocity</span>
-        </label>
-        <p class="ctrlmode__trigger-help">Strike higher on a pad or key for louder, lower for softer (four levels). Also available as the &ldquo;Velocity&rdquo; pad layout.</p>
-      `;
+    if (tab.id === 'sound') {
+      return this._renderSoundTabBody();
     }
     return '';
   }
@@ -309,8 +309,9 @@ export class ControllerMode {
       this._updateModifierHelp();
       this._updateModifierStatus();
     }
-    if (tabId === 'dynamics') {
-      this._bindDynamicsEvents();
+    if (tabId === 'sound') {
+      this._bindSoundEvents();
+      this._refreshSoundTab();
     }
   }
 
@@ -319,13 +320,15 @@ export class ControllerMode {
       const saved = typeof localStorage !== 'undefined' ? localStorage.getItem(ACTIVE_TAB_STORAGE_KEY) : null;
       // Only restore enabled tabs. Flipping a stub to enabled: true later
       // should not auto-promote a stale saved value until the user actually
-      // clicks that tab.
+      // clicks that tab. Legacy "dynamics" tab was folded into "sound" — map
+      // it forward so returning users land on the new Sound surface.
+      if (saved === 'dynamics') return 'sound';
       if (saved && TABS.find(t => t.id === saved && t.enabled)) return saved;
     } catch (_) {
       // localStorage may be unavailable (private mode, locked-down iframes).
       // Falling through to the default keeps the constructor safe.
     }
-    return 'controller';
+    return 'sound';
   }
 
   _saveActiveTab() {
@@ -354,6 +357,98 @@ export class ControllerMode {
     `;
   }
 
+  // Sound tab body. Hosts the project-wide tonal/harmonic controls that
+  // used to live in the top bar: Drone toggle, Changes picker, Correction
+  // select, and Height Velocity. Each control reads its initial value from
+  // the sound-options getters (which main.js wires to CreativeMode / the
+  // project) and dispatches back through the matching onX setters. The
+  // choices rendered by the picker are read against the current project
+  // key/scale at open time so they follow scale changes automatically.
+  _renderSoundTabBody() {
+    const tab = this._activeTabDef();
+    const on = !!this._sound.getDroneEnabled();
+    const progression = this._sound.getProjectProgression() || { enabled: false };
+    const projectKey = this._sound.getProjectKey() || normalizeMusicalContext();
+    const correction = normalizeNoteCorrectionMode(projectKey.correction);
+    return `
+      <p class="ctrlmode__tab-content-desc">${tab.body}</p>
+      <div class="ctrlmode__sound-grid">
+        <label class="ctrlmode__sound-row ctrlmode__sound-row--toggle">
+          <span class="ctrlmode__sound-label">Drone</span>
+          <button class="btn btn--ghost ctrlmode__sound-drone" id="ct-sound-drone" type="button"
+            aria-pressed="${on ? 'true' : 'false'}"
+            title="Sustain the root of the key as a tonal anchor">${on ? 'On' : 'Off'}</button>
+        </label>
+        <label class="ctrlmode__sound-row">
+          <span class="ctrlmode__sound-label">Changes</span>
+          <button class="choice-picker-button ctrlmode__sound-changes" id="ct-sound-changes" type="button"
+            aria-label="Project progression changes" aria-haspopup="dialog"
+            title="Future chord-tone glow will follow this progression">
+            <span class="choice-picker-button__label" id="ct-sound-changes-label">${this._escapeHtml(progressionButtonLabel(progression))}</span>
+            <span class="choice-picker-button__chevron" aria-hidden="true">▼</span>
+          </button>
+        </label>
+        <label class="ctrlmode__sound-row">
+          <span class="ctrlmode__sound-label">Correction</span>
+          <select class="ctrlmode__sound-correction" id="ct-sound-correction" aria-label="Piano and MIDI scale correction">
+            ${Object.values(NOTE_CORRECTION_MODES).map(mode => `
+              <option value="${this._escapeHtml(mode.id)}" ${mode.id === correction ? 'selected' : ''}>${this._escapeHtml(mode.label)}</option>
+            `).join('')}
+          </select>
+        </label>
+        <label class="ctrlmode__sound-row ctrlmode__sound-row--toggle">
+          <span class="ctrlmode__sound-label">Height Velocity</span>
+          <input type="checkbox" class="ctrlmode__sound-checkbox" id="ct-sound-height-velocity" ${!!this._project?.settings?.labs?.heightVelocity ? 'checked' : ''} />
+        </label>
+      </div>
+      <p class="ctrlmode__trigger-help">Drone, Changes, and Correction follow the project key; switching scale or root refreshes them automatically.</p>
+    `;
+  }
+
+  // Re-reads the sound state from the parent and updates the Sound tab DOM
+  // in place. Used by _setActiveTab() so re-entering the Sound tab (or
+  // receiving an external change) shows the latest values without a full
+  // panel re-render — though we DO re-render the panel when switching tabs.
+  _refreshSoundTab() {
+    if (!this.el) return;
+    const on = !!this._sound.getDroneEnabled();
+    const progression = this._sound.getProjectProgression() || { enabled: false };
+    const projectKey = this._sound.getProjectKey() || normalizeMusicalContext();
+    const correction = normalizeNoteCorrectionMode(projectKey.correction);
+
+    const droneBtn = this.el.querySelector('#ct-sound-drone');
+    if (droneBtn) {
+      droneBtn.textContent = on ? 'On' : 'Off';
+      droneBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      droneBtn.classList.toggle('is-on', on);
+    }
+    const changesLabel = this.el.querySelector('#ct-sound-changes-label');
+    if (changesLabel) {
+      const text = progressionButtonLabel(progression);
+      changesLabel.textContent = text;
+      const changesBtn = this.el.querySelector('#ct-sound-changes');
+      if (changesBtn) {
+        const title = progression?.enabled
+          ? `Changes: ${text.replace('Changes: ', '')}. Future chord-tone glow will follow this progression.`
+          : 'Changes: Off';
+        changesBtn.title = title;
+        changesBtn.setAttribute('aria-label', title);
+        changesBtn.classList.toggle('is-active', !!progression?.enabled);
+      }
+    }
+    const correctionSel = this.el.querySelector('#ct-sound-correction');
+    if (correctionSel) correctionSel.value = correction;
+    const hvCb = this.el.querySelector('#ct-sound-height-velocity');
+    if (hvCb) hvCb.checked = !!this._project?.settings?.labs?.heightVelocity;
+  }
+
+  // Public hook for the parent to push external state changes (e.g. when a
+  // chord-tone glow re-resolves the current progression). No-op when the
+  // Sound tab is not currently mounted.
+  refreshSoundTab() {
+    if (this._activeTab === 'sound') this._refreshSoundTab();
+  }
+
   _bindEvents() {
     this.el.querySelectorAll('.ctrlmode__tab:not([disabled])').forEach((btn) => {
       btn.addEventListener('pointerdown', (e) => {
@@ -362,21 +457,53 @@ export class ControllerMode {
       });
     });
     this._bindModifierEvents();
-    this._bindDynamicsEvents();
+    this._bindSoundEvents();
   }
 
-  _bindDynamicsEvents() {
-    const cb = this.el?.querySelector('#ct-height-velocity');
-    if (!cb) return;
-    cb.addEventListener('change', (e) => {
-      if (!this._project) return;
-      this._project.settings ||= {};
-      this._project.settings.labs = { ...(this._project.settings.labs || {}), heightVelocity: e.target.checked };
-      this.onLabsChanged?.();
-      // Refresh pad + piano surfaces so the zones/gridlines apply immediately.
-      window.dispatchEvent(new CustomEvent('settings-pads-changed'));
-      window.dispatchEvent(new CustomEvent('settings-piano-changed'));
-    });
+  _bindSoundEvents() {
+    const droneBtn = this.el?.querySelector('#ct-sound-drone');
+    if (droneBtn) {
+      droneBtn.addEventListener('pointerdown', (event) => {
+        event.preventDefault();
+        const next = !this._sound.getDroneEnabled();
+        this._sound.onDroneToggle(next);
+        this._refreshSoundTab();
+      });
+    }
+    const changesBtn = this.el?.querySelector('#ct-sound-changes');
+    if (changesBtn) {
+      changesBtn.addEventListener('pointerdown', (event) => {
+        event.preventDefault();
+        this._progressionPicker?.close();
+        openProgressionPicker(event.currentTarget, {
+          projectKey: this._sound.getProjectKey() || normalizeMusicalContext(),
+          currentProgression: this._sound.getProjectProgression() || { enabled: false },
+          onSelect: (value) => {
+            this._sound.setProjectProgression(value);
+            this._refreshSoundTab();
+          },
+        });
+      });
+    }
+    const correctionSel = this.el?.querySelector('#ct-sound-correction');
+    if (correctionSel) {
+      correctionSel.addEventListener('change', (event) => {
+        this._sound.onProjectKeyChange({ correction: normalizeNoteCorrectionMode(event.target.value) });
+        this._refreshSoundTab();
+      });
+    }
+    const hvCb = this.el?.querySelector('#ct-sound-height-velocity');
+    if (hvCb) {
+      hvCb.addEventListener('change', (event) => {
+        if (!this._project) return;
+        this._project.settings ||= {};
+        this._project.settings.labs = { ...(this._project.settings.labs || {}), heightVelocity: event.target.checked };
+        this.onLabsChanged?.();
+        // Refresh pad + piano surfaces so the zones/gridlines apply immediately.
+        window.dispatchEvent(new CustomEvent('settings-pads-changed'));
+        window.dispatchEvent(new CustomEvent('settings-piano-changed'));
+      });
+    }
   }
 
   _bindModifierEvents() {

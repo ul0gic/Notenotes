@@ -1521,16 +1521,21 @@
   font-weight: var(--font-weight-semibold);
 }
 
-/* Tabs are blank pills — no visible text. The active tab is filled
-   with the accent color, disabled tabs are outlined and dimmed.
-   The tab name lives in the aria-label/title attributes, not in the
-   visible button content. */
+/* Tabs render as a single segmented control — one rounded container
+   holding titled segments separated by thin dividers. The active segment
+   is filled with the accent color, inactive segments are transparent
+   over a slightly raised surface, and disabled segments are dimmed and
+   not clickable. The tab name is now visible inside the button. */
 .ctrlmode__tabs {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: var(--space-sm);
-  padding: var(--space-xs) 0;
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: stretch;
+  padding: 4px;
+  background: var(--surface-1);
+  border: var(--border-subtle);
+  border-radius: 999px;
+  gap: 0;
+  max-width: 100%;
   overflow-x: auto;
   scrollbar-width: none;
   touch-action: pan-x;
@@ -1542,25 +1547,38 @@
 
 .ctrlmode__tab {
   flex: 0 0 auto;
-  min-width: 36px;
-  min-height: 12px;
-  padding: 0;
+  min-width: 0;
+  min-height: 0;
+  padding: 6px 14px;
   background: transparent;
-  border: 1.5px solid var(--surface-4);
+  border: 0;
   border-radius: 999px;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
   cursor: pointer;
   transition: background var(--duration-fast) var(--ease-out),
-    border-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
     opacity var(--duration-fast) var(--ease-out);
 }
 
+.ctrlmode__tab + .ctrlmode__tab {
+  border-left: 1px solid var(--surface-3);
+}
+
 .ctrlmode__tab:hover:not([disabled]):not(.is-active) {
-  border-color: var(--accent);
+  color: var(--text-primary);
 }
 
 .ctrlmode__tab.is-active {
   background: var(--accent);
-  border-color: var(--accent);
+  color: var(--accent-contrast, #fff);
+}
+
+.ctrlmode__tab.is-active + .ctrlmode__tab,
+.ctrlmode__tab + .ctrlmode__tab.is-active {
+  border-left-color: transparent;
 }
 
 .ctrlmode__tab.is-disabled,
@@ -1569,9 +1587,105 @@
   cursor: not-allowed;
 }
 
-.ctrlmode__tab.is-disabled:hover,
-.ctrlmode__tab[disabled]:hover {
-  border-color: var(--surface-4);
+.ctrlmode__tab-label {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+/* Sound tab layout: each control lives in its own card-like row with a
+   1px stroke so the boundaries between Drone / Changes / Correction /
+   Height Velocity are obvious. The row is a flex container — label on
+   the left (fixed min-width), control on the right (content-sized with
+   a sensible min-width for Changes / Correction so they look like a
+   matched pair). The outer grid still becomes 2 columns on wide panels,
+   but each cell is its own bordered card. */
+.ctrlmode__sound-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-xs);
+  padding: 0;
+  background: transparent;
+  border: 0;
+}
+
+.ctrlmode__sound-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--surface-1);
+  border: 1px solid var(--surface-3);
+  border-radius: var(--radius-md);
+}
+
+.ctrlmode__sound-label {
+  flex: 0 0 auto;
+  min-width: 96px;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.ctrlmode__sound-row .choice-picker-button,
+.ctrlmode__sound-correction {
+  flex: 0 1 auto;
+  min-width: 180px;
+  max-width: 260px;
+  width: auto;
+  justify-content: space-between;
+  align-self: center;
+  margin-left: auto;
+}
+
+.ctrlmode__sound-correction {
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--surface-3);
+  color: var(--text-primary);
+  border: 1.5px solid var(--surface-4);
+  border-radius: var(--radius-md);
+  padding: 6px 28px 6px 10px;
+  font: inherit;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, var(--text-secondary) 50%),
+                    linear-gradient(135deg, var(--text-secondary) 50%, transparent 50%);
+  background-position: calc(100% - 14px) 50%, calc(100% - 9px) 50%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+
+.ctrlmode__sound-correction:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.ctrlmode__sound-drone {
+  flex: 0 0 auto;
+  min-width: 72px;
+  margin-left: auto;
+}
+
+.ctrlmode__sound-drone.is-on {
+  background: var(--accent);
+  color: var(--accent-contrast, #fff);
+  border-color: var(--accent);
+}
+
+input[type="checkbox"].ctrlmode__sound-checkbox {
+  flex: 0 0 auto;
+  margin: 0;
+  margin-left: auto;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+@media (min-width: 560px) {
+  .ctrlmode__sound-grid {
+    grid-template-columns: 1fr 1fr;
+    column-gap: var(--space-sm);
+  }
 }
 
 .ctrlmode__panel {

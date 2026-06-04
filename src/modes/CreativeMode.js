@@ -779,11 +779,18 @@ export class CreativeMode {
     this.aiSeedPopover?.refresh?.();
     // Re-pitch a running drone so the anchor follows the new key.
     if (this._droneSettings.enabled) this._applyDrone();
+    // Keep the Labs > Sound tab in sync with the new key (Correction, etc).
+    this.controllerMode?.refreshSoundTab?.();
   }
 
   /** Whether the drone anchor is currently sounding. */
   get droneEnabled() {
     return !!this._droneSettings.enabled;
+  }
+
+  /** Project progression, normalized. Used by the Labs > Sound tab. */
+  getProjectProgression() {
+    return this.project?.progression;
   }
 
   /**
@@ -800,6 +807,7 @@ export class CreativeMode {
     } else {
       this._stopDrone();
     }
+    this.controllerMode?.refreshSoundTab?.();
     return next;
   }
 

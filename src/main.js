@@ -62,6 +62,24 @@ class App {
     this.modeTabs = new ModeTabs();
     this.modManager = new ModulationManager(null);
     this.creativeMode = new CreativeMode(this.engine, this.transport, this.quantizer, this.store, null, this.modManager);
+
+    // The Labs > Sound tab needs to read project state and dispatch changes
+    // back into the project pipeline. CreativeMode constructs the
+    // ControllerMode internally; we attach the wiring here so the Sound tab
+    // can show live values and route edits through the same _setX paths as
+    // the rest of the app.
+    if (this.creativeMode?.controllerMode) {
+      this.creativeMode.controllerMode._sound = {
+        ...this.creativeMode.controllerMode._sound,
+        getDroneEnabled: () => !!this.creativeMode?.droneEnabled,
+        onDroneToggle: (enabled) => this.creativeMode?.setDrone(enabled),
+        getProjectProgression: () => this.creativeMode?.getProjectProgression?.() ?? normalizeProgressionContext(),
+        setProjectProgression: (value) => this._setProjectProgression(value),
+        getProjectKey: () => this._currentProjectMusicalContext?.() ?? this.project?.musicalContext ?? normalizeMusicalContext(),
+        onProjectKeyChange: (context) => this._setProjectMusicalContext(context, { source: 'labs-sound' }),
+      };
+    }
+
     this.canvasMode = null; // Created after project load
     this.editMode = null;   // Created after project load
     this.settingsPanel = null; // Created after project load
@@ -110,6 +128,7 @@ class App {
     this.transportBar.setProjectKey(this.project.musicalContext);
     this.transportBar.setProjectMeter(this.project.meter);
     this.transportBar.setProjectProgression(this.project.progression);
+    this.creativeMode?.controllerMode?.refreshSoundTab?.();
 
     // Create and render Canvas Mode (needs project)
     this.canvasMode = new CanvasMode(this.transport, this.project, this.undoManager, this.store);
@@ -240,7 +259,6 @@ class App {
     this.transportBar.onPreviewChord = (midis) => {
       this.creativeMode?.previewChord(midis);
     };
-    this.transportBar.onDroneToggle = (enabled) => this.creativeMode?.setDrone(enabled);
     this.transportBar.onBpmChange = (bpm) => {
       if (!this.project) return;
       this.project.bpm = bpm;
@@ -252,6 +270,12 @@ class App {
     this.creativeMode.onRecordArmChanged = (armed) => {
       this.transportBar.setRecordArmed(armed);
     };
+
+    // The ControllerMode is constructed inside CreativeMode and doesn't
+    // have direct access to the App's setters. Refresh its Sound-tab
+    // bindings so external state changes (key change, drone toggle) keep
+    // the Sound tab in sync.
+    this.creativeMode?.controllerMode?.refreshSoundTab?.();
 
     // Advance the Changes chord-tone glow through the progression as playback
     // crosses bars. This only moves which chord is "hot"; it never touches
@@ -467,6 +491,7 @@ class App {
     if (currentProgression.enabled && !progressionFitsContext(currentProgression, next)) {
       this.project.progression = normalizeProgressionContext();
       this.transportBar.setProjectProgression(this.project.progression);
+      this.creativeMode?.controllerMode?.refreshSoundTab?.();
       window.dispatchEvent(new CustomEvent('project-progression-changed', { detail: { ...this.project.progression } }));
       showToast('Changes turned off for this scale');
     }
@@ -526,6 +551,7 @@ class App {
     if (JSON.stringify(current) === JSON.stringify(next)) return;
     this.project.progression = next;
     this.transportBar.setProjectProgression(next);
+    this.creativeMode?.controllerMode?.refreshSoundTab?.();
     this.store?.scheduleAutoSave(this.project);
     window.dispatchEvent(new CustomEvent('project-progression-changed', { detail: { ...next } }));
     showToast(`Changes: ${progressionLabel(next)}`);
