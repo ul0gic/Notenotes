@@ -2207,3 +2207,59 @@ Both rules have explanatory comments in `instruments.css`.
 - `.ctrlmode__placeholder-eyebrow` (the small "Coming soon" uppercase
   label) is no longer used because the placeholder now leads with a
   larger "Future" title.
+
+## Rapid Release Crash Guard 0.1.111
+
+Windows Chrome `STATUS_BREAKPOINT` persisted on the Section A voice branch even
+after the sample natural-end guard. User repro expanded from Glockenspiel /
+samples to FM Piano and then to plain rapid pad 1 clicking, which made the
+sample-only theory insufficient. The shared branch-new path was rapid
+`noteOn()` followed by immediate `noteOff()` while the per-voice amp envelope
+was still inside `setValueCurveAtTime()`.
+
+### Root cause hypothesis pinned in tests
+
+`WebAudioSynth._releaseVoice()` and `_retireVoiceNow()` were using
+`AudioParam.cancelAndHoldAtTime(now)` before setting the release target. That is
+spec-shaped and useful in theory, but it appears to be a Chrome renderer hazard
+when called repeatedly against just-created voice gain envelopes under fast pad
+clicking. It also explains why both samples and FM patches could crash: both
+voice types schedule the same amp envelope and release through the same helper.
+
+The stress harness now records `MockParam.cancelAndHoldAtTime()` calls and
+asserts they stay at zero on the rapid-retrigger paths. Before the fix, the
+first fast sample stress produced 1192 `cancelAndHoldAtTime()` calls. After the
+fix, the harness keeps the previous source-count / leak invariants while also
+proving the rapid-release path does not use `cancelAndHoldAtTime()`.
+
+### Live engine behavior
+
+`src/instruments/WebAudioSynth.js` no longer uses `cancelAndHoldAtTime()` for
+per-voice amp releases. Instead it:
+
+- computes the audible level with `_envelopeLevelAt()` exactly as before,
+- clears that voice-owned gain automation from `voice.startTime` using
+  `cancelScheduledValues()`, which removes the active attack/decay curves
+  because each voice has its own GainNode,
+- restores the computed current level at `now`, then
+- applies the existing `setTargetAtTime(0, now, release / 3)` release shape.
+
+This is deliberately not the earlier failed fix that shortened ultra-fast tap
+releases. Sample release lengths, patch envelope values, and source stop tails
+are preserved, so Glockenspiel / sample quality should stay at the Opus branch
+baseline. The change only replaces the suspect Chrome API call with explicit
+per-voice automation clearing.
+
+### Validation notes
+
+Automated checks can pin the Web Audio scheduling invariant, but they cannot
+prove the real Chrome renderer will not abort. Manual validation still needs
+the user repro on Windows Chrome:
+
+1. Pick Glockenspiel or another sampled patch, click pad 1 rapidly.
+2. Pick FM Piano / FM Bell, click pad 1 rapidly.
+3. Repeat in Chord mode and Single mode.
+
+If a crash remains after this change, do not shorten releases or reduce sample
+quality again. Next investigation should instrument the input/event path and
+the exact browser console/crash behavior.

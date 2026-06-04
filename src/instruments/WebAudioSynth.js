@@ -1047,12 +1047,12 @@ export class WebAudioSynth {
       const g = voice.env && voice.env.gain;
       if (g) {
         const level = this._envelopeLevelAt(this.patch.envelope, now - (voice.startTime ?? now), voice.velocity ?? 1);
-        // cancelAndHoldAtTime cleanly truncates an in-flight envelope curve at
-        // `now`; falling back to cancelScheduledValues for older engines. This
-        // avoids scheduling a value INSIDE an active setValueCurve window (which
-        // Chrome treats as an error).
-        if (typeof g.cancelAndHoldAtTime === 'function') g.cancelAndHoldAtTime(now);
-        else g.cancelScheduledValues(now);
+        // This GainNode is per voice, so it is safe to clear its envelope from
+        // the voice start. Avoid cancelAndHoldAtTime here: rapid release while
+        // setValueCurveAtTime is active has caused Windows Chrome renderer
+        // aborts, while clearing the voice-owned automation first avoids
+        // scheduling inside an active curve without changing the audible level.
+        g.cancelScheduledValues(Math.max(0, voice.startTime ?? now));
         g.setValueAtTime(Math.max(0.0001, level), now);
         g.setTargetAtTime(0, now, rel / 3);
       }
@@ -1146,8 +1146,9 @@ export class WebAudioSynth {
     try {
       const g = voice.env && voice.env.gain;
       if (g) {
-        if (typeof g.cancelAndHoldAtTime === 'function') g.cancelAndHoldAtTime(now);
-        else g.cancelScheduledValues(now);
+        const level = this._envelopeLevelAt(this.patch.envelope, now - (voice.startTime ?? now), voice.velocity ?? 1);
+        g.cancelScheduledValues(Math.max(0, voice.startTime ?? now));
+        g.setValueAtTime(Math.max(0.0001, level), now);
         g.setTargetAtTime(0, now, 0.004);
       }
     } catch (_) {}

@@ -75,6 +75,7 @@ class MockParam {
   }
   cancelAndHoldAtTime(t) {
     this._finite('cancelAndHoldAtTime', t);
+    this.ctx._cancelAndHoldCalls.push(`${this.owner}.${this.name}@${t.toFixed(4)}`);
     // Drop events scheduled at/after t, and truncate any curve that spans t so a
     // value scheduled exactly at t sits on the (legal) boundary, not inside it.
     this._auto = this._auto
@@ -170,6 +171,7 @@ class MockAudioContext {
     this._totalCreated = 0;
     this._overlaps = [];
     this._illegalStops = []; // stop() calls on already-finished nodes (Chrome aborts on these)
+    this._cancelAndHoldCalls = []; // suspected Chrome renderer hazard under rapid release
     this._disconnectCount = 0;
     this.destination = new MockNode(this, 'Destination');
   }
@@ -245,6 +247,7 @@ function runStress(label, { patch, taps, sameNote = false, withRelease = true, a
   const ctx = synth.engine.ctx;
   ctx._overlaps = [];
   ctx._illegalStops = []; // reset per run (AudioEngine is a singleton; ctx is shared)
+  ctx._cancelAndHoldCalls = [];
 
   const baseTotal = ctx._totalCreated;
   let peakActive = 0;
@@ -282,7 +285,7 @@ function runStress(label, { patch, taps, sameNote = false, withRelease = true, a
   console.log(`  scheduling exceptions: ${thrown}${firstError ? '  firstError=' + firstError.message : ''}`);
   console.log(`  automation overlap warnings: ${ctx._overlaps.length}`);
   if (ctx._overlaps.length) console.log('   e.g. ' + ctx._overlaps.slice(0, 3).join('\n        '));
-  return { created, peakActive, peakVoices, peakSounding, leakedActive, leakedVoices, thrown, firstError, overlaps: ctx._overlaps.length, illegalStops: ctx._illegalStops.length };
+  return { created, peakActive, peakVoices, peakSounding, leakedActive, leakedVoices, thrown, firstError, overlaps: ctx._overlaps.length, illegalStops: ctx._illegalStops.length, cancelAndHoldCalls: ctx._cancelAndHoldCalls.length };
 }
 
 // Chord stress: fire several notes AT THE SAME instant (a chord strum), the way
@@ -295,6 +298,7 @@ function runChordStress(label, { patch, strums = 200, chordSize = 4, hold = fals
   const ctx = synth.engine.ctx;
   ctx._overlaps = [];
   ctx._illegalStops = [];
+  ctx._cancelAndHoldCalls = [];
   const baseTotal = ctx._totalCreated;
   const roots = [48, 50, 52, 53, 55, 57, 59, 60, 62, 64];
   // A chordSize-note stack (root, 3rd, 5th, 7th, 9th, 11th, 13th).
@@ -332,7 +336,7 @@ function runChordStress(label, { patch, strums = 200, chordSize = 4, hold = fals
   console.log(`  automation overlap warnings: ${ctx._overlaps.length}`);
   return {
     created, peakActive, peakSounding, thrown, firstError,
-    leakedActive: ctx._activeSources.size, leakedVoices: synth._voices.size, overlaps: ctx._overlaps.length, illegalStops: ctx._illegalStops.length,
+    leakedActive: ctx._activeSources.size, leakedVoices: synth._voices.size, overlaps: ctx._overlaps.length, illegalStops: ctx._illegalStops.length, cancelAndHoldCalls: ctx._cancelAndHoldCalls.length,
   };
 }
 
@@ -380,6 +384,7 @@ const chordRuns = { c1, c2, c3 };
 for (const [k, r] of Object.entries(all)) {
   assert.equal(r.thrown, 0, `${k}: scheduling threw ${r.thrown} time(s) (${r.firstError && r.firstError.message})`);
   assert.equal(r.illegalStops, 0, `${k}: ${r.illegalStops} stop()-after-finished call(s) — the STATUS_BREAKPOINT class bug`);
+  assert.equal(r.cancelAndHoldCalls, 0, `${k}: ${r.cancelAndHoldCalls} cancelAndHoldAtTime call(s) on rapid release — Chrome renderer hazard`);
   assert.equal(r.overlaps, 0, `${k}: ${r.overlaps} AudioParam overlap hazard(s)`);
   assert.equal(r.leakedActive, 0, `${k}: ${r.leakedActive} source node(s) never freed after flush (leak)`);
   assert.equal(r.leakedVoices, 0, `${k}: ${r.leakedVoices} voice(s) stuck in the held map after flush`);
