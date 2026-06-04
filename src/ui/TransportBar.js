@@ -9,7 +9,6 @@ import { NOTE_CORRECTION_MODES, NOTE_NAMES, SCALES, normalizeMusicalContext, nor
 import { ALLOWED_GROUPINGS, METER_PICKER_IDS, METER_PRESETS, meterLabel, normalizeMeter, pulseCountForMeter } from '../engine/Meter.js';
 import { normalizeProgressionContext, parseDegreeToken, progressionChoiceGroups, progressionLabel, progressionPreset } from '../engine/Progressions.js';
 import { suggestNextChords } from '../engine/ChordSuggestions.js';
-import { normalizeProgressionContext, progressionChoiceGroups, progressionLabel, progressionPreset } from '../engine/Progressions.js';
 import { TapTempo } from '../engine/TapTempo.js';
 import { ChoicePicker } from './ChoicePicker.js';
 
@@ -238,6 +237,7 @@ export class TransportBar {
     this.el.querySelector('#chord-suggest-button')?.addEventListener('pointerdown', (event) => {
       event.preventDefault();
       this._openSuggestPopover(event.currentTarget);
+    });
     this.el.querySelector('#project-drone-toggle')?.addEventListener('pointerdown', (event) => {
       event.preventDefault();
       const next = !this._droneActive;

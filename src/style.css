@@ -455,6 +455,7 @@ input, textarea, select, [contenteditable] {
 .suggest-chord__reason {
   font-size: var(--font-size-xs);
   color: var(--text-tertiary);
+}
 .transport-bar__tap {
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);

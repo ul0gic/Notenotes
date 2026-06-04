@@ -446,6 +446,7 @@ test('manual progression advance nudges and wraps the active step', () => {
   // Default delta is one step forward; empty progressions are a safe no-op.
   assert.equal(advanceProgressionContext(axis).activeStepIndex, 1);
   assert.equal(advanceProgressionContext({ enabled: false }).activeStepIndex, 0);
+});
 test('tap tempo derives BPM from inter-tap timing and clamps to range', () => {
   assert.equal(clampBpm(120), 120);
   assert.equal(clampBpm(10), TAP_MIN_BPM);   // too slow -> floor
@@ -486,6 +487,7 @@ test('TapTempo accumulates taps, ignores stale gaps, and resets cleanly', () => 
   fast.reset();
   assert.equal(fast.tapCount, 0);
   assert.equal(fast.bpm, null);
+});
 test('drone holds the root of the key and follows key changes', () => {
   // Disabled -> no notes.
   assert.deepEqual(droneNotesForContext({ root: 'C', scale: 'major' }, { enabled: false }), []);
@@ -510,6 +512,7 @@ test('drone settings normalize octave and flags safely', () => {
   assert.equal(normalizeDroneSettings({ octave: 'x' }).octave, DEFAULT_DRONE_OCTAVE); // invalid -> default
   assert.equal(normalizeDroneSettings({ enabled: 1, addFifth: 'yes' }).enabled, true);
   assert.equal(normalizeDroneSettings({ addFifth: 'yes' }).addFifth, true);
+});
 test('degree palettes expose 12 colors, normalize ids, and hand back copies', () => {
   // Every palette covers all 12 chromatic intervals.
   for (const palette of Object.values(DEGREE_PALETTES)) {
