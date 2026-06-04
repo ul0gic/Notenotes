@@ -120,7 +120,10 @@ class MockScheduledSource extends MockNode {
   }
   stop(when = this.ctx.currentTime) {
     if (!this._started) throw new Error(`${this.kind}.stop called before start (node ${this.id})`);
-    // Chrome: the most recent stop() call is the one applied.
+    // Chrome aborts (STATUS_BREAKPOINT class) if you stop() an already-finished
+    // node. The engine try/catches stop(), so a throw would be masked — record
+    // it instead so the test can assert the engine never does this.
+    if (this._endedFired) { this.ctx._illegalStops.push(`${this.kind}#${this.id}`); return; }
     this._stopped = true;
     this._stopTime = when;
   }
@@ -166,6 +169,7 @@ class MockAudioContext {
     this._createdByKind = {};
     this._totalCreated = 0;
     this._overlaps = [];
+    this._illegalStops = []; // stop() calls on already-finished nodes (Chrome aborts on these)
     this._disconnectCount = 0;
     this.destination = new MockNode(this, 'Destination');
   }
@@ -192,7 +196,14 @@ class MockAudioContext {
   advance(seconds) {
     this._now += seconds;
     for (const src of [...this._activeSources]) {
-      if (src._stopped && src._stopTime <= this._now) src._fireEnded();
+      // A non-looping BufferSource finishes on its own when its buffer ends,
+      // even if stop() was never called — model that natural end too.
+      let endAt = src._stopped ? src._stopTime : Infinity;
+      if (src.kind === 'BufferSource' && src.buffer && !src.loop) {
+        const natural = src._startTime + src.buffer.duration / (src.playbackRate.value || 1);
+        endAt = Math.min(endAt, natural);
+      }
+      if (endAt <= this._now) src._fireEnded();
     }
   }
 }
@@ -210,7 +221,9 @@ function makeSamplePatch(playbackMode = 'oneShot') {
     const buf = new MockBuffer(1, Math.floor(sr * durationSec), sr);
     return { rootMidi, buffer: buf };
   };
-  const sampleMap = [mk(48, 2.4), mk(60, 2.2), mk(72, 1.8)];
+  // Short buffers model real percussion/glockenspiel samples (the crash repro),
+  // whose BufferSources finish quickly on their own.
+  const sampleMap = [mk(48, 0.45), mk(60, 0.4), mk(72, 0.3)];
   return {
     type: 'sample',
     name: 'Test Grand',
@@ -230,7 +243,8 @@ function runStress(label, { patch, taps, sameNote = false, withRelease = true, a
   synth.init();
   synth.loadPatch(patch);
   const ctx = synth.engine.ctx;
-  ctx._overlaps = []; // reset per run (AudioEngine is a singleton; ctx is shared)
+  ctx._overlaps = [];
+  ctx._illegalStops = []; // reset per run (AudioEngine is a singleton; ctx is shared)
 
   const baseTotal = ctx._totalCreated;
   let peakActive = 0;
@@ -268,7 +282,7 @@ function runStress(label, { patch, taps, sameNote = false, withRelease = true, a
   console.log(`  scheduling exceptions: ${thrown}${firstError ? '  firstError=' + firstError.message : ''}`);
   console.log(`  automation overlap warnings: ${ctx._overlaps.length}`);
   if (ctx._overlaps.length) console.log('   e.g. ' + ctx._overlaps.slice(0, 3).join('\n        '));
-  return { created, peakActive, peakVoices, peakSounding, leakedActive, leakedVoices, thrown, firstError, overlaps: ctx._overlaps.length };
+  return { created, peakActive, peakVoices, peakSounding, leakedActive, leakedVoices, thrown, firstError, overlaps: ctx._overlaps.length, illegalStops: ctx._illegalStops.length };
 }
 
 // Chord stress: fire several notes AT THE SAME instant (a chord strum), the way
@@ -280,6 +294,7 @@ function runChordStress(label, { patch, strums = 200, chordSize = 4, hold = fals
   synth.loadPatch(patch);
   const ctx = synth.engine.ctx;
   ctx._overlaps = [];
+  ctx._illegalStops = [];
   const baseTotal = ctx._totalCreated;
   const roots = [48, 50, 52, 53, 55, 57, 59, 60, 62, 64];
   // A chordSize-note stack (root, 3rd, 5th, 7th, 9th, 11th, 13th).
@@ -317,7 +332,7 @@ function runChordStress(label, { patch, strums = 200, chordSize = 4, hold = fals
   console.log(`  automation overlap warnings: ${ctx._overlaps.length}`);
   return {
     created, peakActive, peakSounding, thrown, firstError,
-    leakedActive: ctx._activeSources.size, leakedVoices: synth._voices.size, overlaps: ctx._overlaps.length,
+    leakedActive: ctx._activeSources.size, leakedVoices: synth._voices.size, overlaps: ctx._overlaps.length, illegalStops: ctx._illegalStops.length,
   };
 }
 
@@ -364,6 +379,7 @@ const chordRuns = { c1, c2, c3 };
 
 for (const [k, r] of Object.entries(all)) {
   assert.equal(r.thrown, 0, `${k}: scheduling threw ${r.thrown} time(s) (${r.firstError && r.firstError.message})`);
+  assert.equal(r.illegalStops, 0, `${k}: ${r.illegalStops} stop()-after-finished call(s) — the STATUS_BREAKPOINT class bug`);
   assert.equal(r.overlaps, 0, `${k}: ${r.overlaps} AudioParam overlap hazard(s)`);
   assert.equal(r.leakedActive, 0, `${k}: ${r.leakedActive} source node(s) never freed after flush (leak)`);
   assert.equal(r.leakedVoices, 0, `${k}: ${r.leakedVoices} voice(s) stuck in the held map after flush`);

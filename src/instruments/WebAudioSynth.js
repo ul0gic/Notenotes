@@ -766,16 +766,18 @@ export class WebAudioSynth {
       env.connect(this._toneInput || this._output);
       source.start(now);
 
-      const voice = { source, filter, env, midi, startTime: now, velocity, sample: true };
-      // Register + wire identity-guarded teardown on the source's 'ended' event.
-      // Without prompt teardown, fast retriggering piles up BufferSource/filter/
-      // gain nodes faster than GC frees them (STATUS_BREAKPOINT/OOM).
+      // A non-looping BufferSource finishes by itself when its buffer ends and
+      // fires 'ended' (which tears the voice down). We record that natural-end
+      // time and do NOT pre-schedule a stop(): calling stop() again at/after a
+      // source's natural end targets an already-finished node, which Chrome can
+      // abort on (STATUS_BREAKPOINT) — the rapid-sample-retrigger crash. See
+      // _stopVoiceSources, which uses naturalEnd to never stop a finished source.
+      const playbackRate = source.playbackRate.value || 1;
+      const voice = {
+        source, filter, env, midi, startTime: now, velocity, sample: true,
+        naturalEnd: now + sampleBuffer.duration / playbackRate,
+      };
       this._registerVoice(voice, midi, source);
-
-      if (p.playbackMode === 'oneShot') {
-        const stopAt = now + (sampleBuffer.duration / source.playbackRate.value) + 0.05;
-        try { source.stop(stopAt); } catch (_) {}
-      }
       // Keep the number of still-ringing voices bounded (rapid-retrigger guard).
       this._enforceSoundingCap(now);
       return;
@@ -880,7 +882,10 @@ export class WebAudioSynth {
       env.connect(this._toneInput || this._output);
       source.start(now);
 
-      const voice = { source, filter, env, midi, startTime: now, velocity, pluck: true };
+      const voice = {
+        source, filter, env, midi, startTime: now, velocity, pluck: true,
+        naturalEnd: now + buf.duration, // KS buffer is non-looping; ends on its own
+      };
       this._registerVoice(voice, midi, source);
       this._enforceSoundingCap(now);
       return;
@@ -1056,17 +1061,47 @@ export class WebAudioSynth {
     this._stopVoiceSources(voice, now + rel + 0.1);
   }
 
-  /** Stop every source / oscillator a voice owns. Idempotent; never throws. */
+  /**
+   * Stop every source / oscillator a voice owns. Idempotent (each node is
+   * stopped at most once) and never throws.
+   *
+   * Crucially: a non-looping BufferSource (sample / pluck) finishes by itself at
+   * `voice.naturalEnd`. Calling stop() at or after that moment targets a node
+   * that has already ended — which Chrome can abort the renderer on
+   * (STATUS_BREAKPOINT). So for buffer sources we skip stop() once we're at/past
+   * the natural end, and otherwise clamp the stop time to just before it.
+   * Oscillators never self-finish, so they're always safe to stop once.
+   */
   _stopVoiceSources(voice, when) {
     if (!voice) return;
-    const stop = (node) => { if (node) { try { node.stop(when); } catch (_) {} } };
-    stop(voice.source);
-    stop(voice.osc); stop(voice.osc2);
-    for (const o of voice.oscillators || []) stop(o);
-    for (const o of voice.oscillators2 || []) stop(o);
-    if (voice.fmMod) stop(voice.fmMod);
-    if (voice.vibrato && voice.vibrato.lfo) stop(voice.vibrato.lfo);
-    if (voice.noise) stop(voice.noise.source);
+    const ctxNow = this.engine.ctx ? this.engine.ctx.currentTime : when;
+
+    // Stop a node at `when`. Re-stopping EARLIER is allowed (to cut a ringing
+    // voice short — that's how voice-stealing / the sounding cap keep polyphony
+    // down), but we never schedule a stop at/after the moment the node has
+    // already finished: calling stop() on a finished node can abort Chrome's
+    // renderer (STATUS_BREAKPOINT). `_nnEndsAt` tracks the node's effective end
+    // (its natural buffer end, or the earliest stop we've scheduled).
+    // Oscillators / looping buffers never self-end, so they pass naturalEnd = ∞.
+    const stopNode = (node, naturalEnd) => {
+      if (!node) return;
+      let endsAt = node._nnEndsAt;
+      if (endsAt === undefined) endsAt = (naturalEnd !== undefined ? naturalEnd : Infinity);
+      if (ctxNow >= endsAt - 0.004) { node._nnEndsAt = Math.min(endsAt, ctxNow); return; } // already ended / ending
+      let t = when;
+      if (t >= endsAt) t = endsAt - 0.004; // never at/after the natural (or prior) end
+      if (t < ctxNow) t = ctxNow;
+      try { node.stop(t); } catch (_) {}
+      node._nnEndsAt = t;
+    };
+
+    stopNode(voice.source, voice.naturalEnd); // sample / pluck BufferSource (has a natural end)
+    stopNode(voice.osc); stopNode(voice.osc2);
+    for (const o of voice.oscillators || []) stopNode(o);
+    for (const o of voice.oscillators2 || []) stopNode(o);
+    if (voice.fmMod) stopNode(voice.fmMod);
+    if (voice.vibrato && voice.vibrato.lfo) stopNode(voice.vibrato.lfo);
+    if (voice.noise) stopNode(voice.noise.source); // looping noise buffer — no natural end
   }
 
   /**
