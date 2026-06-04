@@ -35,10 +35,17 @@ import {
 } from './utils/FolderBackup.js';
 import { applyAccessibilityProfilesFromUrl, ensureAccessibilitySettings } from './ui/AccessibilityProfiles.js';
 import { projectMasterVolume, projectMetronomeVolume } from './engine/OutputVolume.js';
+import { crashBreadcrumb, installCrashBreadcrumbConsole } from './debug/CrashBreadcrumbs.js';
+import { APP_VERSION } from './version.js';
 
 if (typeof window !== 'undefined') {
   const params = new URLSearchParams(window.location.search);
   window.__notenotesDebug = params.has('debug');
+  installCrashBreadcrumbConsole();
+  crashBreadcrumb('app.boot', {
+    version: APP_VERSION,
+    userAgent: window.navigator?.userAgent || 'unknown',
+  });
 }
 
 if (import.meta.env.DEV && typeof window !== 'undefined') {

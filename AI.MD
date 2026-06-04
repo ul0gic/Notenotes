@@ -2263,3 +2263,81 @@ the user repro on Windows Chrome:
 If a crash remains after this change, do not shorten releases or reduce sample
 quality again. Next investigation should instrument the input/event path and
 the exact browser console/crash behavior.
+
+## Opt-In Crash Breadcrumbs 0.1.112
+
+The Windows Chrome `STATUS_BREAKPOINT` crash still reproduced after the
+`cancelAndHoldAtTime()` removal, including with Glockenspiel and rapid plain
+pad clicks. At that point the right next step is evidence gathering, not another
+audio-quality-reducing guard. Chrome renderer aborts often do not surface a
+catchable JavaScript exception, so this slice adds a tiny opt-in breadcrumb trail
+that persists the last pad/synth events to `localStorage` before the tab dies.
+
+### Activation and retrieval
+
+Crash logging is off by default. It is enabled by loading the app with
+`?crashlog=1`, which stores `notenotes-crashlog-enabled=1` in `localStorage`.
+Normal users do not run the logger, and the hot audio path returns immediately
+when the cached flag is false.
+
+After a crash and reload, open DevTools and run:
+
+```js
+window.notenotesCrashLog.text()
+```
+
+Useful helpers exposed by `src/debug/CrashBreadcrumbs.js`:
+
+- `window.notenotesCrashLog.enable()` / `.disable()` toggle logging.
+- `window.notenotesCrashLog.clear()` clears the saved trail before a fresh repro.
+- `window.notenotesCrashLog.dump()` returns the raw array.
+- `window.notenotesCrashLog.text()` returns a pasteable text form.
+
+The trail is capped at 160 entries by `normalizeBreadcrumbTrail()` so rapid pad
+clicks remain bounded. The smoke suite covers the cap/normalization helper.
+
+### Instrumented paths
+
+`src/main.js`
+
+- Installs the console helper during boot.
+- Logs `app.boot` with app version and user agent when crash logging is enabled.
+- Records `window.error` and `window.unhandledrejection` if a normal JS failure
+  happens before a renderer crash.
+
+`src/instruments/ScaleBoard.js`
+
+- Logs `scale.pointerdown` / `scale.pointerup` with pad index, MIDI note, pad
+  mode, pointer type, and active-pad count.
+- Logs `scale.pressPad.start` and `scale.pressPad.midis`, including whether the
+  pad was already active and which MIDI notes the mode resolved to.
+- Logs `scale.releasePad.start`, `scale.noteOn`, and `scale.noteOff`.
+
+`src/instruments/WebAudioSynth.js`
+
+- Logs `synth.noteOn.start` with patch name/type, MIDI note, velocity, audio
+  context state, same-note delta, and held/releasing counts.
+- Logs retrigger throttle, same-note retrigger release, and voice stealing.
+- Tags voices with `kind` (`sample`, `fm`, `pluck`, `synth`) and logs
+  `synth.voice.register`.
+- For samples, logs `synth.voice.sampleReady` with playable MIDI, root MIDI,
+  playback rate, and source buffer duration.
+- Logs `synth.noteOff`, `synth.voice.release`,
+  `synth.voice.stopSources`, `synth.voice.retireNow`, and
+  `synth.voice.ended`.
+
+### How to use the data
+
+The last few lines before the crash should show which boundary was reached:
+
+- Last event is `scale.pointerdown` or `scale.pressPad.start`: input/Pad routing
+  is crashing before synth allocation.
+- Last event is `synth.voice.sampleReady` but not `synth.voice.register`: source
+  creation/start may be the suspect.
+- Last event is `synth.voice.release` / `synth.voice.stopSources`: release/stop
+  scheduling remains suspect.
+- Last event is `synth.voice.ended`: natural-ended cleanup/disconnect may be the
+  suspect.
+
+Do not infer from silence alone: the renderer can abort between two adjacent
+breadcrumbs. Use multiple repro trails and compare the common last boundary.

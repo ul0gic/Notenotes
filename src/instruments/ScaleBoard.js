@@ -37,6 +37,7 @@ import './heightVelocity.css';
 import { showToast } from '../ui/Toast.js';
 import { syllabify, extractPlayableSyllables, sanitizePhraseInput } from './voice/syllabify.js';
 import { dwellSettings, tremorAllows } from '../ui/AccessibilityProfiles.js';
+import { crashBreadcrumb } from '../debug/CrashBreadcrumbs.js';
 
 const STEP_PLAY_DEFAULT_OCTAVE = 4;
 const STEP_PLAY_MIN_OCTAVE = 1;
@@ -1199,6 +1200,13 @@ export class ScaleBoard {
       pad.addEventListener('pointerdown', (e) => {
         e.preventDefault();
         this._cancelDwell(`pad:${i}`);
+        crashBreadcrumb('scale.pointerdown', {
+          index: i,
+          midi,
+          mode: this.padMode,
+          pointerType: e.pointerType || 'unknown',
+          activePads: this._activePadIndexes.size,
+        });
 
         const learnTarget = this._controllerLearnTargetForPad(i, midi);
         if (learnTarget && this._onControllerLearnTarget?.(learnTarget)) return;
@@ -1224,6 +1232,13 @@ export class ScaleBoard {
 
       const handleRelease = (e) => {
         e.preventDefault();
+        crashBreadcrumb('scale.pointerup', {
+          index: i,
+          midi,
+          mode: this.padMode,
+          pointerType: e.pointerType || 'unknown',
+          activePads: this._activePadIndexes.size,
+        });
         this.releasePad(i);
         this._dwellActivePads.delete(i);
       };
@@ -1287,6 +1302,13 @@ export class ScaleBoard {
   }
 
   pressPad(index, velocity = 0.8) {
+    crashBreadcrumb('scale.pressPad.start', {
+      index,
+      mode: this.padMode,
+      velocity: Number(velocity.toFixed?.(3) ?? velocity),
+      alreadyActive: this._activePadIndexes.has(index),
+      noteCount: this._notes.length,
+    });
     if (this.padMode === 'step') {
       this.triggerStepPlay();
       return;
@@ -1307,6 +1329,7 @@ export class ScaleBoard {
     if (this.padMode === 'root') {
       const rootMidi = this._rootMidiNear(midi);
       const midis = rootMidi === midi ? [midi] : [midi, rootMidi];
+      crashBreadcrumb('scale.pressPad.midis', { index, action: 'root', midis });
       this._activeRootDyads.set(index, midis);
       midis.forEach(m => this._noteOn(m, velocity));
       return;
@@ -1315,9 +1338,11 @@ export class ScaleBoard {
     const isChord = this.padMode === 'chords';
     if (isChord) {
       const chordMidis = this._getChordMidis(index);
+      crashBreadcrumb('scale.pressPad.midis', { index, action: 'chord', midis: chordMidis });
       this._activeChords.set(index, chordMidis);
       chordMidis.forEach(m => this._noteOn(m, velocity));
     } else {
+      crashBreadcrumb('scale.pressPad.midis', { index, action: 'single', midis: [midi] });
       this._noteOn(midi, velocity);
     }
   }
@@ -1432,6 +1457,12 @@ export class ScaleBoard {
   }
 
   releasePad(index) {
+    crashBreadcrumb('scale.releasePad.start', {
+      index,
+      mode: this.padMode,
+      active: this._activePadIndexes.has(index),
+      activePads: this._activePadIndexes.size,
+    });
     if (this.padMode === 'step') return;
     if (!this._activePadIndexes.has(index)) return;
     const pad = this.el?.querySelector(`.scaleboard__pad[data-index="${index}"]`);
@@ -1570,6 +1601,11 @@ export class ScaleBoard {
   }
 
   _noteOn(midi, velocity = 0.8) {
+    crashBreadcrumb('scale.noteOn', {
+      midi,
+      mode: this.padMode,
+      velocity: Number(velocity.toFixed?.(3) ?? velocity),
+    });
     if (this._onBeforeNoteOn) this._onBeforeNoteOn();
     this.synth.noteOn(midi, velocity);
     this._activePads.add(midi);
@@ -1588,6 +1624,7 @@ export class ScaleBoard {
   }
 
   _noteOff(midi) {
+    crashBreadcrumb('scale.noteOff', { midi, mode: this.padMode });
     this.synth.noteOff(midi);
     this._activePads.delete(midi);
     if (this._onNoteOff) this._onNoteOff(midi);

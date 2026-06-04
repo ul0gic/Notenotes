@@ -20,6 +20,7 @@ import { pickZone, playableMidi } from './sampleZone.js';
 import { humanize } from '../engine/Humanize.js';
 import { periodicWaveCoefficients } from '../engine/AdditiveWave.js';
 import { renderKarplusStrong } from '../engine/KarplusStrong.js';
+import { crashBreadcrumb } from '../debug/CrashBreadcrumbs.js';
 
 /** Maximum simultaneous HELD voices (keys currently down). */
 const MAX_VOICES = 8;
@@ -712,22 +713,43 @@ export class WebAudioSynth {
   noteOn(midi, velocity = 0.8, atTime) {
     if (!this._output || !this._toneInput) this.init();
     this.engine.unlockGesture?.();
-    if (!this._output) return;
+    if (!this._output) {
+      crashBreadcrumb('synth.noteOn.noOutput', { midi });
+      return;
+    }
 
     const ctx = this.engine.ctx;
     const now = atTime !== undefined ? atTime : ctx.currentTime;
     const p = this.patch;
+    const lastTrig = this._lastTriggerAt.get(midi);
+    crashBreadcrumb('synth.noteOn.start', {
+      midi,
+      velocity: Number(Number(velocity).toFixed(3)),
+      patch: p.name || p.id || 'unnamed',
+      type: p.type || 'synth',
+      ctxState: ctx.state,
+      deltaMs: lastTrig === undefined ? null : Math.round((now - lastTrig) * 1000),
+      held: this._voices.size,
+      releasing: this._releasing.size,
+    });
 
     // Per-note retrigger throttle: drop spurious rapid re-triggers of the SAME
     // note before they allocate a voice/BufferSource. Uses the audio clock, so a
     // chord (distinct notes at the same instant) is never throttled.
-    const lastTrig = this._lastTriggerAt.get(midi);
-    if (lastTrig !== undefined && (now - lastTrig) < MIN_RETRIGGER_SEC) return;
+    if (lastTrig !== undefined && (now - lastTrig) < MIN_RETRIGGER_SEC) {
+      crashBreadcrumb('synth.noteOn.throttled', {
+        midi,
+        deltaMs: Math.round((now - lastTrig) * 1000),
+        thresholdMs: Math.round(MIN_RETRIGGER_SEC * 1000),
+      });
+      return;
+    }
     this._lastTriggerAt.set(midi, now);
 
     // If this note is already playing, release the old copy quickly so a fast
     // retrigger doesn't leave a full-length duplicate ringing out.
     if (this._voices.has(midi)) {
+      crashBreadcrumb('synth.noteOn.retriggerRelease', { midi });
       this._releaseVoice(this._voices.get(midi), now, FAST_RETRIGGER_RELEASE);
     }
 
@@ -735,7 +757,10 @@ export class WebAudioSynth {
     if (this._voices.size >= MAX_VOICES) {
       const oldest = this._voiceQueue.shift();
       const stolen = oldest !== undefined ? this._voices.get(oldest) : null;
-      if (stolen) this._releaseVoice(stolen, now, FAST_STEAL_RELEASE);
+      if (stolen) {
+        crashBreadcrumb('synth.noteOn.steal', { midi, stolenMidi: stolen.midi });
+        this._releaseVoice(stolen, now, FAST_STEAL_RELEASE);
+      }
     }
 
     if (p.type === 'sample' && (p.sampleBuffer || (p.sampleMap && p.sampleMap.length))) {
@@ -775,8 +800,16 @@ export class WebAudioSynth {
       const playbackRate = source.playbackRate.value || 1;
       const voice = {
         source, filter, env, midi, startTime: now, velocity, sample: true,
+        kind: 'sample',
         naturalEnd: now + sampleBuffer.duration / playbackRate,
       };
+      crashBreadcrumb('synth.voice.sampleReady', {
+        midi,
+        playMidi,
+        sampleRoot,
+        playbackRate: Number(playbackRate.toFixed(4)),
+        bufferSec: Number(sampleBuffer.duration.toFixed(3)),
+      });
       this._registerVoice(voice, midi, source);
       // Keep the number of still-ringing voices bounded (rapid-retrigger guard).
       this._enforceSoundingCap(now);
@@ -836,7 +869,7 @@ export class WebAudioSynth {
       carrier.start(now);
       mod.start(now);
 
-      const voice = { oscillators: [carrier], fmMod: mod, fmModGain: modGain, vibrato, filter, env, midi, startTime: now, velocity };
+      const voice = { oscillators: [carrier], fmMod: mod, fmModGain: modGain, vibrato, filter, env, midi, startTime: now, velocity, kind: 'fm' };
       this._registerVoice(voice, midi, carrier);
       this._enforceSoundingCap(now);
       return;
@@ -884,6 +917,7 @@ export class WebAudioSynth {
 
       const voice = {
         source, filter, env, midi, startTime: now, velocity, pluck: true,
+        kind: 'pluck',
         naturalEnd: now + buf.duration, // KS buffer is non-looping; ends on its own
       };
       this._registerVoice(voice, midi, source);
@@ -936,7 +970,7 @@ export class WebAudioSynth {
     // Store voice. Dispose nodes once the voice's first oscillator stops (via
     // noteOff / stealing / panic), mirroring the sample path so rapid
     // retriggering can't pile up nodes.
-    const voice = { oscillators, oscillators2, vibrato, noise, filter, env, midi, startTime: now, velocity };
+    const voice = { oscillators, oscillators2, vibrato, noise, filter, env, midi, startTime: now, velocity, kind: 'synth' };
     this._registerVoice(voice, midi, oscillators[0]);
     this._enforceSoundingCap(now);
   }
@@ -948,8 +982,14 @@ export class WebAudioSynth {
    */
   noteOff(midi, atTime) {
     const voice = this._voices.get(midi);
-    if (!voice) return;
     const now = atTime !== undefined ? atTime : this.engine.ctx.currentTime;
+    crashBreadcrumb('synth.noteOff', {
+      midi,
+      found: !!voice,
+      held: this._voices.size,
+      releasing: this._releasing.size,
+    });
+    if (!voice) return;
     this._releaseVoice(voice, now, this.patch.envelope.release);
   }
 
@@ -1003,6 +1043,13 @@ export class WebAudioSynth {
     voice._releasing = false;
     this._voices.set(midi, voice);
     this._voiceQueue.push(midi);
+    crashBreadcrumb('synth.voice.register', {
+      midi,
+      kind: voice.kind || (voice.sample ? 'sample' : voice.pluck ? 'pluck' : 'synth'),
+      held: this._voices.size,
+      releasing: this._releasing.size,
+      naturalEndDeltaMs: Number.isFinite(voice.naturalEnd) ? Math.round((voice.naturalEnd - voice.startTime) * 1000) : null,
+    });
     if (endNode && typeof endNode.addEventListener === 'function') {
       endNode.addEventListener('ended', () => this._onVoiceEnded(voice), { once: true });
     }
@@ -1010,6 +1057,12 @@ export class WebAudioSynth {
 
   /** Terminal node finished — forget the voice and free its graph. */
   _onVoiceEnded(voice) {
+    crashBreadcrumb('synth.voice.ended', {
+      midi: voice?.midi,
+      kind: voice?.kind || (voice?.sample ? 'sample' : voice?.pluck ? 'pluck' : 'synth'),
+      held: this._voices.size,
+      releasing: this._releasing.size,
+    });
     this._forgetVoice(voice);
     this._disposeVoiceNodes(voice);
   }
@@ -1033,6 +1086,14 @@ export class WebAudioSynth {
    */
   _releaseVoice(voice, now, releaseSec) {
     if (!voice || voice._releasing) return;
+    crashBreadcrumb('synth.voice.release', {
+      midi: voice.midi,
+      kind: voice.kind || (voice.sample ? 'sample' : voice.pluck ? 'pluck' : 'synth'),
+      releaseMs: Math.round(Math.max(0.005, Number(releaseSec) || 0.005) * 1000),
+      ageMs: Math.round((now - (voice.startTime ?? now)) * 1000),
+      held: this._voices.size,
+      releasing: this._releasing.size,
+    });
     voice._releasing = true;
     // No longer a held voice (so it can't be re-stolen or double-released).
     if (this._voices.get(voice.midi) === voice) {
@@ -1075,6 +1136,12 @@ export class WebAudioSynth {
   _stopVoiceSources(voice, when) {
     if (!voice) return;
     const ctxNow = this.engine.ctx ? this.engine.ctx.currentTime : when;
+    crashBreadcrumb('synth.voice.stopSources', {
+      midi: voice.midi,
+      kind: voice.kind || (voice.sample ? 'sample' : voice.pluck ? 'pluck' : 'synth'),
+      whenDeltaMs: Math.round((when - ctxNow) * 1000),
+      naturalEndDeltaMs: Number.isFinite(voice.naturalEnd) ? Math.round((voice.naturalEnd - ctxNow) * 1000) : null,
+    });
 
     // Stop a node at `when`. Re-stopping EARLIER is allowed (to cut a ringing
     // voice short — that's how voice-stealing / the sounding cap keep polyphony
@@ -1137,6 +1204,13 @@ export class WebAudioSynth {
    */
   _retireVoiceNow(voice, now) {
     if (!voice) return;
+    crashBreadcrumb('synth.voice.retireNow', {
+      midi: voice.midi,
+      kind: voice.kind || (voice.sample ? 'sample' : voice.pluck ? 'pluck' : 'synth'),
+      ageMs: Math.round((now - (voice.startTime ?? now)) * 1000),
+      held: this._voices.size,
+      releasing: this._releasing.size,
+    });
     this._releasing.delete(voice);
     if (this._voices.get(voice.midi) === voice) {
       this._voices.delete(voice.midi);

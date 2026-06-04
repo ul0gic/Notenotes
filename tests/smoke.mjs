@@ -122,6 +122,7 @@ import {
   shapedDrumNoiseSample,
 } from '../src/engine/DrumSynthesis.js';
 import { auditProjectAudioAssets, createProject } from '../src/data/ProjectStore.js';
+import { normalizeBreadcrumbTrail } from '../src/debug/CrashBreadcrumbs.js';
 
 function test(name, fn) {
   try {
@@ -954,4 +955,14 @@ test('audio audit reports missing, orphaned, and backup readiness without mutati
   assert.equal(audit.bytesReferenced, 150);
   assert.equal(audit.bytesOrphaned, 200);
   assert.equal(audit.backupReady, false);
+});
+
+test('crash breadcrumb trail is bounded and normalizes entries', () => {
+  let trail = [];
+  for (let i = 0; i < 6; i += 1) {
+    trail = normalizeBreadcrumbTrail(trail, { t: i, tag: `event-${i}`, data: { i } }, 3);
+  }
+  assert.equal(trail.length, 3);
+  assert.deepEqual(trail.map(entry => entry.tag), ['event-3', 'event-4', 'event-5']);
+  assert.deepEqual(normalizeBreadcrumbTrail(null, { tag: 'safe' }, 2).map(entry => entry.tag), ['safe']);
 });
