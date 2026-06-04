@@ -39,6 +39,10 @@ const MAX_SOUNDING_VOICES = 16;
 const FAST_STEAL_RELEASE = 0.05;
 /** Release (seconds) applied to the previous copy when the same note retriggers. */
 const FAST_RETRIGGER_RELEASE = 0.06;
+/** Release used for accidental / machine-gun taps shorter than a real played note. */
+const FAST_TAP_RELEASE = 0.025;
+/** Taps shorter than this should not leave a long patch release tail behind. */
+const FAST_TAP_THRESHOLD = 0.12;
 
 /**
  * Sample voices are far heavier than synth oscillators — each is an
@@ -950,7 +954,7 @@ export class WebAudioSynth {
     const voice = this._voices.get(midi);
     if (!voice) return;
     const now = atTime !== undefined ? atTime : this.engine.ctx.currentTime;
-    this._releaseVoice(voice, now, this.patch.envelope.release);
+    this._releaseVoice(voice, now, this._releaseSecondsForVoice(voice, now, this.patch.envelope.release));
   }
 
   /**
@@ -1058,7 +1062,19 @@ export class WebAudioSynth {
       }
     } catch (_) { /* scheduling is best-effort; never let it bubble into input handlers */ }
 
-    this._stopVoiceSources(voice, now + rel + 0.1);
+    this._stopVoiceSources(voice, now + rel + this._sourceStopTailSeconds(rel));
+  }
+
+  _releaseSecondsForVoice(voice, now, releaseSec) {
+    const rel = Math.max(0.005, Number(releaseSec) || 0.005);
+    const heldFor = Math.max(0, now - (voice?.startTime ?? now));
+    if (heldFor < FAST_TAP_THRESHOLD) return Math.min(rel, FAST_TAP_RELEASE);
+    return rel;
+  }
+
+  _sourceStopTailSeconds(releaseSec) {
+    const rel = Math.max(0.005, Number(releaseSec) || 0.005);
+    return Math.min(0.06, Math.max(0.012, rel * 0.5));
   }
 
   /**
@@ -1088,11 +1104,13 @@ export class WebAudioSynth {
       let endsAt = node._nnEndsAt;
       if (endsAt === undefined) endsAt = (naturalEnd !== undefined ? naturalEnd : Infinity);
       if (ctxNow >= endsAt - 0.004) { node._nnEndsAt = Math.min(endsAt, ctxNow); return; } // already ended / ending
+      if (node._nnStopScheduled) return;
       let t = when;
       if (t >= endsAt) t = endsAt - 0.004; // never at/after the natural (or prior) end
       if (t < ctxNow) t = ctxNow;
       try { node.stop(t); } catch (_) {}
       node._nnEndsAt = t;
+      node._nnStopScheduled = true;
     };
 
     stopNode(voice.source, voice.naturalEnd); // sample / pluck BufferSource (has a natural end)
