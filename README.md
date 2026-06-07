@@ -6,7 +6,7 @@
 
 [**Try it now**](https://zeidalidiez.github.io/Notenotes/) | [Report an idea](https://github.com/zeidalidiez/Notenotes/issues/new) | [Contribute](#-contributing)
 
-![Notenotes - Pads view](labels.png)
+
 
 </div>
 
