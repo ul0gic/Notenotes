@@ -19,36 +19,36 @@ Notenotes is a pre-DAW. Think of it as the napkin sketch before you sit down at 
 I built this app primarily to experiment with music myself, and to understand ways to think about music outside of the constraints of what I've learned in music theory. I am a long time musician who has trouble putting ideas into a DAW, so I needed a noodling board of sorts. This is not ever meant to replace a DAW, and as such I don't want to focus on production and effects. In my head you come up with a hook on Notenotes and then you build it into a song elsewhere. 
 
 
-**Color over notation** Beats can be colors. Pads can be colors. I want people to read songs in different ways.
+**Color and shapes alongside notation** Beats can be colors. Pads can be colors. I want people to read songs in different ways while keeping things music legible.
 
-**Unconventional instruments** Plug in a controller - the buttons become your scale. Extremely intuitive, easy to pick up.
+**Unconventional instruments** Plug in a controller - the buttons become your scale. Extremely intuitive, easy to pick up. 
 
-**Always in scale** Lock the pads to a key to narrow your options to the notes you need to see. 
+**Stay in scale, if you want** Lock the pads to a key to narrow your options to the notes you need to see. 
 
-**Songs canvas** Drag blocks of sound onto a simplified, minimalistic canvas grid.
+**Snippets on a Canvas** Drag blocks of sound onto a simple, minimalistic yet customizable canvas grid.
  
 **Local, offline** Runs in your computer and does not require anything, not even an online connection.
 
 
 ---
 
-##  Try it in 10 seconds
+##  Try it now, on your browser
 
 > **Live app:** [zeidalidiez.github.io/Notenotes](https://zeidalidiez.github.io/Notenotes/)
 
 No install. Click a pad. You're making music.
 
-It's a Progressive Web App. In Chrome, use the three-dot menu, then Cast, save, and share, then Install page as app. In Edge, use Apps, then Install this site as an app. In Safari, use Share, then Add to Home Screen. The current app version is shown in Settings, and Settings checks the app's public version file on GitHub so it can tell you when your browser is hanging onto an old cached build.
+It's a Progressive Web App. You may install it locally or not, your choice. 
 
 ---
 
 ##  A quick tour
 
-### Create - the jam space
+## Create - the jam space
 
 ![Create mode - pads, instruments, and record](readme_images/createmode.gif)
 
-Pick a scale. Mash the pads. Switch instruments mid-loop. Press record, jam, press stop - your loop becomes a snippet.
+Pick a scale, meter and patch. Mash the pads or switch to the full piano. Switch instruments mid-loop. Press record, jam, press stop - whatever you play becomes your snippet.
 
 ### Scales - in-key, always
 
@@ -56,13 +56,13 @@ Pick a scale. Mash the pads. Switch instruments mid-loop. Press record, jam, pre
 
 Pick a key and scale in the top bar. Every press on a pad, every note on the piano, every drum hit is in key. You can't pick a wrong note - the app won't let you. Step Play, Keys, and Pad mode all read from the same scale, so changing the key once updates everything.
 
-### Canvas - composition as collage
+## Canvas - composition as collage
 
 ![Canvas mode - dragging snippets onto a multi-track timeline](readme_images/canvas.gif)
 
 Drag your captured snippets onto typed tracks. MIDI goes on MIDI tracks, drums go on drum tracks, and audio goes on audio tracks. Move them, mute them, pan them, layer them, or use the Time tool to flip a clip into half-time or double-time without rewriting the original snippet. Hit play and listen to the song you didn't know you were writing.
 
-### Inspect - when you're ready for detail
+## Inspect - when you're ready for detail
 
 ![Inspect mode - piano roll editor for refining notes](readme_images/inspect.gif)
 
@@ -98,7 +98,7 @@ Plug in any USB or Bluetooth controller. The Controller Lab (under **Labs** in t
 
 Plus: **16 synth presets** split into Chip and Modern families, picked from the same searchable library pattern as scales. Chip stays punchy and direct; Modern is voiced fuller with supporting oscillators, light unison, curved envelopes, filter movement, key tracking, restrained patch drive, velocity-aware brightness, tasteful stereo spread, and a subtle master glue stage so harder MIDI notes speak with a little more bite and held notes do not sit dead-center. **Tone** controls shape sound without becoming a full DAW, and the entire instrument layer is [pluggable](#-build-your-own-instrument).
 
-### For someone who wants a different perspective into the world of music.
+### For someone who wants a different perspective into the world of music. These options are turned off by default for the most part, and must be enabled. 
 
 - **Scale-locked pads** - every press is in key. You can't pick a wrong note. Turn on **Extensions** to keep the scale going into the next octave without turning it into a theory quiz. The old dead-end Custom mode is gone; Layout now starts the cleaner modular-pad direction with balanced equal-pad templates like Fit, Compact, and Rows, plus more expressive templates like Big Tonic and Thumb-friendly, while keeping the pads as real buttons.
 - **Step Play** - a Pads mode for one-switch or one-key playing. Pick notes from the current scale in the chip editor, then hit the large Step button, any performance key, or a MIDI note to advance through them while Notenotes records your timing. The picker stays scale-aware, but saved steps are fixed notes, so changing key, scale, or Pad octave later does not rewrite your little sequence. The note picker has its own sane octave carousel from 1 to 6 instead of inheriting the Pads octave or wandering into unusable ranges. If a saved note falls outside the current scale, it keeps playing and gets a red `OUT` badge instead of silently changing. Individual steps can also carry an alternate note that plays every other pass through the loop. When degree colors are enabled, Step Play uses the same colors as the other pad surfaces, and the editor has Undo plus explicit Save/Cancel actions so a stray outside tap does not throw away work. Pair it with Inspect's **Fit Rhythm** tool when you want the pitches you entered to land cleanly in a bar.
@@ -171,47 +171,35 @@ These are the ideas that drive the project. Some are coded, some are sketches, s
 
 ### More ways to create
 - [ ] **Mic-to-midi** - Sound into the mic, the app transcribes it as MIDI you can edit.
-- [ ] **Tap-to-rhythm** - the transport now has a **Tap** button: tap a steady beat and the BPM is set from your timing (a long pause starts a fresh count). Seeding a beat from taps is the next step.
 - [ ] **MIDI device support** - bring your own keyboard, pad controller, or wind instrument.
 - [ ] **Webcam/Wiimote motion controls** - Movement to modulate, other potential uses.
 - [ ] **Touch + accelerometer** - on mobile, tilt for modulation, tap velocity for dynamics.
 - [ ] **Foot pedals & accessibility switches** - every input becomes an instrument.
-- [ ] **Lyric notepad** - write words next to the notes they fit.
+- [ ] **Lyrics support** - write words next to the snippets they fit, visible in the inspector allowing you to show when each word comes in and how long it lasts. Attach lyrics to the snippets. 
 
 
 ###  Sound and color
-- [x] **Per-beat colors** in the background visualizer.
-- [ ] **Per-pad colors** - paint Pads however helps you remember.
-- [x] **Color-blind safe palettes** as a first-class option. The Layout degree-color panel has a **Palette** picker: Vivid (the original), Color-blind safe (distinct for red-green and blue-yellow vision), and a Brightness ramp whose lightness increases by degree so the colors stay orderable for any vision. You can still hand-tweak individual degree colors after picking a palette.
+
 - [ ] **Synesthesia mode** - clips on the Canvas glow their note color as they play.
 - [ ] **Color-strip notation** as an alternative to the piano roll.
 
 ### Safety nets for those who need them
-- [x] **Scale lock** on the pads.
-- [x] **Progression / chord context** - the project has a quiet, backward-compatible degree-based progression model, a compact Changes picker in the top bar, compatible-scale filtering, and adjustable chord-tone glow on Pads and Piano. The glow now advances through the progression as playback crosses bars, honoring each step's bar length and looping, while old saved projects keep their frozen step. Next: a manual step-control surface for stepping changes by hand.
 - [ ] **Microtonal Pads mode** - true quarter-tone maqam/raga support needs a deliberate pitch-label, MIDI-export, ABC-export, AI-schema, and controller-binding design instead of being slipped in as float scale intervals.
-- [X] **Drone mode** - sustain the root of your key in the background as a tonal anchor.
-- [x] **Suggest-next-chord** - a **Suggest** button in the top bar opens gentle next-chord hints for the current key and scale. When Changes are on it leads with the upcoming chord in your progression, then offers a few functional alternatives; tap one to hear it. It never changes what you play.
 
 ### Rhythm and meter
-- [x] **Meter belongs with key and scale** - the top bar now holds the project meter as a first-class project setting.
-- [x] **Simple project meters** - 2/4, 3/4, 4/4, and 5/4 are supported as project-level timing.
-- [x] **Compound meter presets** - 6/8, 9/8, and 12/8 are supported with felt pulses, grouped canvas lines, matching beat dots, and export timing that does not pretend they are just longer 4/4.
-- [x] **Asymmetric meter presets** - 5/8 and 7/8 are supported with visible grouping choices, so 7/8 can be 2+2+3, 2+3+2, or 3+2+2 instead of one vague uneven bar.
-- [x] **Clear pulse behavior** - in compound meters, BPM means the big felt pulse. 6/8 at 120 BPM means two dotted-quarter pulses per bar, not six frantic eighth-note clicks.
-- [ ] **No random time-signature soup** - I do not want a giant custom meter box that technically works but teaches the wrong idea. Fewer choices that feel right beats a dropdown full of confusing math.
 - [ ] **Meter maps later** - one Canvas has one project timing for now. Changing meter mid-song is a real feature, but it needs a proper design instead of a rushed checkbox.
+- [ ] **Rhythm Helpers** - 
 
 ### Sharing
-- [x] **MIDI and WAV export** alongside ABC and sheet music.
 - [ ] **MP3 export** once there is a reliable browser encoder path.
+- [ ] **Visual export** Stage GIF/Video capture with audio and export.
+- [ ] **Invite a friend** Send a link with a snippet to someone, if they have saved data it adds the snippet to their data, if they don't it starts them with the snippet. 
 
 
 
 ### Expanding sound
 - [ ] **Found-sound recorder** - sample your environment, drop it into the kit.
 - [ ] **Body percussion** - claps and snaps recognized via mic become a drum lane.
-- [ ] **User samples** - drag-and-drop your own audio as instruments.
 - [ ] **More synth presets and kits** - community-contributed.
 
 If your idea isn't here, **add it.** This list is the project.
