@@ -190,7 +190,7 @@ These are the ideas that drive the project. Some are coded, some are sketches, s
 
 ###  Sound and color
 
-- [x] **Synesthesia mode** - a **Colors** toggle on the Canvas toolbar makes each clip glow its note color as the playhead crosses it. The color comes from the clip's dominant scale degree in the same degree-color palette the pads and piano use, so the whole app reads in one color language.
+- [ ] **Expanded lyrics mode** - Attach lyrics to each individual midi note in the snippet. 
 - [ ] **Color-strip notation** as an alternative to the piano roll.
 
 ### Safety nets for those who need them
@@ -203,12 +203,10 @@ These are the ideas that drive the project. Some are coded, some are sketches, s
 ### Sharing
 - [ ] **MP3 export** once there is a reliable browser encoder path.
 - [ ] **Visual export** Stage GIF/Video capture with audio and export.
-- [x] **Invite a friend** Every MIDI/drum snippet has a **Share** button that copies a link. Open the link and the snippet merges into your library (or starts you off with it if you have no saved data). The note data rides inside the link itself, so there is no server and nothing to upload - audio snippets are not shareable this way. 
 
 
 
 ### Expanding sound
-- [ ] **Found-sound recorder** - sample your environment, drop it into the kit.
 - [ ] **Body percussion** - claps and snaps recognized via mic become a drum lane.
 - [ ] **More synth presets and kits** - community-contributed.
 
